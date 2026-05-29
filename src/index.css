@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@import "video.js/dist/video-js.css";
+@import "videojs-ima/dist/videojs.ima.css";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-slate-950: #020617;
+  --shadow-premium: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 antialiased overflow-x-hidden;
+  }
+  h1, h2, h3, h4, .font-display {
+    @apply font-display tracking-tight;
+  }
+  /* Force CPX notification to be on top and fixed */
+  #notification, [id^="cpx-research"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 99999 !important;
+    pointer-events: none; /* Allow clicking through the container if it's empty */
+  }
+  
+  #notification > *, [id^="cpx-research"] > * {
+    pointer-events: auto; /* Re-enable clicks for the actual notification content */
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white border border-slate-200/50 shadow-premium;
+  }
+  
+  .dark-glass-card {
+    @apply bg-slate-900 border border-white/10 shadow-2xl;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-linear-to-r from-slate-900 to-slate-600;
+  }
+  
+  .premium-blur {
+    @apply absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full pointer-events-none -z-10;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, rgba(147, 51, 234, 0.06) 40%, transparent 70%);
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

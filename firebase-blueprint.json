@@ -1,0 +1,188 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with behavioral tracking and tiered balances",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin", "advertiser"] },
+        "pendingBalance": { "type": "number", "description": "Funds awaiting cooldown/verification" },
+        "withdrawableBalance": { "type": "number", "description": "Cleared funds available for withdrawal" },
+        "behavioralTags": { "type": "array", "items": { "type": "string" }, "description": "Interests like tech, finance, etc." },
+        "demographics": {
+          "type": "object",
+          "properties": {
+            "deviceType": { "type": "string" },
+            "location": { "type": "string" },
+            "age": { "type": "number" }
+          }
+        },
+        "securityMetrics": {
+          "type": "object",
+          "properties": {
+            "lastIp": { "type": "string" },
+            "deviceFingerprint": { "type": "string" },
+            "isSuspended": { "type": "boolean" },
+            "suspensionReason": { "type": "string" }
+          }
+        },
+        "referralCode": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "pendingBalance", "withdrawableBalance"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "B2B Advertiser-defined tasks with budget tracking",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "advertiserId": { "type": "string" },
+        "title": { "type": "string" },
+        "totalBudget": { "type": "number" },
+        "remainingBudget": { "type": "number" },
+        "userPayout": { "type": "number", "description": "Reward after platform split" },
+        "platformMargin": { "type": "number", "description": "Calculated 30% margin" },
+        "targetDemographics": { "type": "array", "items": { "type": "string" } },
+        "tag": { "type": "string", "description": "Label for user behavioral tracking" },
+        "link": { "type": "string", "description": "Affiliate or external link" },
+        "videoUrl": { "type": "string", "description": "Direct video link or embed" },
+        "imageUrl": { "type": "string", "description": "Rich media image URL" },
+        "shareText": { "type": "string", "description": "Pre-filled text for social media sharing" },
+        "enableSocialShare": { "type": "boolean", "description": "Whether to show social share buttons" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"] }
+      },
+      "required": ["advertiserId", "totalBudget", "userPayout", "status"]
+    },
+    "TaskCompletion": {
+      "title": "Task Completion",
+      "description": "Record of a user completing a task",
+      "type": "object",
+      "properties": {
+        "completionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "rewardEarned": { "type": "number" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["userId", "taskId", "status", "rewardEarned", "submittedAt"]
+    },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "User request to withdraw earnings via bank transfer",
+      "type": "object",
+      "properties": {
+        "withdrawalId": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "completed", "rejected"] },
+        "bankDetails": {
+          "type": "object",
+          "properties": {
+            "accountName": { "type": "string" },
+            "bankName": { "type": "string" },
+            "accountNumber": { "type": "string" }
+          }
+        },
+        "requestedAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "status", "bankDetails", "requestedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction ledger entry",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["earning", "withdrawal", "referral"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "type", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or admin-sent notification to users",
+      "type": "object",
+      "properties": {
+        "notificationId": { "type": "string" },
+        "userId": { "type": "string", "description": "Specific user, or 'all' for broadcast" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["title", "message", "createdAt"]
+    },
+    "CoursePurchase": {
+      "title": "Course Purchase",
+      "description": "Record of a user buying an academy course",
+      "type": "object",
+      "properties": {
+        "purchaseId": { "type": "string" },
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "amount": { "type": "number" },
+        "purchasedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "courseId", "amount", "purchasedAt"]
+    },
+    "VaultEntry": {
+      "title": "Vault Entry",
+      "description": "Stake/fixed-term locking of user funds in the Vault",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "bonus": { "type": "number" },
+        "payoutAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["locked", "unlocked"] },
+        "lockedAt": { "type": "string", "format": "date-time" },
+        "unlocksAt": { "type": "string", "format": "date-time" },
+        "claimedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "bonus", "payoutAmount", "status", "lockedAt", "unlocksAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks created by admins"
+    },
+    "/completions/{completionId}": {
+      "schema": "TaskCompletion",
+      "description": "User submissions for tasks"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Money withdrawal requests"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Transaction logs for balance history"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System notifications"
+    },
+    "/coursePurchases/{purchaseId}": {
+      "schema": "CoursePurchase",
+      "description": "Academy course purchases"
+    },
+    "/vault_entries/{vaultEntryId}": {
+      "schema": "VaultEntry",
+      "description": "Vault staking entries"
+    }
+  }
+}

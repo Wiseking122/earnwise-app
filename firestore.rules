@@ -1,0 +1,167 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function hasActivePlan(userId) {
+      return isAdmin() || (exists(/databases/$(database)/documents/users/$(userId)) && 
+                          getUserData(userId).plan != null && 
+                          getUserData(userId).plan != 'none');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'wiseking7890@gmail.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Validators ---
+    function isValidUser(data) {
+      return data.uid == request.auth.uid &&
+             data.email is string &&
+             data.role in ['user', 'admin', 'advertiser'] &&
+             data.pendingBalance is number &&
+             data.withdrawableBalance is number &&
+             data.referralCode is string &&
+             (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+
+    function isValidTask(data) {
+      return data.title is string && data.title.size() <= 200 &&
+             data.type in ['survey', 'ad', 'app_download', 'referral', 'content_creation'] &&
+             data.reward is number && data.reward >= 0 &&
+             data.status in ['active', 'inactive'];
+    }
+
+    function isValidCompletion(data) {
+      return data.userId == request.auth.uid &&
+             data.taskId is string &&
+             (data.status == 'pending' || (data.status == 'approved' && (data.isAdNetwork == true || data.isSpin == true))) &&
+             data.rewardEarned is number &&
+             (data.submittedAt == request.time || data.submittedAt is timestamp);
+    }
+
+    function isValidWithdrawal(data) {
+      return data.userId == request.auth.uid &&
+             data.amount is number && data.amount > 0 &&
+             data.status == 'pending' &&
+             data.bankDetails.accountNumber is string;
+    }
+
+    function isValidNotification(data) {
+      return data.title is string && data.title.size() <= 100 &&
+             data.message is string && data.message.size() <= 1000 &&
+             (data.userId == 'all' || data.userId is string) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidCoursePurchase(data) {
+      return data.userId == request.auth.uid &&
+             data.courseId is string &&
+             (data.amount == 7000 || data.amount == 0) &&
+             (data.purchasedAt == request.time || data.purchasedAt is timestamp);
+    }
+
+    function isValidVaultEntry(data) {
+      return data.userId == request.auth.uid &&
+             data.amount is number && data.amount > 0 &&
+             data.bonus is number && data.bonus >= 0 &&
+             data.payoutAmount is number && data.payoutAmount > 0 &&
+             data.status in ['locked', 'unlocked'] &&
+             (data.lockedAt == request.time || data.lockedAt is timestamp) &&
+             (data.unlocksAt is timestamp || data.unlocksAt is string);
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /completions/{completionId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidWithdrawal(incoming()) && isValidId(withdrawalId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all' || isAdmin());
+      allow create: if isSignedIn() && (isAdmin() || incoming().userId == request.auth.uid);
+      allow delete: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data.userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) ||
+        (resource.data.userId == 'all' && incoming().diff(existing()).affectedKeys().hasOnly(['readBy']))
+      );
+    }
+
+    match /coursePurchases/{purchaseId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidCoursePurchase(incoming()) && isValidId(purchaseId);
+    }
+
+    match /vault_entries/{vaultEntryId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidVaultEntry(incoming()) && isValidId(vaultEntryId) &&
+                      getUserData(request.auth.uid).withdrawableBalance >= incoming().amount;
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidVaultEntry(incoming()) && (
+                      incoming().diff(existing()).affectedKeys().hasOnly(['status', 'claimedAt']) &&
+                      existing().status == 'locked' &&
+                      incoming().status == 'unlocked' &&
+                      incoming().claimedAt == request.time
+                    );
+      allow delete: if false;
+    }
+
+    // Default Deny at the bottom
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

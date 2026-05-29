@@ -1,0 +1,11 @@
+{
+  "name": "Remix: Earnwise",
+  "description": "Earnwise is a premier task-based platform where users earn real money completing quick surveys, watching ads, and exploring digital tasks. Sign up, complete daily goals, and enjoy fast, secure payouts instantly.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "Real-time Payouts",
+    "Tiered Rewards",
+    "Affiliate Royalties",
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

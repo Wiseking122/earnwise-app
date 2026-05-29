@@ -1,0 +1,431 @@
+import { useState, useEffect } from 'react';
+import Layout from '../components/Layout';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Dices, 
+  Play, 
+  Trophy, 
+  Zap, 
+  ShieldCheck, 
+  Eye,
+  AlertCircle,
+  Coins,
+  History,
+  Timer,
+  Gift
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { doc, updateDoc, increment, collection, addDoc, serverTimestamp, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { PLANS } from '../constants/plans';
+import { playRewardSound } from './sounds';
+import TeleAd from '../components/TeleAd';
+
+type SpinResult = {
+  id: number;
+  label: string;
+  value: number;
+  color: string;
+};
+
+const WHEEL_RESULTS: SpinResult[] = [
+  { id: 0, label: '₦2', value: 2, color: 'bg-slate-900' },
+  { id: 1, label: '₦5', value: 5, color: 'bg-indigo-600' },
+  { id: 2, label: '₦1', value: 1, color: 'bg-emerald-500' },
+  { id: 3, label: '₦10', value: 10, color: 'bg-amber-500' },
+  { id: 4, label: '₦5', value: 5, color: 'bg-rose-500' },
+  { id: 5, label: '₦20', value: 20, color: 'bg-purple-600' },
+  { id: 6, label: '₦5', value: 5, color: 'bg-sky-500' },
+  { id: 7, label: '₦10', value: 10, color: 'bg-yellow-400' },
+];
+
+export default function LuckySpin() {
+  const { user, profile } = useAuth();
+  const [spinning, setSpinning] = useState(false);
+  const [mustWatchAd, setMustWatchAd] = useState(true);
+  const [adLoading, setAdLoading] = useState(false);
+  const [adCountdown, setAdCountdown] = useState<number | null>(null);
+  const [rotation, setRotation] = useState(0);
+  const [result, setResult] = useState<SpinResult | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [globalHistory, setGlobalHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [activeTab, setActiveTab] = useState<'my' | 'global'>('global');
+
+  const planDetails = PLANS.find(p => p.id === (profile?.plan || 'free'));
+  const multiplier = planDetails?.multiplier || 1.0;
+
+  useEffect(() => {
+    fetchHistory();
+    fetchGlobalHistory();
+  }, [user]);
+
+  const fetchHistory = async () => {
+    if (!user) return;
+    try {
+      const q = query(
+        collection(db, 'completions'),
+        where('userId', '==', user.uid),
+        where('isSpin', '==', true),
+        limit(15) // Fetch more to allow for valid local sorting
+      );
+      const snap = await getDocs(q);
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      docs.sort((a: any, b: any) => {
+        const timeA = a.submittedAt?.toMillis?.() || 0;
+        const timeB = b.submittedAt?.toMillis?.() || 0;
+        return timeB - timeA;
+      });
+      setHistory(docs.slice(0, 5));
+    } catch (err) {
+      console.error("Error fetching spin history:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const fetchGlobalHistory = async () => {
+    try {
+      const q = query(
+        collection(db, 'completions'),
+        where('isSpin', '==', true),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      docs.sort((a: any, b: any) => {
+        const timeA = a.submittedAt?.toMillis?.() || 0;
+        const timeB = b.submittedAt?.toMillis?.() || 0;
+        return timeB - timeA;
+      });
+      setGlobalHistory(docs.slice(0, 10));
+    } catch (err) {
+      console.error("Error fetching global history:", err);
+    }
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (adCountdown !== null && adCountdown > 0) {
+      timer = setTimeout(() => setAdCountdown(adCountdown - 1), 1000);
+    } else if (adCountdown === 0) {
+      setMustWatchAd(false);
+      setAdLoading(false);
+      setAdCountdown(null);
+    }
+    return () => clearTimeout(timer);
+  }, [adCountdown]);
+
+  const handleWatchAd = () => {
+    if (adLoading) return;
+    
+    setAdLoading(true);
+    setAdCountdown(7); // 7 second mandatory ad view
+    
+    // Open high-yield Hilltop/Adsterra/Montage link
+    const adLinks = [
+      'https://omg10.com/4/11070990',
+      'https://omg10.com/4/11070991',
+      'https://omg10.com/4/11070998',
+      'https://omg10.com/4/11071002'
+    ];
+    const randomAd = adLinks[Math.floor(Math.random() * adLinks.length)];
+    window.open(randomAd, '_blank');
+  };
+
+  const spin = async () => {
+    if (!user || spinning || mustWatchAd) return;
+    
+    setSpinning(true);
+    setResult(null);
+    
+    const spinCount = 5 + Math.floor(Math.random() * 5); // 5-10 full spins
+    const randomIndex = Math.floor(Math.random() * WHEEL_RESULTS.length);
+    const segmentAngle = 360 / WHEEL_RESULTS.length;
+    
+    // Correct rotation math: Ensure the chosen segment aligns with the pointer at the top (0 degrees).
+    // The current segments are rendered clockwise, so we need to rotate negative degrees relative to segment index to bring it to top.
+    const extraAngle = (spinCount * 360) - (randomIndex * segmentAngle);
+    
+    setRotation(prev => prev + extraAngle);
+
+    // Wait for animation
+    setTimeout(async () => {
+      const actualResult = WHEEL_RESULTS[randomIndex];
+      let finalReward = actualResult.value * multiplier;
+      
+      // Enforce hard cap of 20 NGN
+      if (finalReward > 20) {
+        finalReward = 20;
+      }
+      
+      setResult({ ...actualResult, value: finalReward / multiplier }); // Store adjusted value for display if needed
+      setSpinning(false);
+      setMustWatchAd(true); // Reset ad wall for next spin
+
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          balance: increment(finalReward),
+          taskEarnings: increment(finalReward),
+          xp: increment(25)
+        });
+
+        await addDoc(collection(db, 'completions'), {
+          userId: user.uid,
+          taskId: 'lucky_spin_reward',
+          status: 'approved',
+          rewardEarned: finalReward,
+          isSpin: true,
+          label: actualResult.label,
+          submittedAt: serverTimestamp(),
+        });
+        
+        playRewardSound();
+        fetchHistory();
+      } catch (err) {
+        console.error("Error recording spin result:", err);
+      }
+    }, 4000);
+  };
+
+  return (
+    <Layout>
+      <div className="p-5 pb-24 space-y-8 max-w-xl mx-auto">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 bg-blue-500 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
+            <Dices size={32} className="text-white" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Lucky Spin & Win</h2>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Ad-Powered Rewards</p>
+        </div>
+
+        {/* Spin Wheel Area */}
+        <div className="relative flex flex-col items-center">
+          {/* Legend/Multiplier */}
+          <div className="absolute -top-4 right-0 z-20">
+             <div className="bg-white px-3 py-1.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-2">
+                <Zap size={14} className="text-blue-500 fill-blue-500" />
+                <span className="text-[10px] font-black text-slate-900">x{multiplier.toFixed(1)} Bonus</span>
+             </div>
+          </div>
+
+          <div className="w-72 h-72 rounded-full border-8 border-slate-900 bg-slate-900 relative shadow-[0_32px_64px_-15px_rgba(255,255,255,0.1)] overflow-hidden">
+             {/* The Pointer */}
+             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-30">
+                <div className="w-6 h-8 bg-white rounded-b-full shadow-lg border-x-4 border-b-4 border-slate-900 flex items-center justify-center">
+                    <div className="w-1 h-3 bg-red-500 rounded-full animate-bounce" />
+                </div>
+             </div>
+
+             <motion.div 
+               animate={{ rotate: rotation }}
+               transition={{ duration: 4, ease: [0.16, 1, 0.3, 1] }}
+               className="w-full h-full relative"
+             >
+                {WHEEL_RESULTS.map((res, i) => (
+                    <div 
+                        key={res.id}
+                        className={`absolute top-0 left-1/2 w-1/2 h-full origin-left flex items-center justify-end pr-8 text-white font-black text-xs`}
+                        style={{ transform: `rotate(${i * (360 / WHEEL_RESULTS.length)}deg)` }}
+                    >
+                        <div className={`absolute inset-0 ${res.color} border-l border-white/10`} 
+                             style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)', opacity: 0.9 }}>
+                        </div>
+                        <span className="relative z-10 rotate-90">{res.label}</span>
+                    </div>
+                ))}
+             </motion.div>
+
+             <div className="absolute inset-0 m-auto w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-inner z-20 border-4 border-slate-900">
+                <Play size={16} className={spinning ? 'animate-spin' : ''} />
+             </div>
+          </div>
+
+          <div className="mt-12 w-full space-y-4">
+            <AnimatePresence mode="wait">
+              {mustWatchAd ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="bg-slate-900 text-white rounded-[2rem] p-8 text-center space-y-6 shadow-2xl relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20" />
+                  <div className="relative z-10 space-y-2">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                        <Gift size={24} className="text-blue-400" />
+                    </div>
+                    <h3 className="font-black text-xl">Unlock Your Spin</h3>
+                    <p className="text-xs text-slate-400 font-medium">Choose a quick action below to enable your lucky spin!</p>
+                  </div>
+
+                  {/* Telegram Ad SDK Placement */}
+                  <div className="relative z-20 min-h-[50px] flex justify-center">
+                     <TeleAd />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 relative z-10">
+                    <button
+                      onClick={handleWatchAd}
+                      disabled={adLoading}
+                      className="w-full bg-blue-600 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-lg shadow-blue-600/20 disabled:bg-blue-300"
+                    >
+                      {adLoading ? (
+                        <div className="flex items-center gap-3">
+                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                           <span>Verifying: {adCountdown}s</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Eye size={16} />
+                          Unlock Spin with Ad
+                        </>
+                      )}
+                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="h-[1px] bg-white/10 flex-1" />
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sponsor Zone</span>
+                        <div className="h-[1px] bg-white/10 flex-1" />
+                    </div>
+                    <button
+                      onClick={handleWatchAd}
+                      disabled={adLoading}
+                      className="w-full bg-slate-800 border border-white/10 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {adLoading ? `Loading Task... (${adCountdown}s)` : (
+                        <>
+                          <Zap size={16} className="text-amber-400" />
+                          Partner Micro-Task
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.button 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  onClick={spin}
+                  disabled={spinning}
+                  className="w-full bg-indigo-600 h-20 rounded-[2rem] text-white font-black text-xl flex items-center justify-center gap-4 shadow-2xl shadow-indigo-200 active:scale-95 transition-all"
+                >
+                  {spinning ? (
+                    'SPINNING...'
+                  ) : (
+                    <>
+                      <Zap size={24} className="fill-white" />
+                      SPIN NOW
+                    </>
+                  )}
+                </motion.button>
+              )}
+            </AnimatePresence>
+            
+            {result && !spinning && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] text-center"
+              >
+                <div className="flex justify-center gap-1 mb-2">
+                    <Trophy className="text-emerald-500" size={24} />
+                    <Trophy className="text-emerald-500 scale-125" size={24} />
+                    <Trophy className="text-emerald-500" size={24} />
+                </div>
+                <h4 className="font-black text-emerald-900 text-lg">CONGRATULATIONS!</h4>
+                <p className="text-emerald-700 font-bold">You won <span className="text-xl">₦{(result.value * multiplier).toFixed(2)}</span></p>
+                <div className="inline-block mt-4 bg-emerald-500 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    Added to Balance
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        {/* History */}
+        <div className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm space-y-6">
+            <div className="flex items-center justify-between px-2">
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setActiveTab('global')}
+                    className={`text-[10px] font-black uppercase tracking-widest pb-2 transition-all ${activeTab === 'global' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
+                  >
+                    Global Winners
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('my')}
+                    className={`text-[10px] font-black uppercase tracking-widest pb-2 transition-all ${activeTab === 'my' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
+                  >
+                    My Spins
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Live</span>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                {loadingHistory ? (
+                    <div className="h-20 bg-slate-50 rounded-2xl animate-pulse" />
+                ) : (activeTab === 'my' ? history : globalHistory).length > 0 ? (
+                    (activeTab === 'my' ? history : globalHistory).map((h, i) => (
+                        <motion.div 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          key={h.id || `spin-${i}`} 
+                          className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100"
+                        >
+                           <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 overflow-hidden">
+                                   {activeTab === 'global' ? (
+                                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${h.userId || i}`} alt="Winner" />
+                                   ) : (
+                                      <Coins size={18} className="text-amber-500" />
+                                   )}
+                               </div>
+                               <div>
+                                   <p className="text-[11px] font-black text-slate-900">
+                                      {activeTab === 'global' ? `Lucky Winner Won ${h.label}` : `Won ${h.label}`}
+                                   </p>
+                                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                      {h.submittedAt?.toDate()?.toLocaleTimeString() || 'Just now'}
+                                   </p>
+                               </div>
+                           </div>
+                           <div className="text-right">
+                              <span className="text-emerald-600 font-black text-sm block">+₦{h.rewardEarned?.toFixed(2)}</span>
+                              {h.rewardEarned > (h.value || 0) && (
+                                <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">x{multiplier} Plan Boost</span>
+                              )}
+                           </div>
+                        </motion.div>
+                    ))
+                ) : (
+                    <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                        <History size={32} className="mx-auto text-slate-200 mb-2" />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No activity recorded yet</p>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Rule Info */}
+        <div className="bg-blue-50 border border-blue-100 p-6 rounded-[2.5rem] flex gap-4">
+            <AlertCircle size={24} className="text-blue-500 shrink-0" />
+            <div className="space-y-1">
+                <h4 className="font-black text-blue-900 text-sm">How it works</h4>
+                <p className="text-[10px] text-blue-800 leading-relaxed">
+                    To maintain the rewards pool, we require a quick ad verification before every spin. 
+                    This keeps the platform free and ensures high payouts! <strong>Pro Plan</strong> users earn double rewards on every spin.
+                </p>
+            </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}

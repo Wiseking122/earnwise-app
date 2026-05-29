@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Early polyfill for Telegram CloudStorage in older versions (v6.0)
+      (function() {
+        try {
+          function applyPolyfill(webapp) {
+            if (webapp) {
+              // Ensure version is high enough for CloudStorage (6.9+)
+              try {
+                const currentVersion = webapp.version || '6.0';
+                if (parseFloat(currentVersion) < 6.9) {
+                  Object.defineProperty(webapp, 'version', {
+                    value: '7.0',
+                    writable: true,
+                    configurable: true
+                  });
+                }
+              } catch (e) {
+                try { webapp.version = '7.0'; } catch(vErr) {}
+              }
+
+              // Create a safe CloudStorage mock
+              const mock = {
+                setItem: function(k, v, cb) { if(cb) cb(null, false); },
+                getItem: function(k, cb) { if(cb) cb(null, null); },
+                getItems: function(ks, cb) { if(cb) cb(null, {}); },
+                removeItem: function(k, cb) { if(cb) cb(null, false); },
+                removeItems: function(ks, cb) { if(cb) cb(null, false); },
+                getKeys: function(cb) { if(cb) cb(null, []); }
+              };
+              
+              let needsPolyfill = true;
+              try {
+                // If access throws, it definitely needs polyfill
+                if (webapp.CloudStorage && webapp.version && parseFloat(webapp.version) >= 6.9) {
+                  needsPolyfill = false;
+                }
+              } catch (storageErr) {
+                needsPolyfill = true;
+              }
+              
+              if (needsPolyfill) {
+                try {
+                  Object.defineProperty(webapp, 'CloudStorage', {
+                    value: mock,
+                    writable: true,
+                    configurable: true
+                  });
+                } catch (e) {
+                  try {
+                    webapp.CloudStorage = mock;
+                  } catch (e2) {
+                    console.warn("Could not redefine CloudStorage:", e2);
+                  }
+                }
+              }
+            }
+          }
+
+          if (window.Telegram && window.Telegram.WebApp) {
+            applyPolyfill(window.Telegram.WebApp);
+          }
+          
+          let tg = window.Telegram;
+          try {
+            Object.defineProperty(window, 'Telegram', {
+              configurable: true,
+              enumerable: true,
+              get: function() { return tg; },
+              set: function(val) {
+                tg = val;
+                if (tg && tg.WebApp) {
+                  applyPolyfill(tg.WebApp);
+                }
+              }
+            });
+          } catch (tgErr) {}
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/96/gold-bars.png" />
+    <link rel="apple-touch-icon" href="https://img.icons8.com/isometric/180/gold-bars.png" />
+    <title>Earnwise | #1 Digital Wealth Platform</title>
+    <meta name="monetag" content="c83a180e26c6677cacfbeb3a22ecc5e1">
+    <meta name="hilltopads-site-verification" content="86b5c9823363398fa2da">
+    <meta name="2aa1636db390370392d386b5c9823363398fa2da" content="2aa1636db390370392d386b5c9823363398fa2da" />
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+    <script src="//imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+    <meta name="description" content="Unlock your earning potential with Earnwise. The most trusted task-based platform in Nigeria." />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Earnwise - Earn Real Cash Daily" />
+    <meta property="og:description" content="Complete simple tasks and withdraw instantly to your bank. Join the revolution!" />
+    <meta property="og:image" content="https://img.icons8.com/isometric/512/gold-bars.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
