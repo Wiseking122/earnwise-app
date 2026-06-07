@@ -37,7 +37,7 @@ export default function Support() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-transparent">
       <header className="p-6 flex items-center gap-4 bg-white sticky top-0 z-10 border-b border-slate-100">
         <button 
           onClick={() => navigate(-1)}
@@ -147,6 +147,7 @@ export default function Support() {
         <div className="space-y-4">
           <h3 className="text-lg font-black text-slate-900 pl-2">Common Questions</h3>
           {[
+            { q: "How do I upgrade my plan?", a: "To upgrade, fund your wallet via the 'Deposit' tab on the Membership page using Paystack. Once your balance is updated, switch to the 'Plans' tab and click 'Activate Now' on your chosen tier. We do NOT use coupon codes or manual vendors." },
             { q: "How long does withdrawal take?", a: "Most withdrawals are processed instantly through Paystack. Some banks may take up to 30 minutes to reflect the funds." },
             { q: "Why was my task rejected?", a: "Tasks are usually rejected if the proof provided is insufficient or doesn't match the task requirements. You can re-attempt most tasks." },
             { q: "Can I use multiple accounts?", a: "No, Earnwise has a strict one-account-per-person policy. Multiple accounts will lead to permanent suspension." }

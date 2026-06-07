@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, updateDoc, increment, collection, addDoc, serverTimestamp, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, increment, collection, addDoc, serverTimestamp, getDocs, query, where, limit, orderBy, arrayUnion } from 'firebase/firestore';
 import { PLANS } from '../constants/plans';
 import { playRewardSound } from './sounds';
-import TeleAd from '../components/TeleAd';
+import { triggerOnclikaPush } from '../lib/adManager';
+import Confetti from '../components/Confetti';
+import VideoAd from '../components/VideoAd';
 
 type SpinResult = {
   id: number;
@@ -44,7 +46,6 @@ export default function LuckySpin() {
   const [spinning, setSpinning] = useState(false);
   const [mustWatchAd, setMustWatchAd] = useState(true);
   const [adLoading, setAdLoading] = useState(false);
-  const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<SpinResult | null>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -54,6 +55,16 @@ export default function LuckySpin() {
 
   const planDetails = PLANS.find(p => p.id === (profile?.plan || 'free'));
   const multiplier = planDetails?.multiplier || 1.0;
+
+  const userHasSpunToday = () => {
+    if (!profile?.completedAds) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return profile.completedAds.some((ad: any) => 
+      ad.id === 'lucky_spin_ad' && ad.timestamp.startsWith(today)
+    );
+  };
+
+  const hasSpunToday = userHasSpunToday();
 
   useEffect(() => {
     fetchHistory();
@@ -67,7 +78,7 @@ export default function LuckySpin() {
         collection(db, 'completions'),
         where('userId', '==', user.uid),
         where('isSpin', '==', true),
-        limit(15) // Fetch more to allow for valid local sorting
+        limit(15)
       );
       const snap = await getDocs(q);
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -105,38 +116,41 @@ export default function LuckySpin() {
     }
   };
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (adCountdown !== null && adCountdown > 0) {
-      timer = setTimeout(() => setAdCountdown(adCountdown - 1), 1000);
-    } else if (adCountdown === 0) {
-      setMustWatchAd(false);
-      setAdLoading(false);
-      setAdCountdown(null);
-    }
-    return () => clearTimeout(timer);
-  }, [adCountdown]);
-
   const handleWatchAd = () => {
     if (adLoading) return;
     
+    // Open required ad link
+    window.open('https://omg10.com/4/11110033', '_blank');
+
+    // Programmatically trigger Onclika ad locker manually on user action
+    triggerOnclikaPush();
     setAdLoading(true);
-    setAdCountdown(7); // 7 second mandatory ad view
-    
-    // Open high-yield Hilltop/Adsterra/Montage link
-    const adLinks = [
-      'https://omg10.com/4/11070990',
-      'https://omg10.com/4/11070991',
-      'https://omg10.com/4/11070998',
-      'https://omg10.com/4/11071002'
-    ];
-    const randomAd = adLinks[Math.floor(Math.random() * adLinks.length)];
-    window.open(randomAd, '_blank');
+  };
+
+  const handleAdFinished = async () => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        completedAds: arrayUnion({
+          id: 'lucky_spin_ad',
+          timestamp: new Date().toISOString(),
+          reward: 0
+        })
+      });
+      setMustWatchAd(false);
+      setAdLoading(false);
+    } catch (err) {
+      console.error("Error recording ad completion:", err);
+      setAdLoading(false);
+    }
   };
 
   const spin = async () => {
     if (!user || spinning || mustWatchAd) return;
     
+    // Final check locker execution
+    triggerOnclikaPush();
+
     setSpinning(true);
     setResult(null);
     
@@ -191,31 +205,32 @@ export default function LuckySpin() {
 
   return (
     <Layout>
+      {result && <Confetti />}
       <div className="p-5 pb-24 space-y-8 max-w-xl mx-auto">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-blue-500 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
-            <Dices size={32} className="text-white" />
+          <div className="w-16 h-16 bg-blue-500/20 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.3)] rounded-3xl flex items-center justify-center mx-auto">
+            <Dices size={32} className="text-blue-400 drop-shadow-md" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Lucky Spin & Win</h2>
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Ad-Powered Rewards</p>
+          <h2 className="text-2xl font-display font-black text-white tracking-tight drop-shadow-md">Lucky Spin & Win</h2>
+          <p className="text-[10px] text-blue-400/80 font-bold uppercase tracking-widest">Ad-Powered Rewards</p>
         </div>
 
         {/* Spin Wheel Area */}
         <div className="relative flex flex-col items-center">
           {/* Legend/Multiplier */}
           <div className="absolute -top-4 right-0 z-20">
-             <div className="bg-white px-3 py-1.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-2">
-                <Zap size={14} className="text-blue-500 fill-blue-500" />
-                <span className="text-[10px] font-black text-slate-900">x{multiplier.toFixed(1)} Bonus</span>
+             <div className="bg-slate-900/80 backdrop-blur-3xl px-3 py-1.5 rounded-2xl border border-blue-500/30 shadow-[0_4px_15px_rgba(0,0,0,0.3)] flex items-center gap-2">
+                <Zap size={14} className="text-blue-400 drop-shadow-[0_0_5px_rgba(59,130,246,0.8)]" />
+                <span className="text-[10px] font-black text-white">x{multiplier.toFixed(1)} Bonus</span>
              </div>
           </div>
 
-          <div className="w-72 h-72 rounded-full border-8 border-slate-900 bg-slate-900 relative shadow-[0_32px_64px_-15px_rgba(255,255,255,0.1)] overflow-hidden">
+          <div className="w-72 h-72 rounded-full border-8 border-slate-900 bg-slate-950 relative shadow-[0_0_50px_rgba(59,130,246,0.2)] overflow-hidden">
              {/* The Pointer */}
              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-30">
-                <div className="w-6 h-8 bg-white rounded-b-full shadow-lg border-x-4 border-b-4 border-slate-900 flex items-center justify-center">
-                    <div className="w-1 h-3 bg-red-500 rounded-full animate-bounce" />
+                <div className="w-6 h-8 bg-blue-500 rounded-b-full shadow-[0_0_15px_rgba(59,130,246,0.8)] border-x-4 border-b-4 border-slate-900 flex items-center justify-center">
+                    <div className="w-1 h-3 bg-white rounded-full animate-pulse" />
                 </div>
              </div>
 
@@ -227,25 +242,52 @@ export default function LuckySpin() {
                 {WHEEL_RESULTS.map((res, i) => (
                     <div 
                         key={res.id}
-                        className={`absolute top-0 left-1/2 w-1/2 h-full origin-left flex items-center justify-end pr-8 text-white font-black text-xs`}
-                        style={{ transform: `rotate(${i * (360 / WHEEL_RESULTS.length)}deg)` }}
+                        className={`absolute top-0 left-1/2 w-[50%] h-[50%] origin-bottom-left flex items-center justify-end pr-8 text-white font-black text-xs border border-white/5 border-b-0 border-l-0 ${res.color}`}
+                        style={{ 
+                          transform: `rotate(${i * (360 / WHEEL_RESULTS.length)}deg) skewY(${-(90 - (360 / WHEEL_RESULTS.length))}deg)`,
+                          transformOrigin: '0% 100%'
+                        }}
                     >
-                        <div className={`absolute inset-0 ${res.color} border-l border-white/10`} 
-                             style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)', opacity: 0.9 }}>
+                        <div className="relative z-10 skewY(45deg)" style={{ transform: `skewY(${90 - (360 / WHEEL_RESULTS.length)}deg) rotate(${(360 / WHEEL_RESULTS.length)/2}deg)` }}>
+                           <span className="inline-block translate-x-4 translate-y-8 font-display drop-shadow-md">{res.label}</span>
                         </div>
-                        <span className="relative z-10 rotate-90">{res.label}</span>
                     </div>
                 ))}
              </motion.div>
 
-             <div className="absolute inset-0 m-auto w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-inner z-20 border-4 border-slate-900">
-                <Play size={16} className={spinning ? 'animate-spin' : ''} />
+             <div className="absolute inset-0 m-auto w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] z-20 border-4 border-blue-500/50">
+                <Play size={16} className={`text-blue-400 ${spinning ? 'animate-spin' : ''}`} />
              </div>
           </div>
 
           <div className="mt-12 w-full space-y-4">
             <AnimatePresence mode="wait">
-              {mustWatchAd ? (
+              {adLoading && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <div className="max-w-sm w-full">
+                    <VideoAd 
+                      onAdEnded={handleAdFinished} 
+                      onAdStarted={() => {}} 
+                      rewardAmount={0} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {hasSpunToday ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-slate-900/50 text-white rounded-[2rem] p-10 text-center space-y-4 border border-white/5"
+                >
+                  <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                     <Timer size={32} className="text-blue-400 opacity-50" />
+                  </div>
+                  <h3 className="font-black text-xl">Daily Limit Reached</h3>
+                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">You've used your daily spin!</p>
+                  <p className="text-[10px] text-slate-400 max-w-[200px] mx-auto">Come back in 24 hours for another chance to win big rewards.</p>
+                </motion.div>
+              ) : mustWatchAd && !adLoading ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -258,15 +300,17 @@ export default function LuckySpin() {
                         <Gift size={24} className="text-blue-400" />
                     </div>
                     <h3 className="font-black text-xl">Unlock Your Spin</h3>
-                    <p className="text-xs text-slate-400 font-medium">Choose a quick action below to enable your lucky spin!</p>
+                    <p className="text-xs text-slate-400 font-medium">Click the button below to enable your lucky spin!</p>
                   </div>
 
                   {/* Telegram Ad SDK Placement */}
                   <div className="relative z-20 min-h-[50px] flex justify-center">
-                     <TeleAd />
+                     <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700 font-mono">
+                        Secure Ad Gateway Active
+                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 relative z-10">
+                   <div className="grid grid-cols-1 gap-3 relative z-10">
                     <button
                       onClick={handleWatchAd}
                       disabled={adLoading}
@@ -275,29 +319,12 @@ export default function LuckySpin() {
                       {adLoading ? (
                         <div className="flex items-center gap-3">
                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                           <span>Verifying: {adCountdown}s</span>
+                           <span>Loading Ad Experience...</span>
                         </div>
                       ) : (
                         <>
                           <Eye size={16} />
                           Unlock Spin with Ad
-                        </>
-                      )}
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <div className="h-[1px] bg-white/10 flex-1" />
-                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sponsor Zone</span>
-                        <div className="h-[1px] bg-white/10 flex-1" />
-                    </div>
-                    <button
-                      onClick={handleWatchAd}
-                      disabled={adLoading}
-                      className="w-full bg-slate-800 border border-white/10 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
-                    >
-                      {adLoading ? `Loading Task... (${adCountdown}s)` : (
-                        <>
-                          <Zap size={16} className="text-amber-400" />
-                          Partner Micro-Task
                         </>
                       )}
                     </button>

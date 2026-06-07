@@ -8,12 +8,12 @@ import {
   GoogleAuthProvider,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { setDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { setDoc, doc, getDoc, serverTimestamp, query, collection, where, limit, getDocs, updateDoc, increment } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogIn, UserPlus, Mail, Lock, Sparkles, AlertCircle, CheckCircle2, KeyRound, ArrowLeft, Users } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Sparkles, AlertCircle, CheckCircle2, KeyRound, ArrowLeft, Users, Eye, EyeOff } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import axios from 'axios';
 import { safeStorage } from '../lib/storage';
@@ -23,6 +23,7 @@ export default function Welcome() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -30,6 +31,7 @@ export default function Welcome() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [authNetworkError, setAuthNetworkError] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [checkingRedirect, setCheckingRedirect] = useState(true);
@@ -115,10 +117,29 @@ export default function Welcome() {
             subscriptionTier: 'free',
             referralCode,
             referredBy: finalReferralCode || null,
+            totalReferrals: 0,
+            hasReceivedReferralBonus: false,
             createdAt: serverTimestamp()
           };
 
           await setDoc(userDocRef, userData, { merge: true });
+
+          // Increment Referral Count for Referrer
+          if (finalReferralCode) {
+            try {
+              const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode), limit(1));
+              const referrerSnap = await getDocs(referrerQuery);
+              if (!referrerSnap.empty) {
+                const referrerDoc = referrerSnap.docs[0];
+                await updateDoc(referrerDoc.ref, {
+                  totalReferrals: increment(1)
+                });
+              }
+            } catch (err) {
+              console.error("Failed to increment referral count:", err);
+            }
+          }
+
           
           safeStorage.removeItem('referralCode');
 
@@ -142,6 +163,7 @@ export default function Welcome() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setAuthNetworkError(false);
     setMessage('');
 
     try {
@@ -204,6 +226,7 @@ export default function Welcome() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
+    setAuthNetworkError(false);
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
@@ -228,13 +251,19 @@ export default function Welcome() {
           }
         } else if (popupErr.code === 'auth/account-exists-with-different-credential') {
           setError("An account already exists with the same email. Please sign in using your original method.");
+        } else if (popupErr.code === 'auth/network-request-failed' || popupErr.message?.includes('network-request-failed')) {
+          setAuthNetworkError(true);
+          setError('Google Sign-In failed due to secure iframe/network restrictions. Tap "Troubleshooting Guide" below for immediate steps to fix this.');
         } else {
           throw popupErr;
         }
       }
       } catch (err: any) {
       console.error("Google Sign-in error:", err);
-      if (err.code === 'auth/operation-not-allowed') {
+      if (err.code === 'auth/network-request-failed' || err.message?.includes('network-request-failed')) {
+        setAuthNetworkError(true);
+        setError('Google Sign-In failed due to secure iframe/network restrictions. Tap "Troubleshooting Guide" below for immediate steps to fix this.');
+      } else if (err.code === 'auth/operation-not-allowed') {
         setError('Google sign-in is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.');
       } else if (err.code === 'auth/unauthorized-domain') {
         setError(`Domain "${window.location.hostname}" is not authorized for Google Sign-in. Please add it to "Authorized domains" in your Firebase Console (Authentication > Settings).`);
@@ -247,50 +276,53 @@ export default function Welcome() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col p-6 items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-transparent flex flex-col p-6 items-center py-10 relative">
       {/* Decorative Orbs */}
-      <div className="absolute top-[-10%] left-[-10%] w-64 h-64 rounded-full pointer-events-none animate-pulse" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)' }} />
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 rounded-full pointer-events-none animate-pulse delay-700" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)' }} />
+      <div className="absolute top-[-10%] left-[-10%] w-64 h-64 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%)', animation: 'floatElement 8s ease-in-out infinite' }} />
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(147, 51, 234, 0.2) 0%, transparent 70%)', animation: 'floatElement 12s ease-in-out infinite reverse' }} />
 
       <motion.div 
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        initial={{ opacity: 0, y: -30, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 1, type: "spring", bounce: 0.4 }}
         className="text-center mb-8 relative z-10"
       >
-        <div className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl border border-slate-100 shadow-blue-50">
+        <motion.div 
+          whileHover={{ scale: 1.05, rotate: -5 }}
+          className="w-24 h-24 bg-slate-900/60 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl border border-blue-500/20"
+        >
           <Logo size={64} />
-        </div>
-        <h1 className="text-4xl sm:text-5xl font-black tracking-tight mb-3 text-slate-900">Earnwise</h1>
-        <p className="text-slate-500 font-bold tracking-wide text-base sm:text-lg">Your Gateway to Digital Wealth</p>
+        </motion.div>
+        <h1 className="text-4xl sm:text-5xl font-black tracking-tight mb-3 text-white drop-shadow-md">Earnwise</h1>
+        <p className="text-slate-400 font-bold tracking-wide text-base sm:text-lg drop-shadow-sm uppercase text-[11px] tracking-widest">Your Gateway to Digital Wealth</p>
       </motion.div>
 
       <motion.div 
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ delay: 0.2, duration: 0.5 }}
-        className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 text-gray-900 shadow-[0_32px_64px_-15px_rgba(0,0,0,0.2)] border border-white/50 relative z-10"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.6, type: "spring", bounce: 0.2 }}
+        className="w-full max-w-md bg-slate-900/80 backdrop-blur-md rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 text-white shadow-2xl border border-white/10 relative z-10"
       >
         <div className="space-y-6">
           <div className="text-center space-y-2 mb-2">
-            <span className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest border border-blue-100">
+            <span className="bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest border border-blue-500/20 shadow-inner">
               ⚡️ Secure Access Gateway
             </span>
-            <p className="text-xs text-slate-500 font-bold max-w-[280px] mx-auto pt-1 leading-relaxed">
+            <p className="text-xs text-slate-400 font-bold max-w-[280px] mx-auto pt-1 leading-relaxed">
               Earnwise utilizes Google OAuth or Credentials for maximum security.
             </p>
           </div>
 
-          <div className="flex gap-2 p-1.5 bg-slate-100/80 rounded-[1.5rem] ring-1 ring-slate-200">
+          <div className="flex gap-2 p-1.5 bg-slate-800/50 rounded-[1.5rem] ring-1 ring-white/5 border border-white/5 shadow-inner">
             <button 
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-black transition-all transform duration-300 ${isLogin ? 'bg-white shadow-[0_4px_12px_rgba(0,0,0,0.05)] text-blue-600 scale-100' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-black transition-all transform duration-300 ${isLogin ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
             >
               Sign In
             </button>
             <button 
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-black transition-all transform duration-300 ${!isLogin ? 'bg-white shadow-[0_4px_12px_rgba(0,0,0,0.05)] text-blue-600 scale-100' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-black transition-all transform duration-300 ${!isLogin ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
             >
               Create Account
             </button>
@@ -303,7 +335,7 @@ export default function Welcome() {
                     type="text" 
                     placeholder="First Name"
                     required
-                    className="w-full bg-slate-50 border border-slate-100 rounded-[1.25rem] py-4 px-5 text-sm font-semibold focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all outline-none"
+                    className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
@@ -311,7 +343,7 @@ export default function Welcome() {
                     type="text" 
                     placeholder="Last Name"
                     required
-                    className="w-full bg-slate-50 border border-slate-100 rounded-[1.25rem] py-4 px-5 text-sm font-semibold focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all outline-none"
+                    className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                   />
@@ -322,7 +354,7 @@ export default function Welcome() {
                   type="tel" 
                   placeholder="+234 800 000 0000"
                   required
-                  className="w-full bg-slate-50 border border-slate-100 rounded-[1.25rem] py-4 px-5 text-sm font-semibold focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all outline-none"
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                 />
@@ -332,28 +364,50 @@ export default function Welcome() {
                   type="email" 
                   placeholder="Email Address"
                   required
-                  className="w-full bg-slate-50 border border-slate-100 rounded-[1.25rem] py-4 px-5 text-sm font-semibold focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all outline-none"
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1 relative">
-                <input 
-                  type="password" 
-                  placeholder="Password"
-                  required
-                  className="w-full bg-slate-50 border border-slate-100 rounded-[1.25rem] py-4 px-5 text-sm font-semibold focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all outline-none"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Password"
+                    required
+                    className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 pr-12 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 focus:outline-none transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
+              
+              {isLogin && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={loading || !email}
+                    className="text-[10px] font-black text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest disabled:opacity-50 mt-1 drop-shadow-sm"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
               
               {!isLogin && (
                 <input 
                   type="text" 
                   placeholder="Referral Code (Optional)"
-                  className="w-full bg-slate-50 border border-slate-100 rounded-[1.25rem] py-4 px-5 text-sm font-semibold focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all outline-none"
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                   value={referralCodeInput}
                   onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase().trim())}
                 />
@@ -361,24 +415,25 @@ export default function Welcome() {
               
               <button 
                 disabled={loading}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-[1.5rem] transition-all flex items-center justify-center gap-3"
+                className="w-full bg-white hover:bg-slate-200 text-slate-900 font-black py-4 rounded-[1.5rem] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
               >
                 {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
               </button>
           </form>
 
           <div className="relative my-4 text-center">
-            <span className="bg-white px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">or</span>
+            <span className="bg-slate-900 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-full relative z-10 border border-white/5 py-1">or</span>
+            <div className="absolute top-1/2 left-0 w-full h-px bg-white/10 -z-0"></div>
           </div>
 
           <button 
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-[1.5rem] shadow-[0_12px_24px_-8px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-[1.5rem] shadow-[0_12px_24px_-8px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-blue-400/30"
           >
             <img src="https://www.google.com/favicon.ico" className="w-5 h-5 brightness-0 invert" alt="Google" />
-            <span className="text-base">Continue with Google</span>
+            <span className="text-sm tracking-wide">Continue with Google</span>
           </button>
 
           <AnimatePresence mode="wait">
@@ -391,6 +446,49 @@ export default function Welcome() {
               >
                 <AlertCircle size={14} className="shrink-0" />
                 <span>{error}</span>
+              </motion.div>
+            )}
+            {authNetworkError && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-slate-800/80 border border-amber-500/30 rounded-2xl p-4 text-xs text-slate-300 space-y-3 shadow-lg shrink-0 mt-2 text-left"
+              >
+                <div className="flex items-center gap-2 text-amber-400 font-black uppercase tracking-wider text-[10px] pb-1 border-b border-white/5">
+                  <KeyRound size={14} />
+                  <span>Google Sign-In Troubleshooting Guide</span>
+                </div>
+                
+                <p className="leading-relaxed text-[11px]">
+                  The AI Studio preview runs inside a highly secure and restricted <strong className="text-white">iframe sandbox</strong>. This can block popups, cross-origin web cookies, and socket handshakes.
+                </p>
+
+                <div className="space-y-2 text-[11px]">
+                  <div className="flex gap-2 items-start">
+                    <span className="bg-blue-500/20 text-blue-300 w-4 h-4 rounded-md flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">1</span>
+                    <p className="leading-normal">
+                      <strong className="text-white">Recommended method:</strong> Open this application in a <strong className="text-blue-400 hover:underline cursor-pointer" onClick={() => window.open(window.location.href, '_blank')}>New Tab</strong> using the icon in the top right of the preview toolbar. Running natively in a new window bypasses these browser constraints.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 items-start">
+                    <span className="bg-blue-500/20 text-blue-300 w-4 h-4 rounded-md flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">2</span>
+                    <p className="leading-normal">
+                      <strong className="text-white">Firebase Setup:</strong> Ensure your project's authorization settings allow this container. In your <strong className="text-white">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains</strong>, make sure you've added:
+                      <code className="block bg-slate-950 p-2 rounded-lg font-mono text-[9px] text-amber-300 mt-1 select-all break-all border border-white/5 font-semibold">
+                        {window.location.hostname}
+                      </code>
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 items-start">
+                    <span className="bg-blue-500/20 text-blue-300 w-4 h-4 rounded-md flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">3</span>
+                    <p className="leading-normal">
+                      <strong className="text-white">Alternative:</strong> Create a test user directly inside this iframe using the <strong className="text-white">Email &amp; Password form</strong> above (just select <em>Create Account</em>). This does not rely on third-party redirects and works flawlessly inside sandbox frames.
+                    </p>
+                  </div>
+                </div>
               </motion.div>
             )}
             {message && (

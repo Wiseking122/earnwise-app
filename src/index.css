@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 @import "video.js/dist/video-js.css";
 @import "videojs-ima/dist/videojs.ima.css";
@@ -9,18 +9,58 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --color-slate-950: #020617;
-  --shadow-premium: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-premium:
+    0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+@keyframes gradientSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes floatElement {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 antialiased overflow-x-hidden;
+    @apply text-slate-100 font-sans selection:bg-blue-500 selection:text-white antialiased overflow-x-hidden;
+    background-color: #020617;
+    position: relative;
   }
-  h1, h2, h3, h4, .font-display {
-    @apply font-display tracking-tight;
+  
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-image: 
+      radial-gradient(ellipse at 15% 0%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 15%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 80%, rgba(29, 78, 216, 0.1) 0%, transparent 60%),
+      radial-gradient(ellipse at 95% 90%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+    animation: gradientSpin 30s ease-in-out infinite alternate;
   }
+  
+  body::after {
+    /* Removed feTurbulence noise filter to prevent mobile GPU rendering glitches */
+    display: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    @apply font-display tracking-tight text-white;
+  }
+
   /* Force CPX notification to be on top and fixed */
-  #notification, [id^="cpx-research"] {
+  #notification,
+  [id^="cpx-research"] {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -28,28 +68,44 @@
     z-index: 99999 !important;
     pointer-events: none; /* Allow clicking through the container if it's empty */
   }
-  
-  #notification > *, [id^="cpx-research"] > * {
+
+  #notification > *,
+  [id^="cpx-research"] > * {
     pointer-events: auto; /* Re-enable clicks for the actual notification content */
+  }
+
+  input,
+  textarea,
+  select {
+    @apply bg-slate-950 text-white border border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 p-3 rounded-xl transition-all placeholder:text-slate-400;
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-white border border-slate-200/50 shadow-premium;
+    @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all;
   }
-  
+
+  .glass-card:hover {
+    @apply border-white/20 bg-white/10;
+  }
+
   .dark-glass-card {
-    @apply bg-slate-900 border border-white/10 shadow-2xl;
+    @apply bg-slate-900/80 backdrop-blur-md border border-blue-500/10 shadow-[0_8px_40px_rgba(37,99,235,0.15)] transition-all;
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-linear-to-r from-slate-900 to-slate-600;
+    @apply bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-indigo-300;
   }
-  
+
   .premium-blur {
     @apply absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full pointer-events-none -z-10;
-    background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, rgba(147, 51, 234, 0.06) 40%, transparent 70%);
+    background: radial-gradient(
+      circle,
+      rgba(37, 99, 235, 0.08) 0%,
+      rgba(147, 51, 234, 0.05) 40%,
+      transparent 70%
+    );
   }
 }
 

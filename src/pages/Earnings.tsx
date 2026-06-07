@@ -22,6 +22,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import DepositTab from '../components/DepositTab';
 import { CpxWidget } from '../components/CpxWidget';
 import { CpxOfferwall } from '../components/CpxOfferwall';
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function Earnings() {
   const { user, profile } = useAuth();
@@ -126,7 +127,7 @@ export default function Earnings() {
            <div className="absolute inset-0 bg-linear-to-br from-blue-600/30 via-transparent to-purple-600/30 opacity-50" />
            <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-5">
-                 <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center backdrop-blur-xl group-hover:rotate-[15deg] group-hover:scale-110 transition-all duration-500 border border-white/10">
+                 <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center group-hover:rotate-[15deg] group-hover:scale-110 transition-all duration-500 border border-white/10">
                     <Dices size={28} className="text-white drop-shadow-2xl" />
                  </div>
                  <div>
@@ -142,33 +143,33 @@ export default function Earnings() {
 
         {/* Portfolio Summary Card */}
         <div className="grid grid-cols-2 gap-5">
-          <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)' }} />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Available</p>
-            <h2 className="text-3xl font-display font-black text-slate-900 tracking-tighter">₦{(profile?.withdrawableBalance || 0).toLocaleString()}</h2>
+          <div className="bg-slate-900/60 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, transparent 70%)' }} />
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Available</p>
+            <h2 className="text-3xl font-display font-black text-white tracking-tighter drop-shadow-md">₦<AnimatedNumber value={profile?.withdrawableBalance || 0} /></h2>
             <div className="flex items-center gap-2 mt-4">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest italic">Live Capital</p>
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+              <p className="text-[9px] text-emerald-400 font-black uppercase tracking-widest italic">Live Capital</p>
             </div>
           </div>
           
-          <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)' }} />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Pending</p>
-            <h2 className="text-3xl font-display font-black text-slate-900 tracking-tighter">₦{(profile?.pendingBalance || 0).toLocaleString()}</h2>
+          <div className="bg-slate-900/60 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%)' }} />
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Pending</p>
+            <h2 className="text-3xl font-display font-black text-white tracking-tighter drop-shadow-md">₦<AnimatedNumber value={profile?.pendingBalance || 0} /></h2>
             <div className="flex items-center gap-2 mt-4">
-              <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest italic">Escrow Lock</p>
+              <div className="w-1.5 h-1.5 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+              <p className="text-[9px] text-amber-400 font-black uppercase tracking-widest italic">Escrow Lock</p>
             </div>
           </div>
         </div>
 
         {/* Premium Tab Selection */}
-        <div className="flex bg-slate-100/50 backdrop-blur-md p-1.5 rounded-[2rem] border border-slate-200/50 relative">
+        <div className="flex bg-slate-900/60 backdrop-blur-3xl p-1.5 rounded-[2rem] border border-white/5 relative shadow-inner">
           <button 
             onClick={() => setActiveTab('history')}
             className={`flex-1 py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-500 relative z-10 ${
-              activeTab === 'history' ? 'bg-slate-950 text-white shadow-2xl' : 'text-slate-500 hover:text-slate-900'
+              activeTab === 'history' ? 'bg-blue-600 border border-blue-500/50 text-white shadow-[0_4px_15px_rgba(37,99,235,0.4)]' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             <History size={16} /> Ledger
@@ -176,7 +177,7 @@ export default function Earnings() {
           <button 
             onClick={() => setActiveTab('pending')}
             className={`flex-1 py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-500 relative z-10 ${
-              activeTab === 'pending' ? 'bg-slate-950 text-white shadow-2xl' : 'text-slate-500 hover:text-slate-900'
+              activeTab === 'pending' ? 'bg-blue-600 border border-blue-500/50 text-white shadow-[0_4px_15px_rgba(37,99,235,0.4)]' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             <Clock size={16} /> Pending
@@ -184,7 +185,7 @@ export default function Earnings() {
           <button 
             onClick={() => setActiveTab('deposit')}
             className={`flex-1 py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-500 relative z-10 ${
-              activeTab === 'deposit' ? 'bg-slate-950 text-white shadow-2xl' : 'text-slate-500 hover:text-slate-900'
+              activeTab === 'deposit' ? 'bg-blue-600 border border-blue-500/50 text-white shadow-[0_4px_15px_rgba(37,99,235,0.4)]' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             <WalletIcon size={16} /> Deposit

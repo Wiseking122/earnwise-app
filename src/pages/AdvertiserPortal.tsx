@@ -36,7 +36,8 @@ import {
   Facebook,
   Instagram,
   Twitter,
-  Youtube
+  Youtube,
+  Trash2
 } from 'lucide-react';
 
 interface ServiceOption {
@@ -48,7 +49,7 @@ interface ServiceOption {
 const PLATFORM_SERVICES: Record<string, ServiceOption[]> = {
   Facebook: [
     { id: 'fb_likes', name: 'Page Likes', rate: 50 },
-    { id: 'fb_shares', name: 'Post Shares', rate: 30 }
+    { id: 'fb_followers', name: 'Facebook Followers', rate: 90 }
   ],
   Instagram: [
     { id: 'ig_followers', name: 'Instagram Followers', rate: 60 },
@@ -90,6 +91,7 @@ export default function AdvertiserPortal() {
   const [selectedPlatform, setSelectedPlatform] = useState('Facebook');
   const [selectedServiceId, setSelectedServiceId] = useState('fb_likes');
   const [quantity, setQuantity] = useState(100);
+  const [durationDays, setDurationDays] = useState<number | ''>(30); // Default duration to 30 days
   const [targetLink, setTargetLink] = useState('');
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -129,14 +131,25 @@ export default function AdvertiserPortal() {
     return () => unsubscribe();
   }, [user]);
 
+  const isAdmin = profile?.role === 'admin';
+
   // Compute pricing
   const services = PLATFORM_SERVICES[selectedPlatform] || [];
   const selectedService = services.find(s => s.id === selectedServiceId) || services[0] || { id: '', name: 'Standard Service', rate: 25 };
-  const baseRate = selectedService.rate;
+  
+  // Apply a 2% discount structurally to the rates of ads in campaigns
+  const baseRate = selectedService.rate * 0.98; // 2% campaign rate reduction applied
   const baseCost = baseRate * quantity;
-  const serviceFee = Math.round(baseCost * 0.05); // 5% fee
-  const totalAmount = baseCost + serviceFee;
-  const isBalanceLow = (profile?.withdrawableBalance || 0) < totalAmount;
+  const cleanDuration = Number(durationDays) || 0;
+  const dailyFee = 250 * cleanDuration; // ₦250 per day setup & listing maintenance
+  const totalWithDaily = baseCost + dailyFee;
+  const serviceFee = Math.round(totalWithDaily * 0.05); // 5% fee
+  
+  // Apply an additional 2% reduction on overall campaign invoice to ensure a safe cumulative cost reduce of 2%+
+  const subtotal = totalWithDaily + serviceFee;
+  const campaignDiscount = Math.round(subtotal * 0.02); // 2% campaign amount budget reduction
+  const totalAmount = isAdmin ? 0 : subtotal - campaignDiscount;
+  const isBalanceLow = (profile?.withdrawableBalance || 0) < totalAmount && !isAdmin;
 
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +158,12 @@ export default function AdvertiserPortal() {
 
     if (quantity < 50) {
       setValidationError('Campaign quantity must be at least 50 units.');
+      return;
+    }
+
+    const cleanDuration = Number(durationDays) || 30;
+    if (cleanDuration < 1) {
+      setValidationError('Campaign duration must be at least 1 day.');
       return;
     }
 
@@ -176,6 +195,11 @@ export default function AdvertiserPortal() {
 
         // 1. Create task entry directly in 'tasks'
         const taskRef = doc(collection(db, 'tasks'));
+        
+        // Expiration timestamp based on user selected days
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + cleanDuration);
+
         transaction.set(taskRef, {
           advertiserId: user.uid,
           title: campaignName.trim() || `${selectedPlatform} ${selectedService.name} Campaign`,
@@ -186,7 +210,8 @@ export default function AdvertiserPortal() {
           platformMargin: selectedService.rate * 0.30, // System margin splits
           totalBudget: baseCost,
           remainingBudget: baseCost,
-          durationDays: 30,
+          durationDays: cleanDuration,
+          expiresAt: expiresAt,
           status: 'pending', // review queues
           tag: selectedPlatform.toLowerCase(),
           requiresProof: true,
@@ -218,6 +243,7 @@ export default function AdvertiserPortal() {
       setTargetLink('');
       setAdditionalInstructions('');
       setQuantity(100);
+      setDurationDays(30);
       
       // Hold success animation for 2.5 seconds, then return
       setTimeout(() => {
@@ -228,6 +254,59 @@ export default function AdvertiserPortal() {
     } catch (err: any) {
       console.error(err);
       setValidationError(err.message || 'Failed to place campaign. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCampaign = async (task: Task) => {
+    if (!window.confirm(`Are you sure you want to cancel the campaign "${task.title}"? Your remaining budget will be refunded.`)) return;
+    
+    try {
+      setLoading(true);
+      const taskRef = doc(db, 'tasks', task.id);
+      const userRef = doc(db, 'users', user!.uid);
+
+      await runTransaction(db, async (transaction) => {
+        const taskSnap = await transaction.get(taskRef);
+        if (!taskSnap.exists()) throw new Error("Campaign no longer exists.");
+
+        const taskData = taskSnap.data();
+        
+        // We can only cancel if status is pending or active
+        const isRefundable = taskData.status === 'active' || taskData.status === 'pending';
+        const refundCost = isRefundable ? (taskData.remainingBudget !== undefined ? taskData.remainingBudget : taskData.totalBudget || 0) : 0;
+        
+        // Proportional fee calculations
+        const dailyFeePaid = 250 * (taskData.durationDays || 30);
+        const totalPaidWithDailyFees = refundCost + (isRefundable ? dailyFeePaid : 0);
+        const refundFee = Math.round(totalPaidWithDailyFees * 0.05);
+        const totalRefund = totalPaidWithDailyFees + refundFee;
+
+        // Delete task
+        transaction.delete(taskRef);
+
+        if (totalRefund > 0 && !isAdmin) {
+          transaction.update(userRef, {
+            withdrawableBalance: increment(totalRefund),
+            balance: increment(totalRefund)
+          });
+
+          const transRef = doc(collection(db, 'transactions'));
+          transaction.set(transRef, {
+            userId: user!.uid,
+            amount: totalRefund,
+            type: 'earning',
+            description: `Cancelled Campaign Refund: ${task.title}`,
+            createdAt: serverTimestamp()
+          });
+        }
+      });
+
+      alert("Campaign successfully cancelled and budget refunded!");
+    } catch (err: any) {
+      console.error(err);
+      alert(`Failed to cancel campaign: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -283,7 +362,7 @@ export default function AdvertiserPortal() {
                 <input 
                   type="text" 
                   placeholder="e.g. Instagram Growth 2026"
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500 transition-all shadow-inner"
+                  className="w-full border border-slate-600 text-slate-900 bg-white rounded-2xl p-4 font-bold text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                   value={campaignName}
                   onChange={e => setCampaignName(e.target.value)}
                   id="campaign-name-input"
@@ -366,10 +445,37 @@ export default function AdvertiserPortal() {
                   min="50"
                   required
                   placeholder="1000"
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500 transition-all shadow-inner"
+                  className="w-full border border-slate-600 text-slate-900 bg-white rounded-2xl p-4 font-bold text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                   value={quantity === 0 ? '' : quantity}
                   onChange={e => setQuantity(Number(e.target.value))}
                   id="campaign-quantity-input"
+                />
+              </div>
+
+              {/* Campaign Duration (Days) */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Campaign Duration (Days)</label>
+                  <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">₦250/day setup fee</span>
+                </div>
+                <input 
+                  type="text" 
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  required
+                  placeholder="e.g. 30"
+                  className="w-full border border-slate-600 text-slate-900 bg-white rounded-2xl p-4 font-bold text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  value={durationDays}
+                  onChange={e => {
+                    const rawVal = e.target.value;
+                    if (rawVal === '') {
+                      setDurationDays('');
+                    } else {
+                      const cleanNum = Number(rawVal.replace(/[^0-9]/g, ''));
+                      setDurationDays(cleanNum);
+                    }
+                  }}
+                  id="campaign-duration-input"
                 />
               </div>
 
@@ -380,7 +486,7 @@ export default function AdvertiserPortal() {
                   type="url" 
                   required
                   placeholder="https://facebook.com/your-profile"
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500 transition-all shadow-inner"
+                  className="w-full border border-slate-600 text-slate-900 bg-white rounded-2xl p-4 font-bold text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                   value={targetLink}
                   onChange={e => setTargetLink(e.target.value)}
                   id="campaign-target-link"
@@ -393,7 +499,7 @@ export default function AdvertiserPortal() {
                 <textarea 
                   rows={3}
                   placeholder="e.g. Page must be liked and comments must not contain spam..."
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500 transition-all shadow-inner resize-none"
+                  className="w-full border border-slate-600 text-slate-900 bg-white rounded-2xl p-4 font-bold text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none"
                   value={additionalInstructions}
                   onChange={e => setAdditionalInstructions(e.target.value)}
                   id="campaign-instructions"
@@ -447,7 +553,10 @@ export default function AdvertiserPortal() {
 
                   <div className="flex justify-between">
                     <span>Base Rate</span>
-                    <span className="text-slate-900 font-black">₦{selectedService.rate} / unit</span>
+                    <span className="text-slate-900 font-black flex items-center gap-2">
+                      <span className="text-xs line-through text-slate-400">₦{selectedService.rate}</span>
+                      <span className="text-emerald-600">₦{baseRate.toFixed(2)}</span>
+                    </span>
                   </div>
 
                   <div className="flex justify-between">
@@ -455,9 +564,22 @@ export default function AdvertiserPortal() {
                     <span className="text-slate-900 font-black">{quantity.toLocaleString()}</span>
                   </div>
 
+                  <div className="flex justify-between">
+                    <span>Duration</span>
+                    <span className="text-slate-900 font-black">{durationDays || 0} Days</span>
+                  </div>
+
                   <div className="flex justify-between pt-4 border-t border-slate-100 border-dashed">
                     <span>Delivery Total</span>
-                    <span className="text-slate-900 font-black">₦{baseCost.toLocaleString()}</span>
+                    <span className="text-slate-900 font-black flex items-center gap-2">
+                      <span className="text-xs line-through text-slate-400">₦{(selectedService.rate * quantity).toLocaleString()}</span>
+                      <span>₦{baseCost.toLocaleString()}</span>
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>Daily Host Fee (₦250/d)</span>
+                    <span className="text-slate-900 font-black">₦{dailyFee.toLocaleString()}</span>
                   </div>
 
                   <div className="flex justify-between">
@@ -465,9 +587,15 @@ export default function AdvertiserPortal() {
                     <span className="text-slate-900 font-black">₦{serviceFee.toLocaleString()}</span>
                   </div>
 
+                  <div className="flex justify-between text-emerald-600 font-bold bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+                    <span>Campaign Discount (2%)</span>
+                    <span>-₦{campaignDiscount.toLocaleString()}</span>
+                  </div>
+
                   <div className="flex justify-between items-end pt-4 border-t border-slate-100">
                     <span className="text-[10px] text-slate-400 font-black tracking-widest">Total Amount</span>
-                    <span className="text-2xl font-display font-black text-blue-500 tracking-tighter">
+                    <span className="text-2xl font-display font-black text-blue-500 tracking-tighter flex items-center gap-2">
+                      {isAdmin && <span className="text-xs bg-emerald-100 text-emerald-600 px-2 py-1 rounded-lg">FREE</span>}
                       ₦{totalAmount.toLocaleString()}
                     </span>
                   </div>
@@ -654,11 +782,23 @@ export default function AdvertiserPortal() {
                       </div>
                     </div>
 
-                    <div className="text-right font-display text-slate-900 font-extrabold flex flex-col items-end">
-                      <span className="text-sm">₦{((task.totalBudget || 0)).toLocaleString()}</span>
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5 leading-none">
-                        Budget
-                      </span>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right font-display text-slate-900 font-extrabold flex flex-col items-end">
+                        <span className="text-sm">₦{((task.totalBudget || 0)).toLocaleString()}</span>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5 leading-none">
+                          Budget
+                        </span>
+                      </div>
+                      
+                      <button
+                        onClick={() => handleDeleteCampaign(task)}
+                        disabled={loading}
+                        className="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors"
+                        title="Cancel Campaign"
+                        id={`cancel-campaign-${task.id}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
                 ))

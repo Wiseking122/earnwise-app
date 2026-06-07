@@ -27,6 +27,19 @@ export default function Academy() {
 
   const categories = ['All', 'Freelancing', 'AI Strategy', 'E-commerce', 'Writing', 'Design', 'Marketing', 'Photography', 'Education'];
 
+  const [imageOverrides, setImageOverrides] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    try {
+      COURSES.forEach(c => {
+        const cached = localStorage.getItem(`course_override_${c.id}`);
+        if (cached) {
+          initial[c.id] = cached;
+        }
+      });
+    } catch (_) {}
+    return initial;
+  });
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -45,14 +58,42 @@ export default function Academy() {
     return unsub;
   }, [user]);
 
+  // Real-time listener for course image overrides
+  useEffect(() => {
+    if (!user) return;
+
+    const unsub = onSnapshot(collection(db, 'course_overrides'), (snap) => {
+      const overrides: Record<string, string> = {};
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.image) {
+          overrides[doc.id] = data.image;
+          try {
+            localStorage.setItem(`course_override_${doc.id}`, data.image);
+          } catch (_) {}
+        }
+      });
+      setImageOverrides(overrides);
+    }, (error) => {
+      console.warn("Could not load real-time course cover overrides: ", error);
+    });
+
+    return unsub;
+  }, [user]);
+
   const filteredCourses = useMemo(() => {
-    return COURSES.filter(c => {
+    return COURSES.map(c => {
+      if (imageOverrides[c.id]) {
+        return { ...c, image: imageOverrides[c.id] };
+      }
+      return c;
+    }).filter(c => {
       const matchSearch = c.title.toLowerCase().includes(search.toLowerCase()) || 
                           c.description.toLowerCase().includes(search.toLowerCase());
       const matchCat = category === 'All' || c.category === category;
       return matchSearch && matchCat;
     });
-  }, [search, category]);
+  }, [search, category, imageOverrides]);
 
   return (
     <Layout>
@@ -136,11 +177,7 @@ export default function Academy() {
                   className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-xs hover:shadow-md transition-all group"
                 >
                   <div className="relative aspect-video overflow-hidden">
-                    <img 
-                      src={course.imageUrl} 
-                      alt={course.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
+                    <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-linear-to-t from-slate-900/80 via-transparent to-transparent" />
                     <div className="absolute top-4 right-4">
                       <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest backdrop-blur-md border ${

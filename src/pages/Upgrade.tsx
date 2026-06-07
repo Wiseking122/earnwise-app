@@ -310,7 +310,7 @@ export default function Upgrade() {
                       </li>
                       <li className="flex items-center gap-2 text-xs text-slate-300">
                         <CheckCircle2 size={12} className="text-indigo-400 shrink-0" />
-                        <span>Unlimited AI Tutor Assistance</span>
+                        <span>Unlimited Wise AI Assistance</span>
                       </li>
                     </ul>
                   </div>

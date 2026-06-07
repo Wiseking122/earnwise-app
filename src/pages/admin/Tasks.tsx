@@ -40,6 +40,7 @@ export default function AdminTasks() {
   const [adRequests, setAdRequests] = useState<Task[]>([]);
   const [activeTab, setActiveTab] = useState<'manage' | 'verify' | 'ads'>('manage');
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedScreenshotForModal, setSelectedScreenshotForModal] = useState<string | null>(null);
   
   // New Task Form
   const [newTitle, setNewTitle] = useState('');
@@ -349,7 +350,7 @@ export default function AdminTasks() {
                          type="number" 
                          value={adDurations[ad.id] || '30'} 
                          onChange={(e) => setAdDurations(prev => ({ ...prev, [ad.id]: e.target.value }))}
-                         className="w-full bg-gray-50 border-none rounded-xl p-3 text-sm font-bold outline-none ring-1 ring-gray-100 focus:ring-blue-500"
+                         className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-3 text-sm font-bold outline-none ring-1 ring-gray-100 focus:ring-blue-500"
                          placeholder="Set days (e.g. 30)"
                        />
                     </div>
@@ -401,13 +402,13 @@ export default function AdminTasks() {
               <form onSubmit={handleCreateTask} className="bg-white p-6 rounded-3xl border-2 border-blue-100 shadow-xl space-y-4">
                 <input 
                   type="text" placeholder="Task Title (e.g. Subscribe to Tech Channel)" required 
-                  className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-bold"
+                  className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                   value={newTitle} onChange={e => setNewTitle(e.target.value)}
                 />
                 
                 <div className="grid grid-cols-2 gap-4">
                    <select 
-                    className="bg-gray-50 border-none rounded-xl p-4 text-sm font-bold"
+                    className="bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                     value={newType} onChange={e => setNewType(e.target.value as TaskType)}
                   >
                     <option value="ad">Watch Ad</option>
@@ -417,7 +418,7 @@ export default function AdminTasks() {
                   </select>
                   <input 
                     type="text" placeholder="Behavioral Tag (e.g. finance, tech)" 
-                    className="bg-gray-50 border-none rounded-xl p-4 text-sm font-bold"
+                    className="bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                     value={newTag} onChange={e => setNewTag(e.target.value)}
                   />
                 </div>
@@ -427,7 +428,7 @@ export default function AdminTasks() {
                     <label className="text-[10px] font-black uppercase text-gray-400 px-1">Total Budget (₦)</label>
                     <input 
                       type="number" placeholder="10000" required step="0.01"
-                      className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-bold"
+                      className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                       value={newTotalBudget} onChange={e => setNewTotalBudget(e.target.value)}
                     />
                   </div>
@@ -435,7 +436,7 @@ export default function AdminTasks() {
                     <label className="text-[10px] font-black uppercase text-gray-400 px-1">CPA (Cost Per Action) (₦)</label>
                     <input 
                       type="number" placeholder="50" required step="0.01"
-                      className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-bold"
+                      className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                       value={newCpa} onChange={e => setNewCpa(e.target.value)}
                     />
                   </div>
@@ -443,7 +444,7 @@ export default function AdminTasks() {
                     <label className="text-[10px] font-black uppercase text-gray-400 px-1">Duration (Days)</label>
                     <input 
                       type="number" placeholder="30" required
-                      className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-bold"
+                      className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                       value={newDurationDays} onChange={e => setNewDurationDays(e.target.value)}
                     />
                   </div>
@@ -452,17 +453,17 @@ export default function AdminTasks() {
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <input 
                     type="url" placeholder="Affiliate Link (Optional)" 
-                    className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-medium"
+                    className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-medium"
                     value={newLink} onChange={e => setNewLink(e.target.value)}
                   />
                   <input 
                     type="url" placeholder="Video URL (Optional)" 
-                    className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-medium"
+                    className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-medium"
                     value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)}
                   />
                   <input 
                     type="url" placeholder="Image URL (Optional)" 
-                    className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-medium"
+                    className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-medium"
                     value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)}
                   />
                 </div>
@@ -477,7 +478,7 @@ export default function AdminTasks() {
                 {enableSocialShare && (
                   <textarea 
                     placeholder="Share Text (e.g. Join me on Julia and earn from brands! #Monetize)"
-                    className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-medium h-20"
+                    className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-medium h-20"
                     value={newShareText} onChange={e => setNewShareText(e.target.value)}
                   />
                 )}
@@ -502,7 +503,10 @@ export default function AdminTasks() {
                 <div key={task.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-gray-900">{task.title}</h4>
-                    <p className="text-xs font-black text-blue-600">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
+                      Creator: {task.advertiserId === 'internal_platform' || !task.advertiserId ? '🛡️ Admin' : `👤 User Advertiser (${task.advertiserId.slice(0, 8)})`}
+                    </p>
+                    <p className="text-xs font-black text-blue-600 mt-1">
                       ₦{(task.userPayout || 0).toFixed(2)} Payout • {task.type} • Tag: {task.tag || 'none'}
                     </p>
                     <div className="mt-2 flex gap-2">
@@ -520,7 +524,7 @@ export default function AdminTasks() {
                     <button onClick={() => toggleTaskStatus(task)} className="p-2 bg-gray-50 text-gray-500 rounded-lg">
                       {task.status === 'active' ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                     </button>
-                    <button onClick={() => handleDeleteTask(task.id)} className="p-2 bg-red-50 text-red-500 rounded-lg">
+                    <button onClick={() => handleDeleteTask(task.id)} className="p-2 bg-red-50 text-red-550 rounded-lg group hover:bg-red-100 transition-colors">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -529,36 +533,80 @@ export default function AdminTasks() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {completions.length > 0 ? (
-              completions.map(comp => (
-                <div key={comp.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase">User ID: {comp.userId.slice(0, 8)}...</p>
-                      <h4 className="font-bold text-gray-900">Task Completion</h4>
-                      <p className="text-sm font-black text-green-600">${comp.rewardEarned.toFixed(2)} Payout</p>
+              completions.map(comp => {
+                const targetTask = tasks.find(t => t.id === comp.taskId);
+                const isCampaign = !!(comp as any).isCampaignTask || !!comp.screenshot;
+
+                return (
+                  <div key={comp.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <p className="text-[10px] font-black text-gray-400 uppercase">User: {comp.userId.slice(0, 8)}...</p>
+                          {isCampaign ? (
+                            <span className="inline-block bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] uppercase font-black px-2 py-0.5 rounded-full">
+                              Advertiser Campaign Proof
+                            </span>
+                          ) : (
+                            <span className="inline-block bg-slate-50 border border-slate-100 text-slate-600 text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
+                              Standard Proof Submission
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="font-extrabold text-gray-900 text-base leading-tight">
+                          {targetTask?.title || "Task Completion"}
+                        </h4>
+                        <p className="text-sm font-black text-green-600">₦{comp.rewardEarned.toFixed(2)} Payout</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400 font-bold">
+                          {comp.submittedAt?.toDate ? new Date(comp.submittedAt.toDate()).toLocaleDateString() : 'Just now'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                       <p className="text-[10px] text-gray-400 font-bold">{new Date(comp.submittedAt?.toDate()).toLocaleDateString()}</p>
+
+                    {/* Proof Description Text */}
+                    <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-100/50 space-y-1">
+                      <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Proof Details / Handle Description:</span>
+                      <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                        {(comp as any).proofText || comp.proof || "No additional text description was provided."}
+                      </p>
+                    </div>
+
+                    {/* Screenshot Proof */}
+                    {(comp as any).screenshot && (
+                      <div className="space-y-2">
+                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Screenshot Proof (Click to expand):</span>
+                        <div className="relative inline-block overflow-hidden rounded-2xl border border-slate-200 group">
+                          <img 
+                            src={(comp as any).screenshot} 
+                            alt="Screenshot Proof" 
+                            onClick={() => setSelectedScreenshotForModal((comp as any).screenshot)}
+                            className="max-h-44 object-cover cursor-pointer group-hover:scale-[1.02] active:scale-95 transition-all duration-300" 
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => handleVerifyCompletion(comp, 'approved')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-green-100"
+                      >
+                        <Check size={18} /> Approve & Reward
+                      </button>
+                      <button 
+                        onClick={() => handleVerifyCompletion(comp, 'rejected')}
+                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                      >
+                        <X size={18} /> Reject Submission
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => handleVerifyCompletion(comp, 'approved')}
-                      className="flex-1 bg-green-600 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2"
-                    >
-                      <Check size={18} /> Approve
-                    </button>
-                    <button 
-                      onClick={() => handleVerifyCompletion(comp, 'rejected')}
-                      className="flex-1 bg-red-50 text-red-600 font-black py-3 rounded-xl flex items-center justify-center gap-2"
-                    >
-                      <X size={18} /> Reject
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-20">
                 <AlertCircle size={48} className="text-gray-200 mx-auto mb-4" />
@@ -568,6 +616,25 @@ export default function AdminTasks() {
           </div>
         )}
       </div>
+
+      {/* Expanded Screenshot Modal Overlay */}
+      {selectedScreenshotForModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-full max-h-full">
+            <button 
+              onClick={() => setSelectedScreenshotForModal(null)} 
+              className="absolute -top-12 right-0 bg-white text-slate-900 rounded-full w-10 h-10 flex items-center justify-center font-black shadow-lg hover:bg-gray-100 hover:scale-105 active:scale-95 transition-all text-sm z-[60]"
+            >
+              ✕
+            </button>
+            <img 
+              src={selectedScreenshotForModal} 
+              alt="Expanded Proof" 
+              className="max-h-[80vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl bg-white animate-fade-in" 
+            />
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

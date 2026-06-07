@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Search
 } from 'lucide-react';
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function Transactions() {
   const { profile } = useAuth();
@@ -66,7 +67,7 @@ export default function Transactions() {
             <div className="relative z-10 flex items-center justify-between">
                 <div>
                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Total Wallet</p>
-                   <h3 className="text-3xl font-black tracking-tight">₦{(profile?.balance || 0).toLocaleString()}</h3>
+                   <h3 className="text-3xl font-black tracking-tight">₦<AnimatedNumber value={profile?.balance || 0} /></h3>
                 </div>
                 <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
                     <Wallet size={24} className="text-white" />
@@ -79,7 +80,7 @@ export default function Transactions() {
                         <TrendingUp size={14} className="text-emerald-400" />
                         <span className="text-[9px] font-black uppercase text-slate-400">Income</span>
                     </div>
-                    <p className="font-black text-sm text-emerald-400">₦{(profile?.taskEarnings || 0).toLocaleString()}</p>
+                    <p className="font-black text-sm text-emerald-400">₦<AnimatedNumber value={profile?.taskEarnings || 0} /></p>
                 </div>
                 <div className="flex-1 bg-white/5 p-4 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-2 mb-1">

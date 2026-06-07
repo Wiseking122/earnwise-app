@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -8,9 +8,13 @@ const app = initializeApp(firebaseConfig);
 // @ts-ignore - firestoreDatabaseId is dynamically added by the platform
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  host: "firestore.googleapis.com", 
-  }, firebaseConfig.firestoreDatabaseId || '(default)');
-export const auth = getAuth();
+}, firebaseConfig.firestoreDatabaseId || '(default)');
+export const auth = getAuth(app);
+
+// Force localStorage persistence for better Telegram Mini App compatibility
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.warn("Failed to set Firebase Auth persistence to localStorage:", err);
+});
 let analytics: any = null;
 if (typeof window !== 'undefined') {
   isSupported().then((supported) => {

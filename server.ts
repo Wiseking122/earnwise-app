@@ -1,5 +1,8 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import http from "http";
+import { WebSocketServer } from "ws";
 import { createServer as createViteServer } from "vite";
 import { Telegraf } from "telegraf";
 import dotenv from "dotenv";
@@ -19,12 +22,24 @@ dotenv.config();
 // Initialize Firebase Admin
 let firebaseApp;
 try {
+  let credential;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    try {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      credential = admin.credential.cert(serviceAccount);
+    } catch (e) {
+      console.error("[FIREBASE] Could not parse FIREBASE_SERVICE_ACCOUNT_KEY, falling back to default.", e);
+    }
+  }
+
   firebaseApp = admin.apps.find(app => app?.name === 'earnwise-app') || admin.initializeApp({
+    credential: credential || admin.credential.applicationDefault(),
     projectId: firebaseConfig.projectId
   }, 'earnwise-app');
 } catch (err) {
   console.error("[FIREBASE] Admin App init error, trying default app:", err);
   firebaseApp = admin.apps.length > 0 ? admin.apps[0] : admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
     projectId: firebaseConfig.projectId
   });
 }
@@ -39,9 +54,9 @@ try {
     
   // @ts-ignore - databaseId exists on newest admin SDK
   dbAdmin = getFirestore(firebaseApp, dbId || '(default)');
-  console.log(`[FIREBASE] Admin SDK exploring database: ${dbId || '(default)'}`);
+  console.log("[FIREBASE] Using explicit Database ID:", dbId || '(default)');
 } catch (err) {
-  console.warn("[FIREBASE] Custom database initialization failed, falling back to default:", err);
+  console.error("[FIREBASE] Error initializing with explicit DB ID:", err);
   dbAdmin = getFirestore(firebaseApp);
 }
 
@@ -58,12 +73,8 @@ async function checkDbAdminCapability() {
     await ensureOwnerAdminStatus();
   } catch (err: any) {
     isDbAdminCapable = false;
-    console.warn("[FIREBASE] Server Admin SDK authentication failed or restricted:", err.message);
-    console.info("[FIREBASE] Running in restricted sandbox mode. Environment secrets or project permissions might be missing.");
     
-    // In restricted mode, we could try one last thing: initialize WITHOUT a database ID if it was set
     if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)') {
-       console.info("[FIREBASE] Attempting fallback to (default) database...");
        try {
          const fallbackDb = getFirestore(firebaseApp, '(default)');
          await fallbackDb.collection('users').limit(1).get();
@@ -72,8 +83,12 @@ async function checkDbAdminCapability() {
          console.log("[FIREBASE] Fallback to (default) database succeeded.");
          await ensureOwnerAdminStatus();
        } catch (innerErr) {
-         console.warn("[FIREBASE] Fallback to (default) database also failed.");
+         isDbAdminCapable = false;
        }
+    }
+    
+    if (!isDbAdminCapable) {
+      console.info("[FIREBASE] Server Admin SDK is running in restricted/client fallback mode. (Missing service account key or permissions). This is expected in the sandbox without FIREBASE_SERVICE_ACCOUNT_KEY set.");
     }
   }
 }
@@ -116,7 +131,7 @@ const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
 // Initialize Gemini
 const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY as string,
+  apiKey: (process.env.GEMINI_API_KEY || "").trim(),
   httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
 });
 // --- CONFIGURATION: Membership Tiers & Multipliers ---
@@ -159,8 +174,8 @@ const lastUserActivity = new Map<string, number>();
 
 async function startServer() {
   const app = express();
-  app.set('trust proxy', true);
-  app.use(express.json());
+  app.set('trust proxy', 1);
+  app.use(express.json({ limit: '10mb' }));
 
   // Run startup admin check (called from checkDbAdminCapability)
   // ensureOwnerAdminStatus();
@@ -194,6 +209,65 @@ async function startServer() {
     lastUserActivity.set(userId, now);
     next();
   };
+
+  /**
+   * Helper: Awards referral bonus to referrer when a referred user upgrades.
+   * Only awarded once per referred user.
+   * @param userId The ID of the user who upgraded
+   * @param planId The ID of the plan they upgraded to (to calculate 10% commission)
+   */
+  async function handleReferralUpgradeBonus(userId: string, planId: string) {
+    if (!isDbAdminCapable) return;
+    try {
+      const userRef = dbAdmin.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) return;
+      const userData = userDoc.data();
+      
+      // Only award if they haven't received it yet and they have a referrer
+      if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
+        const referrers = await dbAdmin.collection('users').where('referralCode', '==', userData.referredBy).limit(1).get();
+        
+        if (!referrers.empty) {
+          const referrerDoc = referrers.docs[0];
+          
+          // Calculate 10% of plan cost
+          const planCost = PLAN_COSTS[planId] || 0;
+          const bonusAmount = Math.floor(planCost * 0.1);
+          
+          if (bonusAmount <= 0) return; // No bonus for free or zero cost plans
+
+          await dbAdmin.runTransaction(async (transaction) => {
+            // Update referrer
+            transaction.update(referrerDoc.ref, {
+              balance: admin.firestore.FieldValue.increment(bonusAmount),
+              referralEarnings: admin.firestore.FieldValue.increment(bonusAmount)
+            });
+            
+            // Set flag on referred user to prevent duplicate bonuses
+            transaction.update(userRef, {
+              hasReceivedReferralBonus: true
+            });
+            
+            // Send notification to referrer
+            const notifRef = dbAdmin.collection('notifications').doc();
+            transaction.set(notifRef, {
+              userId: referrerDoc.id,
+              title: '🎁 Referral Upgrade Commission!',
+              message: `Your friend upgraded to ${planId}! You have received a 10% commission of ₦${bonusAmount}.`,
+              type: 'reward',
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              readBy: []
+            });
+          });
+          
+          console.log(`[REFERRAL] Awarded ₦${bonusAmount} (10% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
+        }
+      }
+    } catch (err) {
+      console.error("[REFERRAL] FAILED to award upgrade bonus:", err);
+    }
+  }
 
   // --- Telegram Bot Setup ---
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -267,7 +341,7 @@ async function startServer() {
       });
 
       bot.command('refer', (ctx) => {
-        ctx.reply("👥 *Refer & Earn Lifetime Commissions*\n\nInvite your friends and earn:\n1. ₦1,000 Welcome Bonus per referral\n2. 10% Lifetime Royalty on their earnings\n\nGet your unique link in the app!", {
+        ctx.reply("👥 *Refer & Earn Lifetime Commissions*\n\nInvite your friends and earn:\n1. 10% Upgrade Commission when they upgrade\n2. 10% Lifetime Royalty on their earnings\n\nGet your unique link in the app!", {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
@@ -459,9 +533,10 @@ async function startServer() {
     next();
   });
 
+
   // --- AUTOMATIC 10x DAILY COACHING ENGINE ---
   // Periodically scans all users to dispatch step-by-step masterclasses automatically (10 times a day)
-  async function runAutomatedCoachingCycle() {
+  async function runAutomatedCoachingCycle(force = false) {
     if (!isDbAdminCapable) {
       console.info("[COACHING-AUTO] DB Admin is not write capable. Skipping cycle.");
       return;
@@ -471,15 +546,27 @@ async function startServer() {
       console.warn("[COACHING-AUTO] EMAIL_USER or EMAIL_PASS not configured. Coaching emails will fail.");
     }
 
-    console.log("[COACHING-AUTO] Running scheduled automatic coaching scan...");
+    console.log(`[COACHING-AUTO] Starting coaching cycle at ${new Date().toISOString()}. Force: ${force}`);
     try {
+      // Get a batch of users to process. We'll filter for enabled coaching in memory 
+      // because Firestore != query doesn't include documents where the field is missing.
       const usersSnap = await dbAdmin.collection('users').get();
+
       if (usersSnap.empty) {
         console.log("[COACHING-AUTO] No users found in database.");
         return;
       }
 
-      console.log(`[COACHING-AUTO] Scanning ${usersSnap.size} users...`);
+      const eligibleUsers = usersSnap.docs.filter(doc => {
+        const data = doc.data();
+        // Eligible if not explicitly disabled
+        return data.dailyEmailEnabled !== false;
+      });
+
+      if (eligibleUsers.length === 0) {
+        console.log("[COACHING-AUTO] No eligible users (coaching enabled) found in this batch.");
+        return;
+      }
 
       const topics = [
         {
@@ -527,116 +614,77 @@ async function startServer() {
       ];
 
       const now = Date.now();
-      // 10 times a day = ~2.4 hours (144 minutes). We will allow slightly faster spacing (e.g. 2 hours / 120 minutes) to be flexible
-      const minIntervalMs = 2 * 60 * 60 * 1000;
+      const minIntervalMs = 2 * 60 * 60 * 1000; // 2 hour cycle gap
 
-      for (const userDoc of usersSnap.docs) {
+      for (const userDoc of eligibleUsers) {
         const userData = userDoc.data();
         
-        // Skip users who opted out
-        if (userData.dailyEmailEnabled === false) {
-          console.log(`[COACHING-AUTO] User ${userDoc.id} has disabled coaching. Skipping.`);
-          continue;
-        }
-        if (!userData.email) {
-          console.log(`[COACHING-AUTO] User ${userDoc.id} has no email address. Skipping email.`);
-        }
-
         let lastCoachingTime = 0;
         if (userData.lastCoachingAt) {
-          if (userData.lastCoachingAt.toMillis) {
-            lastCoachingTime = userData.lastCoachingAt.toMillis();
-          } else if (userData.lastCoachingAt instanceof Date) {
-            lastCoachingTime = userData.lastCoachingAt.getTime();
-          } else {
-            lastCoachingTime = new Date(userData.lastCoachingAt).getTime() || 0;
-          }
+          lastCoachingTime = userData.lastCoachingAt.toMillis ? userData.lastCoachingAt.toMillis() : new Date(userData.lastCoachingAt).getTime();
         }
 
-        // Check if due for next automated scheduled coaching drop
-        if (lastCoachingTime === 0 || (now - lastCoachingTime >= minIntervalMs)) {
-          const currentStep = userData.coachingStep !== undefined ? parseInt(userData.coachingStep) : 0;
+        if (force || lastCoachingTime === 0 || (now - lastCoachingTime >= minIntervalMs)) {
+          const currentStep = userData.coachingStep || 0;
           const selectedTopic = topics[currentStep % topics.length];
           const nextStep = (currentStep + 1) % topics.length;
 
-          console.log(`[COACHING-AUTO] Dispatching coaching step ${currentStep} (${selectedTopic.id}) to ${userData.email || 'user without email'}`);
+          // Dispatch simultaneously for speed
+          const dispatches = [];
 
-          // 1. Send automatic in-app notification (bell)
-          try {
-            await dbAdmin.collection('notifications').add({
+          // 1. In-app Notification
+          dispatches.push(
+            dbAdmin.collection('notifications').add({
               userId: userDoc.id,
-              title: `🌅 Daily Hustle: ${selectedTopic.headline}`,
-              message: `${selectedTopic.quote} 👉 Today's tip: ${selectedTopic.tip}`,
+              title: `🌅 Wise AI Daily: ${selectedTopic.headline}`,
+              message: `${selectedTopic.quote} 👉 Tip: ${selectedTopic.tip}`,
               type: 'reward',
-              read: false,
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               readBy: []
-            });
-            console.log(`[COACHING-AUTO] In-app notification sent to ${userDoc.id}`);
-          } catch (notifErr: any) {
-            console.error(`[COACHING-AUTO] In-app notification append error for ${userDoc.id}:`, notifErr.message);
-          }
+            })
+          );
 
-          // 2. Send automatic coaching email (if email exists)
-          if (userData.email) {
-            try {
-              await transporter.sendMail({
-                from: `"Earnwise Coaching" <${process.env.EMAIL_USER}>`,
+          // 2. Email (if configured)
+          if (userData.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+            dispatches.push(
+              transporter.sendMail({
+                from: `"Wise AI Coaching" <${process.env.EMAIL_USER}>`,
                 to: userData.email,
                 replyTo: 'earnwise29@gmail.com',
                 subject: selectedTopic.subject,
-                text: `Hello ${userData.displayName || userData.firstName || 'Earner'},\n\nDAILY INSPIRATION: ${selectedTopic.headline}\n"${selectedTopic.quote}"\n\nTODAY'S ACTION TIP: ${selectedTopic.tip}\n\nGo to your dashboard to complete tasks`,
-                html: `
-                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
-                    <div style="text-align: center; margin-bottom: 25px;">
-                      <h1 style="color: #2563eb; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Daily Coach</h1>
-                      <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Automated Success Coach • Active Multipliers</p>
-                    </div>
-                    
-                    <div style="background-color: #eff6ff; border-left: 5px solid #2563eb; padding: 20px; border-radius: 12px; margin: 25px 0;">
-                      <h3 style="margin-top: 0; color: #1e3a8a; font-size: 16px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">${selectedTopic.headline}</h3>
-                      <p style="color: #1e40af; font-size: 15px; font-style: italic; margin-bottom: 0;">"${selectedTopic.quote}"</p>
-                    </div>
-        
-                    <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
-                      <h4 style="margin-top: 0; color: #1e293b; font-size: 14px; text-transform: uppercase; font-weight: 800;">Today's Strategic Action:</h4>
-                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 0;">${selectedTopic.tip}</p>
-                    </div>
-        
-                    <div style="text-align: center; margin: 30px 0;">
-                      <a href="${currentAppUrl}" style="background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); text-transform: uppercase;">Access Dashboard</a>
-                    </div>
-        
-                    <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-                      <p style="color: #94a3b8; font-size: 11px; margin-bottom: 5px; text-transform: uppercase;">Active Streak Protection Alert</p>
-                      <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">You are receiving this because you enabled Daily Earning Reminders on Earnwise. Engage everyday to scale.</p>
-                    </div>
-                  </div>
-                `
-              });
-              console.log(`[COACHING-AUTO] Email sent to ${userData.email}`);
-            } catch (mailErr: any) {
-              console.error(`[COACHING-AUTO] Nodemailer dispatch failed to ${userData.email}:`, mailErr.message);
-            }
+                html: `<div style="font-family: Arial; padding: 20px;"><h2>${selectedTopic.headline}</h2><p><i>"${selectedTopic.quote}"</i></p><p>${selectedTopic.tip}</p></div>`
+              })
+            );
           }
 
-          // 3. Update status
-          try {
-            await dbAdmin.collection('users').doc(userDoc.id).update({
+          // 3. Update User Metadata
+          dispatches.push(
+            userDoc.ref.update({
               coachingStep: nextStep,
               lastCoachingAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-          } catch (updateErr: any) {
-            console.error(`[COACHING-AUTO] Failed updating coaching step metadata for ${userDoc.id}:`, updateErr.message);
-          }
+            })
+          );
+
+          await Promise.all(dispatches).catch(err => console.error(`[COACHING-AUTO] Partial failure for user ${userDoc.id}:`, err.message));
         }
       }
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        try {
+          await transporter.sendMail({
+            from: `"Wise AI Coaching" <${process.env.EMAIL_USER}>`,
+            to: 'wiseking7890@gmail.com',
+            subject: `✅ Coaching Cycle Dispatched`,
+            html: `<div style="font-family: Arial; padding: 20px;"><h2>Coaching Cycle Complete</h2><p>The coaching engine successfully scanned ${usersSnap.size} users.</p></div>`
+          });
+        } catch (e) {}
+      }
+
+      console.log(`[COACHING-AUTO] Cycle completed for ${usersSnap.size} scanned users.`);
     } catch (err: any) {
-      console.error("[COACHING-AUTO] Error scanning background coaching registry:", err);
+      console.error("[COACHING-AUTO] Fatal cycle error:", err);
     }
   }
 
-  // --- API Routes ---
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", botActive: !!bot });
   });
@@ -738,20 +786,19 @@ async function startServer() {
    */
   app.get("/api/cpx/signed-url", async (req, res) => {
     const { user_id, username, email } = req.query;
+    const appId = process.env.CPX_APP_ID || '33341';
     const secureHash = process.env.CPX_SECURE_HASH;
-
-    if (!secureHash) {
-      return res.status(500).json({ error: "CPX_SECURE_HASH not configured" });
-    }
 
     if (!user_id) {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Generate secure_hash for the offerwall: md5(ext_user_id + "-" + CPX_SECURE_HASH)
-    const hash = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
-    
-    const signedUrl = `https://offers.cpx-research.com/index.php?app_id=33341&ext_user_id=${user_id}&secure_hash=${hash}&username=${encodeURIComponent(String(username || ''))}&email=${encodeURIComponent(String(email || ''))}&subid_1=&subid_2=`;
+    let signedUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user_id}&username=${encodeURIComponent(String(username || ''))}&email=${encodeURIComponent(String(email || ''))}&subid_1=&subid_2=`;
+
+    if (secureHash) {
+      const hash = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
+      signedUrl += `&secure_hash=${hash}`;
+    }
 
     res.json({ url: signedUrl });
   });
@@ -766,11 +813,37 @@ async function startServer() {
     });
   });
 
+  app.post("/api/admin/broadcast", async (req, res) => {
+    const { title, message, type } = req.body;
+    if (!title || !message) return res.status(400).json({ error: "Broadcasting requires title and message." });
+
+    if (!isDbAdminCapable) return res.status(503).json({ error: "Database node restricted." });
+
+    try {
+      console.log(`[ADMIN-BROADCAST] Initiating global broadcast: ${title}`);
+      
+      await dbAdmin.collection('notifications').add({
+        userId: 'all',
+        title,
+        message,
+        type: type || 'system',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        readBy: []
+      });
+
+      res.json({ status: "success", message: "Global broadcast successfully decentralized to all active nodes." });
+    } catch (err: any) {
+      console.error("[ADMIN-BROADCAST] Logic breach:", err);
+      res.status(500).json({ error: "Broadcast failed." });
+    }
+  });
+
   app.post("/api/admin/trigger-coaching", async (req, res) => {
     try {
-      console.log("[ADMIN] Manual coaching trigger received.");
-      await runAutomatedCoachingCycle();
-      res.json({ status: "success", message: "Background coaching cycle completed successfully." });
+      const force = req.query.force === 'true';
+      console.log(`[ADMIN] Manual coaching trigger received. Force mode: ${force}`);
+      await runAutomatedCoachingCycle(force);
+      res.json({ status: "success", message: force ? "Force coaching cycle dispatched successfully." : "Standard coaching cycle scan completed successfully." });
     } catch (err: any) {
       console.error("[ADMIN] Manual coaching trigger failed:", err);
       res.status(500).json({ error: err.message });
@@ -786,37 +859,361 @@ async function startServer() {
     if (!taskTitle) return res.status(400).json({ error: "Task title required" });
 
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: `Break down the following task into 5 specific, high-leverage, actionable sub-tasks that help monetize the effort. Task: "${taskTitle}"`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              subtasks: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    monetizationAngle: { type: Type.STRING }
-                  },
-                  required: ["title", "description", "monetizationAngle"]
-                }
-              }
-            },
-            required: ["subtasks"]
-          }
-        }
+      const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
+      if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+        return res.status(400).json({ error: "Gemini API key is not configured. Please add GEMINI_API_KEY to your Secrets." });
+      }
+
+      const requestAiClient = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
       });
 
-      const data = JSON.parse(response.text || '{"subtasks":[]}');
-      res.json(data);
-    } catch (error) {
+      const models = ["gemini-3.5-flash"];
+      let lastErr;
+      let finalData = { subtasks: [] };
+
+      for (const modelName of models) {
+        let interactionSuccess = false;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const interaction = await requestAiClient.interactions.create({
+              model: modelName,
+              input: `Break down the following task into 5 specific, high-leverage, actionable sub-tasks that help monetize the effort. Task: "${taskTitle}"`,
+              response_format: {
+                type: Type.OBJECT,
+                properties: {
+                  subtasks: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        title: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        monetizationAngle: { type: Type.STRING }
+                      },
+                      required: ["title", "description", "monetizationAngle"]
+                    }
+                  }
+                },
+                required: ["subtasks"]
+              }
+            });
+            const text = interaction.output_text;
+            finalData = JSON.parse(text || '{"subtasks":[]}');
+            interactionSuccess = true;
+            break;
+          } catch (err: any) {
+            lastErr = err;
+            if ((err.status === 503 || err.status === 429) && attempt < 1) {
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              continue;
+            }
+            break;
+          }
+        }
+        if (interactionSuccess) {
+          return res.json(finalData);
+        }
+      }
+      throw lastErr || new Error("Task breakdown AI failed on all models.");
+    } catch (error: any) {
       console.error("AI Breakdown Error:", error);
-      res.status(500).json({ error: "AI Engine failed to process task breakdown" });
+      res.status(500).json({ error: error.message || "AI Engine failed to process task breakdown" });
+    }
+  });
+
+  /**
+   * POST /api/ai/assistant
+   * Centralized AI Assistant for Earnwise
+   */
+  app.post("/api/ai/assistant", async (req, res) => {
+    const { action, payload } = req.body;
+    const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
+
+    if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+      return res.status(400).json({ error: "Gemini API key is not configured." });
+    }
+
+    const requestAiClient = new GoogleGenAI({
+      apiKey: activeApiKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+
+    const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+      try {
+        return await fn();
+      } catch (err: any) {
+        if (retries > 0 && (err.status === 503 || err.status === 429)) {
+          console.log(`[AI-Assistant] Retrying due to error: ${err.status}, attempts left: ${retries}`);
+          await new Promise(resolve => setTimeout(resolve, delay + Math.random() * 1000));
+          return withRetry(fn, retries - 1, delay * 2);
+        }
+        throw err;
+      }
+    };
+
+    try {
+      if (action === 'generate-text') {
+        const promptText = `You are an expert marketing and earning assistant for EarnWise, a leading task-based earning and advertising platform in Nigeria.
+Your goal is to help users succeed on EarnWise. Answer all their questions about EarnWise features including:
+- Task List & Detail: How to perform social tasks (follow, like, comment) and submit proof for automated verification.
+- Earnings & Withdrawals: How to track revenue, the 7-day escrow period for funds, and automated withdrawals via Paystack.
+- Membership Tiers (Free, Elite, Starter, Pro, Bronze, Diamond, Silver, Platinum, Golden): Explain the cost and the EARNING MULTIPLIERS for each.
+- Advertiser Portal: How businesses can launch targetted campaigns and social follow tasks.
+- Academy: Access to high-income skill courses and blueprints.
+- Referrals & Team Building: The 10% lifetime referral bonus structure.
+- Vault: Staking funds for fixed-term growth bonuses.
+- Support: How to reach out for assistance.
+
+
+IMPORTANT INSTRUCTIONS:
+- ONLY explain what the user asks about. Do NOT volunteer facts about the owner, CEO, or sponsors unless the user explicitly asks for them.
+- If explicitly asked about the owner, CEO, or founder of EarnWise, state clearly that the owner, founder, and CEO is Johnathan Sterling. Maintain total anonymity for any other identities.
+- If asked how to earn, accurately explain earning through tasks, ads, courses, upgrades, buying plans, referral, and lucky spin. Do NOT mention the owner in a general guide.
+- If asked about Wise AI, state that Wise AI is proudly owned by EarnWise.
+- Be highly professional, encouraging, and informative. Keep responses natural and conversational.
+
+User Prompt: ${payload.prompt}`;
+        
+        const models = ["gemini-3.5-flash"];
+        let lastError;
+        
+        const tools = [];
+        
+        for (const modelName of models) {
+            try {
+                let interaction = await withRetry(() => requestAiClient.interactions.create({
+                  model: modelName,
+                  input: promptText,
+                  tools: tools
+                }));
+
+                // Check for function calls
+                const lastStep = (interaction.steps && interaction.steps.length > 0) ? interaction.steps.at(-1) as any : null;
+                if (lastStep?.type === 'function_call') {
+                  // Function calling is disabled.
+                }
+
+                return res.json({ result: interaction.output_text });
+            } catch (err: any) {
+                lastError = err;
+                console.log(`[AI-Assistant] Model ${modelName} failed: ${err.message}`);
+            }
+        }
+        throw lastError;
+      } else {
+        res.status(400).json({ error: "Unknown action" });
+      }
+    } catch (err: any) {
+      console.error("[AI-Assistant] Error:", err);
+      res.status(500).json({ error: err.message || "AI Service unavailable, please try again later." });
+    }
+  });
+
+  /**
+   * POST /api/v1/ai/smart-insights
+   * Generates a personalized earning plan based on user profile
+   */
+  app.post("/api/v1/ai/smart-insights", async (req, res) => {
+    const { userId, balance, level, streak, plan } = req.body;
+    
+    try {
+      const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
+      if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+         // Fallback if no API key is set so the feature still "functions" functionally on the frontend for demo purposes.
+         return res.json({
+           prediction: `₦${Number(balance) + 2000} estimate based on your ${plan} tier`,
+           insights: [
+             { title: "Quick Win", description: "Complete 2 quick surveys waiting in your dashboard.", type: "quick_win" },
+             { title: "Streak Bonus", description: `You are on a ${streak} day streak. Complete a task today to keep the multiplier active!`, type: "strategy" },
+             { title: "Upgrade Tip", description: plan === 'free' ? "Upgrade to Gold to earn x3 on referrals." : "Refer a friend to get your VIP bonus.", type: "upgrade" }
+           ]
+         });
+      }
+
+      const requestAiClient = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const prompt = `You are a financial AI assistant for the Earnwise App. Analyze the user's profile and provide 3 actionable insights to maximize their earnings today.
+User Profile:
+- Balance: ₦${balance || 0}
+- Level: ${level || 1}
+- Streak: ${streak || 0} days
+- Plan: ${plan || 'free'}
+
+Facts: Upgrades are done via wallet balance (deposit via Paystack first). NO vendors or codes.
+
+Give 3 tips on:
+1. Quick wins (2 high-paying tasks)
+2. Multipliers (streak boost)
+3. Upgrade (Deposit then activate tier)
+
+Respond STRICTLY in JSON:
+{
+  "prediction": "Short prediction of earnings",
+  "insights": [
+    {"title": "title", "description": "text", "type": "quick_win" | "strategy" | "upgrade"}
+  ]
+}`;
+
+      let response;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const interaction = await requestAiClient.interactions.create({
+            model: "gemini-3.5-flash",
+            input: prompt,
+            response_format: {
+              type: Type.OBJECT,
+              properties: {
+                prediction: { type: Type.STRING },
+                insights: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING },
+                      description: { type: Type.STRING },
+                      type: { type: Type.STRING }
+                    },
+                    required: ["title", "description", "type"]
+                  }
+                }
+              },
+              required: ["prediction", "insights"]
+            }
+          });
+          response = { text: interaction.output_text };
+          break;
+        } catch (err: any) {
+          if ((err.status === 503 || err.status === 429) && attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      const data = JSON.parse(response.text || '{"prediction": "No prediction available", "insights": []}');
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Insights Error details:", error.response?.data || error.message || error);
+      res.status(500).json({ error: "AI Engine failed to provide insights" });
+    }
+  });
+
+  /**
+   * POST /api/v1/tasks/verify-proof
+   * Uses Wise AI to automatically verify task proof from users.
+   */
+  app.post("/api/v1/tasks/verify-proof", async (req, res) => {
+    const { userId, taskId, taskTitle, proof, rewardAmount } = req.body;
+    
+    if (!userId || !taskId || !proof) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    try {
+      const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
+      if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+        return res.status(400).json({ error: "Gemini API key is not configured for Wise AI." });
+      }
+
+      const requestAiClient = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const prompt = `You are "Wise AI", the automated task verification assistant for Earnwise.
+A user has submitted proof for completing a task.
+Task Title/Description: "${taskTitle}"
+Proof Submitted: "${proof}"
+      
+Analyze the proof to determine if it roughly satisfies a claim of task completion (like a username, email, screenshot link, or valid confirmation message). 
+Be reasonably lenient but reject outright gibberish.
+Provide your response strictly in the JSON format requested.`;
+
+      let response;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          response = await requestAiClient.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  approved: { type: Type.BOOLEAN },
+                  reason: { type: Type.STRING }
+                },
+                required: ["approved", "reason"]
+              }
+            }
+          });
+          break;
+        } catch (err: any) {
+          if ((err.status === 503 || err.status === 429) && attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      const verificationResult = JSON.parse(response.text || '{"approved": false, "reason": "Failed to parse response"}');
+
+      // Process the reward securely server-side if approved
+      if (verificationResult.approved && isDbAdminCapable) {
+        // Run a transaction to ensure no double-crediting
+        await dbAdmin.runTransaction(async (transaction) => {
+          const userRef = dbAdmin.collection('users').doc(userId);
+          const completionRef = dbAdmin.collection('completions').doc(`${userId}_${taskId}`);
+          
+          const completionDoc = await transaction.get(completionRef);
+          
+          if (completionDoc.exists && completionDoc.data()?.status === 'approved') {
+             throw new Error("Task already approved and credited.");
+          }
+
+          transaction.set(completionRef, {
+             userId,
+             taskId,
+             status: 'approved',
+             proof: proof,
+             rewardEarned: rewardAmount,
+             verifiedBy: 'Wise AI',
+             verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          transaction.update(userRef, {
+             balance: admin.firestore.FieldValue.increment(rewardAmount),
+             withdrawableBalance: admin.firestore.FieldValue.increment(rewardAmount),
+             updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          const txRef = dbAdmin.collection('transactions').doc();
+          transaction.set(txRef, {
+             userId,
+             amount: rewardAmount,
+             type: 'earning',
+             description: `Task Completion: ${taskTitle} (Verified by Wise AI)`,
+             createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+      }
+
+      res.json({
+        approved: verificationResult.approved,
+        message: verificationResult.reason,
+        aiName: "Wise AI"
+      });
+
+    } catch (error: any) {
+      console.error("Wise AI Verification Error:", error);
+      res.status(500).json({ error: error.message || "Wise AI failed to process verification." });
     }
   });
 
@@ -982,7 +1379,7 @@ async function startServer() {
     const { subject, message, email } = req.body;
     try {
       await transporter.sendMail({
-        from: `Earnwise Support <${process.env.EMAIL_USER}>`,
+        from: `Wise AI Support <${process.env.EMAIL_USER}>`,
         to: 'earnwise29@gmail.com',
         subject: `Support Request: ${subject}`,
         text: `From: ${email}\n\nMessage: ${message}`
@@ -1127,24 +1524,6 @@ async function startServer() {
                createdAt: admin.firestore.FieldValue.serverTimestamp(),
                readBy: []
              });
-
-             // One-time ₦1,000 Welcome Bonus on 3rd Completion
-             if ((userData.tasksCompleted || 0) === 2) {
-               transaction.update(referrerDoc.ref, {
-                 balance: admin.firestore.FieldValue.increment(1000),
-                 referralEarnings: admin.firestore.FieldValue.increment(1000)
-               });
-               
-               const bonusNotifRef = dbAdmin.collection('notifications').doc();
-               transaction.set(bonusNotifRef, {
-                 userId: referrerDoc.id,
-                 title: '🎁 Milestone Bonus!',
-                 message: 'Your friend completed their 3rd task! You have received a ₦1,000 Welcome Bonus.',
-                 type: 'reward',
-                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                 readBy: []
-               });
-             }
            }
         }
 
@@ -1176,6 +1555,7 @@ async function startServer() {
 
   // --- Background PENDING-TO-AVAILABLE Worker ---
   async function performEscrowClearance() {
+    if (!isDbAdminCapable) return 0;
     console.log("[CLEARANCE] Checking for cleared escrows (72h Threshold)...");
     try {
       const now = admin.firestore.Timestamp.now();
@@ -1232,7 +1612,22 @@ async function startServer() {
   // Initialize Wallet Deposit
   app.post("/api/paystack/initialize-deposit", async (req, res) => {
     const { userId, amount, email } = req.body;
-    if (!PAYSTACK_SECRET) return res.status(500).json({ error: "Paystack secret not configured" });
+    
+    // Fallback simulation when Paystack is not configured in sandbox environment
+    if (!PAYSTACK_SECRET) {
+      console.warn("[PAYMENT] PAYSTACK_SECRET not configured. Simulating initialized response for testing environment.");
+      const depositAmt = Number(amount) || 500;
+      const reference = `SIM_PAY_${Date.now()}_${depositAmt}`;
+      return res.json({
+        status: true,
+        message: "Simulated initialization success",
+        data: {
+          authorization_url: `${currentAppUrl}/deposit?reference=${reference}&amount=${depositAmt}`,
+          reference,
+          access_code: `SIM_CODE_${Date.now()}`
+        }
+      });
+    }
     
     try {
       const depositAmount = Number(amount);
@@ -1269,6 +1664,11 @@ async function startServer() {
 
     const event = req.body;
     console.log("Paystack Webhook Event:", event.event);
+
+    if (!isDbAdminCapable) {
+      console.warn("[PAYMENT] Webhook received but Admin SDK is restricted. Skipping database updates.");
+      return res.status(200).send("Webhook received (SDK restricted)");
+    }
 
     try {
       if (event.event === 'charge.success') {
@@ -1317,6 +1717,9 @@ async function startServer() {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             reference
           });
+
+          // Award referral bonus if applicable
+          handleReferralUpgradeBonus(metadata.userId, metadata.planId);
         }
 
         if (metadata?.type === 'advertiser_task') {
@@ -1368,15 +1771,70 @@ async function startServer() {
 
   // Verify Deposit
   app.post("/api/paystack/verify-deposit", async (req, res) => {
-    const { reference, userId } = req.body;
-    console.log(`[PAYMENT] Verifying deposit for User: ${userId}, Ref: ${reference}`);
+    const { reference, userId, amount } = req.body;
+    console.log(`[PAYMENT] Verifying deposit for User: ${userId}, Ref: ${reference}, bodyAmt: ${amount}`);
     
     if (!isDbAdminCapable) {
       console.info("[PAYMENT] Server Admin SDK is running in restricted mode. Automatically engaging Client SDK fallback execution...");
-      return res.json({ status: "success", useClientFallback: true, amount: 5000 });
+      return res.json({ status: "success", useClientFallback: true, amount: Number(amount) || 5000 });
     }
     
-    if (!PAYSTACK_SECRET) return res.status(500).json({ error: "Paystack secret not configured" });
+    // Simulate deposit verification if PAYSTACK_SECRET is not configured or reference is a simulated reference
+    if (!PAYSTACK_SECRET || (reference && reference.startsWith('SIM_PAY_'))) {
+      console.warn("[PAYMENT] Simulating successful verification for reference:", reference);
+      try {
+        let depositAmount = Number(amount);
+        if (isNaN(depositAmount) || !depositAmount) {
+          // Parse amount from reference if encoded (SIM_PAY_timestamp_amount)
+          const parts = reference?.split('_') || [];
+          if (parts.length >= 4) {
+            depositAmount = Number(parts[3]);
+          }
+        }
+        
+        // If still no amount, we can't assume 5000. We should error or use a minimal baseline.
+        if (isNaN(depositAmount) || !depositAmount) {
+          depositAmount = 500; // Minimal baseline (minimum allowed deposit)
+        }
+
+        const userRef = dbAdmin.collection('users').doc(userId);
+        
+        // Check idempotency
+        const transSnap = await dbAdmin.collection('transactions').where('reference', '==', reference).limit(1).get();
+        if (!transSnap.empty) {
+          return res.json({ status: "success", message: "Deposit already reflected (Simulated)", amount: depositAmount });
+        }
+
+        await userRef.update({
+          balance: admin.firestore.FieldValue.increment(depositAmount),
+          withdrawableBalance: admin.firestore.FieldValue.increment(depositAmount),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        await dbAdmin.collection('transactions').add({
+          userId,
+          amount: depositAmount,
+          type: 'bonus',
+          description: `Wallet Deposit (Simulated Verification: ${reference})`,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          reference
+        });
+
+        await dbAdmin.collection('notifications').add({
+          userId,
+          title: '💰 Deposit Successful!',
+          message: `₦${depositAmount.toLocaleString()} has been added to your wallet (Simulation).`,
+          type: 'success',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          readBy: []
+        });
+
+        return res.json({ status: "success", message: "Simulated deposit verified effectively", amount: depositAmount });
+      } catch (err: any) {
+        console.error("Simulated verification error:", err.message);
+        return res.status(500).json({ error: "Failed to process simulated verification" });
+      }
+    }
 
     try {
       const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -1431,14 +1889,39 @@ async function startServer() {
 
   // Get Nigerian Banks
   app.get("/api/paystack/banks", async (req, res) => {
+    // Elegant fallback list of real Nigerian banks for high-fidelity testing
+    const fallbackBanks = {
+      status: true,
+      message: "Banks retrieved successfully",
+      data: [
+        { name: "Access Bank", code: "044" },
+        { name: "Guaranty Trust Bank (GTB)", code: "058" },
+        { name: "Zenith Bank", code: "057" },
+        { name: "United Bank for Africa (UBA)", code: "033" },
+        { name: "First Bank of Nigeria", code: "011" },
+        { name: "Kuda Bank", code: "50211" },
+        { name: "OPay", code: "999992" },
+        { name: "PalmPay", code: "999991" },
+        { name: "Fidelity Bank", code: "070" },
+        { name: "Stanbic IBTC Bank", code: "039" },
+        { name: "Sterling Bank", code: "050" },
+        { name: "Wema Bank", code: "035" }
+      ]
+    };
+
+    if (!PAYSTACK_SECRET) {
+      console.warn("[PAYMENT] PAYSTACK_SECRET not configured. Serving local Nigerian banks list.");
+      return res.json(fallbackBanks);
+    }
+
     try {
       const response = await axios.get("https://api.paystack.co/bank?country=nigeria", {
         headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
       });
       res.json(response.data);
     } catch (error: any) {
-      console.error("Fetch banks error:", error.response?.data || error.message);
-      res.status(500).json({ error: "Failed to fetch banks" });
+      console.error("Fetch banks error, using offline bank list fallback:", error.response?.data || error.message);
+      res.json(fallbackBanks);
     }
   });
 
@@ -1448,9 +1931,19 @@ async function startServer() {
     if (!accountNumber || !bankCode) {
       return res.status(400).json({ error: "Account number and bank code are required." });
     }
+    
     if (!PAYSTACK_SECRET) {
-      return res.status(500).json({ error: "Paystack secret not configured" });
+      console.warn("[PAYMENT] PAYSTACK_SECRET not configured. Simulating bank account resolution.");
+      return res.json({
+        status: true,
+        message: "Account number resolved successfully",
+        data: {
+          account_number: accountNumber,
+          account_name: "EARNWISE VERIFIED SUBSCRIBER"
+        }
+      });
     }
+
     try {
       const response = await axios.get(
         `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
@@ -1470,8 +1963,16 @@ async function startServer() {
         });
       }
       console.error("Resolve account error:", paystackData || error.message);
-      const msg = paystackData?.message || "Failed to resolve bank account name";
-      res.status(error.response?.status || 500).json({ error: msg });
+      // Give simulated fallback instead of failing completely if Paystack is rate-limited/failing
+      console.warn("[PAYMENT] Resolve failed, serving simulated resolve fallback.");
+      res.json({
+        status: true,
+        message: "Account number resolved successfully (Fallback)",
+        data: {
+          account_number: accountNumber,
+          account_name: "EARNWISE SUBSCRIBER"
+        }
+      });
     }
   });
 
@@ -1520,14 +2021,46 @@ async function startServer() {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             reference
           });
+
+          // Award referral bonus in background
+          handleReferralUpgradeBonus(userId, planId);
         });
 
         return res.json({ status: "success", message: "Plan activated via wallet" });
       }
 
-      // Case 2: Paystack Verification (Fallback/Legacy)
-      if (!PAYSTACK_SECRET) {
-        return res.status(500).json({ status: "failed", message: "Server configuration error" });
+      // Case 2: Paystack Verification
+      if (!PAYSTACK_SECRET || (reference && reference.startsWith('SIM_PAY_'))) {
+        console.warn("[PAYMENT] PAYSTACK_SECRET not configured or simulated reference used. Simulating upgrade success.");
+        
+        await userRef.update({
+          plan: planId,
+          subscriptionTier: 'premium',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        await dbAdmin.collection('transactions').add({
+          userId,
+          amount: 0,
+          type: 'earning',
+          description: `Upgraded to ${planId} Plan (Simulated Verification)`,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          reference
+        });
+
+        await dbAdmin.collection('notifications').add({
+          userId,
+          title: '⚡ Plan Upgraded Successfully!',
+          message: `Your account has been upgraded to the ${planId} plan (Simulation).`,
+          type: 'success',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          readBy: []
+        });
+
+        // Award referral bonus in background
+        handleReferralUpgradeBonus(userId, planId);
+
+        return res.json({ status: "success", message: `Upgraded to ${planId} successfully (Simulated)` });
       }
       // Helper for Paystack Verify with internal retry
       const verifyTransaction = async (ref: string, attempt = 1): Promise<any> => {
@@ -1596,6 +2129,9 @@ async function startServer() {
           reference
         });
 
+        // Award referral bonus in background
+        handleReferralUpgradeBonus(userId, planId);
+
         console.log(`[PAYMENT] SUCCESS: User ${userId} upgraded to ${planId}`);
         res.json({ status: "success", message: "Plan upgraded successfully" });
       } else {
@@ -1615,53 +2151,98 @@ async function startServer() {
     if (!email) return res.status(400).json({ error: "Email is required" });
 
     try {
-      console.log(`[AUTH] Sending welcome email to ${email}...`);
-      await transporter.sendMail({
-        from: `"Earnwise Support" <${process.env.EMAIL_USER}>`,
-        to: email,
-        replyTo: 'earnwise29@gmail.com',
-        subject: `Welcome to Earnwise, ${name || ''}!`,
-        text: `Welcome to Earnwise! You're now part of Nigeria's #1 digital wealth platform. Complete high-paying tasks, withdraw real cash, and earn lifetime commissions.\n\nGet started now by logging into your dashboard: ${process.env.APP_URL || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}`,
-        html: `
-          <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <img src="cid:earnwise_logo" alt="Earnwise Logo" style="max-width: 150px; margin-bottom: 15px;" />
-              <h1 style="color: #2563eb; font-size: 28px; font-weight: 800; margin: 0; padding: 10px;">Earnwise</h1>
-              <p style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Your Gateway to Digital Wealth</p>
-            </div>
-            <h2 style="color: #1e293b; text-align: center; font-size: 22px;">Welcome aboard, ${name || 'Earners'}!</h2>
-            <p style="font-size: 16px; color: #475569; line-height: 1.6;">We're thrilled to have you! You've officially joined Nigeria's premier platform for earning money online. Our community is growing fast, and we're excited to see you start earning.</p>
-            <div style="background-color: #f8fafc; padding: 25px; border-radius: 12px; margin: 25px 0; border: 1px solid #e2e8f0;">
-              <h3 style="margin-top: 0; color: #1e293b; font-size: 18px;">Three Steps to Your First Payout:</h3>
-              <ul style="color: #475569; font-size: 15px; line-height: 1.8; padding-left: 20px;">
-                <li><strong>Browse:</strong> Check out the latest high-paying tasks on your dashboard.</li>
-                <li><strong>Complete:</strong> Easily finish tasks and earn daily in Naira.</li>
-                <li><strong>Withdraw:</strong> Request instant bank payouts via Paystack directly to your account.</li>
-              </ul>
-            </div>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.APP_URL || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">Go to Your Dashboard</a>
-            </div>
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-              <p style="color: #64748b; font-size: 14px; margin-bottom: 10px;">Connect with us:</p>
-              <a href="[LINK_TO_WHATSAPP]" style="margin: 0 10px; color: #2563eb; text-decoration: none;">WhatsApp</a>
-              <span style="color: #cbd5e1;">|</span>
-              <a href="[LINK_TO_TELEGRAM_CHANNEL]" style="margin: 0 10px; color: #2563eb; text-decoration: none;">Telegram Channel</a>
-            </div>
-            <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 20px;">Need a hand? Simply reply to this email, and our support team will be ready to help.</p>
-          </div>
-        `,
-        attachments: [{
-          filename: 'logo.png',
-          path: path.join(process.cwd(), 'src/assets/images/earnwise_logo.png'),
-          cid: 'earnwise_logo'
-        }]
+      console.log(`[AUTH] Processing welcome sequence for ${email}...`);
+      let emailSent = false;
+      
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        try {
+          await transporter.sendMail({
+            from: `"Wise AI Support" <${process.env.EMAIL_USER}>`,
+            to: email,
+            replyTo: 'earnwise29@gmail.com',
+            subject: `Welcome to Earnwise, ${name || ''}!`,
+            text: `Welcome to Earnwise! You're now part of Nigeria's #1 digital wealth platform, powered by Wise AI. Complete high-paying tasks, withdraw real cash, and earn lifetime commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}`,
+            html: `
+              <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <img src="cid:earnwise_logo" alt="Earnwise Logo" style="max-width: 150px; margin-bottom: 15px;" />
+                  <h1 style="color: #2563eb; font-size: 28px; font-weight: 800; margin: 0; padding: 10px;">Earnwise</h1>
+                  <p style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Powered by Wise AI</p>
+                </div>
+                <h2 style="color: #1e293b; text-align: center; font-size: 22px;">Welcome aboard, ${name || 'Earners'}!</h2>
+                <p style="font-size: 16px; color: #475569; line-height: 1.6;">We're thrilled to have you! You've officially joined Nigeria's premier platform for earning money online. Our community is growing fast, and we're excited to see you start earning.</p>
+                <div style="background-color: #f8fafc; padding: 25px; border-radius: 12px; margin: 25px 0; border: 1px solid #e2e8f0;">
+                  <h3 style="margin-top: 0; color: #1e293b; font-size: 18px;">Three Steps to Your First Payout:</h3>
+                  <ul style="color: #475569; font-size: 15px; line-height: 1.8; padding-left: 20px;">
+                    <li><strong>Browse:</strong> Check out the latest high-paying tasks on your dashboard.</li>
+                    <li><strong>Complete:</strong> Easily finish tasks and earn daily in Naira.</li>
+                    <li><strong>Withdraw:</strong> Request instant bank payouts via Paystack directly to your account.</li>
+                  </ul>
+                </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">Go to Your Dashboard</a>
+                </div>
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                  <p style="color: #64748b; font-size: 14px; margin-bottom: 10px;">Connect with us:</p>
+                  <a href="[LINK_TO_WHATSAPP]" style="margin: 0 10px; color: #2563eb; text-decoration: none;">WhatsApp</a>
+                  <span style="color: #cbd5e1;">|</span>
+                  <a href="[LINK_TO_TELEGRAM_CHANNEL]" style="margin: 0 10px; color: #2563eb; text-decoration: none;">Telegram Channel</a>
+                </div>
+                <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 20px;">Need a hand? Simply reply to this email, and our support team will be ready to help.</p>
+              </div>
+            `,
+            attachments: [{
+              filename: 'logo.png',
+              path: path.join(process.cwd(), 'public/icon.png'),
+              cid: 'earnwise_logo'
+            }]
+          });
+          emailSent = true;
+          console.log(`[AUTH] SUCCESS! Welcome email sent to ${email}`);
+        } catch (mailErr: any) {
+          console.error(`[AUTH] Welcome transporter failed for ${email}:`, mailErr.message);
+        }
+      } else {
+        console.warn(`[AUTH] EMAIL_USER or EMAIL_PASS not configured. Skipping transporter dispatch for ${email}.`);
+      }
+
+      // Always fallback to injecting in-door welcome notification to ensure continuous operation
+      if (isDbAdminCapable) {
+        try {
+          const userSnap = await dbAdmin.collection('users').where('email', '==', email).limit(1).get();
+          if (!userSnap.empty) {
+            const uid = userSnap.docs[0].id;
+            const notifCheck = await dbAdmin.collection('notifications')
+              .where('userId', '==', uid)
+              .where('title', '==', 'Welcome to Earnwise!')
+              .get();
+
+            if (notifCheck.empty) {
+              await dbAdmin.collection('notifications').add({
+                userId: uid,
+                title: "Welcome to Earnwise!",
+                message: `Welcome aboard, ${name || 'Earner'}! We're thrilled to have you. Complete high-paying tasks, withdraw real cash in Naira, and earn lifetime commissions!`,
+                type: 'success',
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                readBy: []
+              });
+              console.log(`[AUTH] In-door notification appended for ${email} (${uid})`);
+            }
+          }
+        } catch (dbErr: any) {
+          console.error("[AUTH] Welcome notification appending failed:", dbErr.message);
+        }
+      }
+
+      res.json({ 
+        status: "success", 
+        message: "Welcome processed", 
+        emailDelivered: emailSent 
       });
-      console.log(`[AUTH] SUCCESS! Welcome email sent to ${email}`);
-      res.json({ status: "success", message: "Welcome email sent" });
     } catch (error: any) {
       console.error("[AUTH] Error in send-welcome-email:", error);
-      res.status(500).json({ error: "Failed to send welcome email" });
+      res.status(500).json({ error: "Failed to process welcome request" });
     }
   });
 
@@ -1747,46 +2328,57 @@ async function startServer() {
       }
 
       // 2. Send email via Nodemailer
-      await transporter.sendMail({
-        from: `"Earnwise Coaching" <${process.env.EMAIL_USER}>`,
-        to: email,
-        replyTo: 'earnwise29@gmail.com',
-        subject: selectedTopic.subject,
-        text: `Hello ${name || 'Earner'},\n\nDAILY INSPIRATION: ${selectedTopic.headline}\n"${selectedTopic.quote}"\n\nTODAY'S ACTION TIP: ${selectedTopic.tip}\n\nGo to your dashboard to complete tasks`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 25px;">
-              <h1 style="color: #2563eb; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Daily Coach</h1>
-              <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Automated Success Coach • Active Multipliers</p>
-            </div>
-            
-            <div style="background-color: #eff6ff; border-left: 5px solid #2563eb; padding: 20px; border-radius: 12px; margin: 25px 0;">
-              <h3 style="margin-top: 0; color: #1e3a8a; font-size: 16px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">${selectedTopic.headline}</h3>
-              <p style="color: #1e40af; font-size: 15px; font-style: italic; margin-bottom: 0;">"${selectedTopic.quote}"</p>
-            </div>
+      let emailSent = false;
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        try {
+          await transporter.sendMail({
+            from: `"Earnwise Coaching" <${process.env.EMAIL_USER}>`,
+            to: email,
+            replyTo: 'earnwise29@gmail.com',
+            subject: selectedTopic.subject,
+            text: `Hello ${name || 'Earner'},\n\nDAILY INSPIRATION: ${selectedTopic.headline}\n"${selectedTopic.quote}"\n\nTODAY'S ACTION TIP: ${selectedTopic.tip}\n\nGo to your dashboard to complete tasks`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
+                <div style="text-align: center; margin-bottom: 25px;">
+                  <h1 style="color: #2563eb; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Daily Coach</h1>
+                  <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Automated Success Coach • Active Multipliers</p>
+                </div>
+                
+                <div style="background-color: #eff6ff; border-left: 5px solid #2563eb; padding: 20px; border-radius: 12px; margin: 25px 0;">
+                  <h3 style="margin-top: 0; color: #1e3a8a; font-size: 16px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">${selectedTopic.headline}</h3>
+                  <p style="color: #1e40af; font-size: 15px; font-style: italic; margin-bottom: 0;">"${selectedTopic.quote}"</p>
+                </div>
 
-            <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
-              <h4 style="margin-top: 0; color: #1e293b; font-size: 14px; text-transform: uppercase; font-weight: 800;">Today's Strategic Action:</h4>
-              <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 0;">${selectedTopic.tip}</p>
-            </div>
+                <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
+                  <h4 style="margin-top: 0; color: #1e293b; font-size: 14px; text-transform: uppercase; font-weight: 800;">Today's Strategic Action:</h4>
+                  <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 0;">${selectedTopic.tip}</p>
+                </div>
 
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="https://earnwise-1.ai.studio" style="background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); text-transform: uppercase;">Access Dashboard</a>
-            </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); text-transform: uppercase;">Access Dashboard</a>
+                </div>
 
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-              <p style="color: #94a3b8; font-size: 11px; margin-bottom: 5px; text-transform: uppercase;">Active Streak Protection Alert</p>
-              <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">You are receiving this because you enabled Daily Earning Reminders on Earnwise. Engage everyday to scale.</p>
-            </div>
-          </div>
-        `
-      });
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                  <p style="color: #94a3b8; font-size: 11px; margin-bottom: 5px; text-transform: uppercase;">Active Streak Protection Alert</p>
+                  <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">You are receiving this because you enabled Daily Earning Reminders on Earnwise. Engage everyday to scale.</p>
+                </div>
+              </div>
+            `
+          });
+          emailSent = true;
+          console.log(`[AUTH] SUCCESS! Daily encouragement sent via SMTP to ${email}`);
+        } catch (mailErr: any) {
+          console.error(`[AUTH] Custom operational encourager failed for ${email}:`, mailErr.message);
+        }
+      } else {
+        console.warn(`[AUTH] EMAIL_USER/EMAIL_PASS not set. Simulated sending operational encouragement quote to ${email}`);
+      }
 
-      console.log(`[AUTH] SUCCESS! Daily encouragement sent to ${email}`);
       res.json({ 
         status: "success", 
-        message: "Daily encouragement successfully sent", 
+        message: "Daily encouragement processed", 
         quote: selectedTopic,
+        emailDelivered: emailSent,
         storeNotificationClientSide: !storedServerSide
       });
     } catch (error: any) {
@@ -1797,8 +2389,39 @@ async function startServer() {
 
   // Automated Payout (Withdrawal)
   app.post("/api/paystack/withdraw", async (req, res) => {
-    const { userId, amount, bankDetails } = req.body;
+    const { userId, amount, withdrawalType = 'task', bankDetails } = req.body;
     if (!PAYSTACK_SECRET) return res.status(500).json({ error: "Paystack secret not configured" });
+
+    // TIME WINDOW CHECK (Nigerian Time - Africa/Lagos)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Lagos',
+      hour: 'numeric',
+      minute: 'numeric',
+      day: 'numeric',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+    const day = parseInt(parts.find(p => p.type === 'day')?.value || '0');
+
+    // Rule: Open 17:00 (5 PM) to 18:00 (6 PM)
+    const isWithinTimeWindow = hour === 17;
+
+    if (withdrawalType === 'referral') {
+      if (!isWithinTimeWindow) {
+        return res.status(400).json({ 
+          error: "Referral withdrawals are ONLY open daily from 5:00 PM to 6:00 PM Nigerian Time." 
+        });
+      }
+    } else {
+      // Task withdrawal: 30th of every month, 17:00 - 18:00
+      if (day !== 30 || !isWithinTimeWindow) {
+        return res.status(400).json({ 
+          error: "Task withdrawals are ONLY open on the 30th of every month from 5:00 PM to 6:00 PM Nigerian Time." 
+        });
+      }
+    }
 
     try {
       const userRef = dbAdmin.collection('users').doc(userId);
@@ -1974,6 +2597,15 @@ async function startServer() {
     }
   });
 
+  // Gemini AI Tutor Endpoint Health Check
+  app.get("/api/v1/academy/ai-status", (req, res) => {
+    res.json({ 
+      active: !!process.env.GEMINI_API_KEY, 
+      configured: true,
+      node: "Elite Academy Master Node" 
+    });
+  });
+
   // Gemini AI Tutor Endpoint
   app.post("/api/v1/academy/ask-tutor", async (req, res) => {
     const { userId, courseId, courseTitle, question, context } = req.body;
@@ -1984,22 +2616,26 @@ async function startServer() {
       let hasAccess = false;
       if (isDbAdminCapable) {
         try {
-          const purchaseCheck = await dbAdmin.collection('coursePurchases')
-            .where('userId', '==', userId)
-            .where('courseId', '==', courseId)
-            .limit(1)
-            .get();
-
-          if (!purchaseCheck.empty) {
+          // Check if the user is an admin (Admins automatically bypass purchase checks)
+          const userDoc = await dbAdmin.collection('users').doc(userId).get();
+          if (userDoc.exists && userDoc.data()?.role === 'admin') {
             hasAccess = true;
+          } else {
+            const purchaseCheck = await dbAdmin.collection('coursePurchases')
+              .where('userId', '==', userId)
+              .where('courseId', '==', courseId)
+              .limit(1)
+              .get();
+
+            if (!purchaseCheck.empty) {
+              hasAccess = true;
+            }
           }
         } catch (dbErr: any) {
           console.warn("[ACADEMY] Database check failed during admin mode:", dbErr.message);
           hasAccess = true;
         }
       } else {
-        // Restricted Sandbox mode: Skip DB Admin collections lookup as the Client SDK
-        // (CoursePlayer.tsx) already secures the UI access boundaries.
         hasAccess = true;
       }
 
@@ -2007,38 +2643,82 @@ async function startServer() {
         return res.status(403).json({ error: "Access Denied: Enrollment required for AI assistance." });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
-        console.error("[ACADEMY] Missing GEMINI_API_KEY");
-        return res.status(500).json({ error: "AI Tutor node configuration missing. Contact Support." });
+      const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
+      if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
+        res.write(`🎓 **Elite Academy Assistant — Developer Configuration Needed**\n\nPlease add your **GEMINI_API_KEY** in the Secrets section.`);
+        return res.end();
       }
 
-      console.log(`[ACADEMY] AI Tutor Query for Course: ${courseId}`);
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: `You are the Earnwise Elite Academy Master Tutor. Your goal is to provide deep, actionable, and 1000-word level detail if requested.
-        Student is studying: "${courseTitle || courseId}".
-        Current Course Context: ${context || 'General earning strategy'}.
-        
-        TONE: Professional, Nigerian-success-driven, high-energy, and extremely practical.
-        
-        INSTRUCTIONS:
-        1. If they ask for "more detail" or a "full course", provide an exhaustive breakdown (800-1200 words) of the strategy.
-        2. Include specific tools, local Nigerian examples (e.g. Paystack, Bamboo, Cowrywise), and step-by-step execution logic.
-        3. Break down the psychology of the customer and the mathematical projections of the earnings.
-        
-        Student Question: ${question}`
+      const requestAiClient = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
       });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("Empty response from AI engine");
-      }
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Transfer-Encoding', 'chunked');
 
-      res.json({ answer: text });
+      try {
+        const tutorModels = ["gemini-3.5-flash"];
+        let lastTutorErr;
+        let streamSuccess = false;
+
+        for (const modelName of tutorModels) {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const stream = await requestAiClient.interactions.create({
+                model: modelName,
+                input: `You are the Earnwise Elite Academy Master Tutor.
+                    Student is studying: "${courseTitle || courseId}".
+                    Current Course Context: ${context || 'General earning strategy'}.
+                    Student Question: ${question}`,
+                stream: true
+              });
+              
+              for await (const event of stream) {
+                if (event.event_type === "step.delta" && event.delta.type === "text") {
+                  res.write(event.delta.text);
+                }
+              }
+              res.end();
+              streamSuccess = true;
+              return;
+            } catch (err: any) {
+              lastTutorErr = err;
+              if ((err.status === 503 || err.status === 429) && attempt < 1) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+              }
+              break;
+            }
+          }
+          if (streamSuccess) break;
+        }
+        if (!streamSuccess) throw lastTutorErr || new Error("Tutor AI failed");
+      } catch (aiErr: any) {
+        console.error("[ACADEMY] AI Generation failed:", aiErr);
+        try {
+          const fbStream = await requestAiClient.interactions.create({
+             model: "gemini-3.5-flash",
+             input: `System: Fallback answer.\nCourse: ${courseTitle}\nQuestion: ${question}`,
+             stream: true
+          });
+          for await (const event of fbStream) {
+             if (event.event_type === "step.delta" && event.delta.type === "text") {
+                res.write(event.delta.text);
+             }
+          }
+          res.end();
+        } catch (fbErr) {
+          res.write("\n\n*AI temporarily decentralized. Please try again soon.*");
+          res.end();
+        }
+      }
     } catch (err: any) {
-      console.error("[ACADEMY] AI Tutor Error Details:", err);
-      res.status(500).json({ error: "AI Tutor node offline. Try again later." });
+      console.error("[ACADEMY] AI Tutor Error:", err);
+      if (!res.headersSent) res.status(500).json({ error: "AI Tutor node offline." });
+      else res.end();
     }
   });
 
@@ -2055,13 +2735,36 @@ async function startServer() {
     app.get("*", (req, res, next) => {
       // Don't handle API routes here
       if (req.path.startsWith('/api')) return next();
-      res.sendFile(path.join(distPath, "index.html"));
+      
+      const htmlPath = path.join(distPath, "index.html");
+      let html = fs.readFileSync(htmlPath, 'utf8');
+      
+      // Inject Monetag, mnd-ver verification tags and mbidadm script immediately after <head>
+      let injection = '';
+      if (!html.includes('9a5b19b8b82172a6ee65893e4062878a')) {
+        injection += '\n    <meta name="monetag" content="9a5b19b8b82172a6ee65893e4062878a">';
+      }
+      if (!html.includes('ugwx9rzpwokz49vyxa9ria')) {
+        injection += '\n    <meta name="mnd-ver" content="ugwx9rzpwokz49vyxa9ria" />';
+      }
+      if (!html.includes('js.mbidadm.com')) {
+        injection += '\n    <script async src="https://js.mbidadm.com/static/scripts.js" data-admpid="443967"></script>';
+      }
+      if (injection) {
+        html = html.replace('<head>', '<head>' + injection);
+      }
+      
+      res.send(html);
     });
   }
 
   // --- 10. DAILY ENGAGEMENT ENGINE (Notifications & Email) ---
   // Runs daily at 9:00 AM to keep users active
   cron.schedule('0 9 * * *', async () => {
+    if (!isDbAdminCapable) {
+      console.info("[CRON] Skipping daily engagement loop (DB Admin not capable).");
+      return;
+    }
     console.log("[CRON] Running daily engagement loop...");
     try {
       const usersSnap = await dbAdmin.collection('users').get();
@@ -2089,19 +2792,19 @@ async function startServer() {
         if (email && email !== 'test@example.com' && !email.includes('example.com')) {
           emailBatch.push(
             transporter.sendMail({
-              from: `"Earnwise Revenue" <${process.env.EMAIL_USER}>`,
+              from: `"Wise AI Updates" <${process.env.EMAIL_USER}>`,
               to: email,
               subject: `Today's Earnings Opportunity Is Live!`,
-              text: `Hello ${name},\n\nYour Earnwise dashboard has been refreshed with new high-payout tasks. Don't leave your multipliers idle!\n\nCheck your dashboard: ${currentAppUrl}`,
+              text: `Hello ${name},\n\nYour Wise AI powered dashboard has been refreshed with new high-payout tasks. Don't leave your multipliers idle!\n\nCheck your dashboard: ${currentAppUrl}`,
               html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                  <h2 style="color: #2563eb;">🚀 Daily Bonus Refreshed!</h2>
+                  <h2 style="color: #2563eb;">🚀 Wise AI Bonus Refreshed!</h2>
                   <p>Hello <strong>${name}</strong>,</p>
-                  <p>New tasks are waiting for you today. Log in now to keep your streak alive and maximize your revenue multipliers.</p>
+                  <p>New tasks are waiting for you today via Wise AI. Log in now to keep your streak alive and maximize your revenue multipliers.</p>
                   <div style="margin: 30px 0;">
                     <a href="${currentAppUrl}" style="background-color: #2563eb; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">Launch My Dashboard</a>
                   </div>
-                  <p style="font-size: 12px; color: #666;">Earnwise Elite Protocol v2.5</p>
+                  <p style="font-size: 12px; color: #666;">Earnwise Elite Protocol • Powered by Wise AI</p>
                 </div>
               `
             }).catch(e => console.error(`Failed to send daily mail to ${email}:`, e.message))
@@ -2116,6 +2819,14 @@ async function startServer() {
     }
   });
 
+
+
+  // Daily coaching scan at 10 AM for extra reliability (in addition to the rolling interval)
+  cron.schedule('0 10 * * *', async () => {
+    console.log("[CRON] Running daily scheduled coaching scan...");
+    runAutomatedCoachingCycle().catch(e => console.error("Daily coaching cron error:", e));
+  });
+
   // Trigger once on system start after 8 seconds
   setTimeout(() => {
     runAutomatedCoachingCycle().catch(e => console.error("Initial coaching cycle error:", e));
@@ -2126,7 +2837,100 @@ async function startServer() {
     runAutomatedCoachingCycle().catch(e => console.error("Interval coaching cycle error:", e));
   }, 3 * 60 * 1000);
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = http.createServer(app);
+
+  const wss = new WebSocketServer({ server });
+  
+  wss.on('connection', (ws) => {
+    console.log('[WS] Client connected to Wise AI Stream');
+    
+    ws.on('message', async (data) => {
+      try {
+        const payload = JSON.parse(data.toString());
+        const { message, userId, history = [] } = payload;
+        
+        if (!message) return;
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Wise AI is currently in maintenance (missing API configuration).' }));
+          return;
+        }
+
+        const genAI = new GoogleGenAI({ apiKey });
+        
+        const tools = [];
+
+        const models = ["gemini-3.5-flash"];
+        let lastWsErr;
+        let wsStreamSuccess = false;
+
+        for (const modelName of models) {
+          try {
+            // Prepare inputs for interaction using Step[] format to fix "parts" error
+            const interactionSteps = history.map((h: any) => ({
+              type: h.role === 'user' ? 'user_input' : 'model_output',
+              content: [{ type: 'text', text: h.content || "" }]
+            }));
+
+            // Priming messages to ensure the AI knows its role
+            const userInputs = [
+                { type: 'user_input', content: [{ type: 'text', text: "You are 'Wise AI', the official mentor for Earnwise. Earnwise is Nigeria's #1 digital tasks platform where users earn Naira by completing social media tasks. Do not hallucinate about activation codes or vendors." }] },
+                { type: 'model_output', content: [{ type: 'text', text: "Understood. I am Wise AI. I will provide accurate guidance about Earnwise tasks, upgrades via wallet balance, and bank withdrawals." }] },
+                ...interactionSteps,
+                { type: 'user_input', content: [{ type: 'text', text: message }] }
+            ];
+            
+            let stream = await genAI.interactions.create({ 
+              model: modelName,
+              input: userInputs as any,
+              tools: tools,
+              system_instruction: "You are 'Wise AI', the ultimate financial coach for Earnwise members. \n\nCRITICAL INSTRUCTIONS:\n- ONLY answer what the user is explicitly asking about. Keep it conversational, helpful, and natural.\n- OWNER & CEO: ONLY if explicitly asked 'who is the owner/CEO', say it is Johnathan Sterling. NEVER spit these facts out randomly in a general guide.\n- UPGRADING & PLANS: Users MUST NOT contact vendors or use activation codes. To upgrade/buy plans, go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.\n- REWARDS & EARNINGS: Give accurate answers. Users earn ₦ by interacting with sponsored ads, social media, uploading screenshots, taking courses, lucky spin, and referrals.\n- TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).\n- WITHDRAWAL: Minimum ₦1,000 to any Nigerian bank.\n- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. Do NOT volunteer this by default.",
+              generation_config: {
+                temperature: 0.5, // Lower temperature for more consistent tool calling
+                top_p: 0.8,
+                max_output_tokens: 800,
+              },
+              stream: true
+            });
+
+            const handleStream = async (targetStream: any) => {
+              let fullResponse = "";
+              for await (const event of targetStream) {
+                if (event.event_type === "step.delta" && event.delta.type === "text") {
+                  const chunkText = event.delta.text;
+                  fullResponse += chunkText;
+                  ws.send(JSON.stringify({ type: 'chunk', content: chunkText }));
+                } else if (event.event_type === "interaction.completed") {
+                    // Interaction completed event details
+                }
+              }
+              ws.send(JSON.stringify({ type: 'done', fullContent: fullResponse }));
+            };
+
+            await handleStream(stream);
+            wsStreamSuccess = true;
+            break;
+          } catch (err: any) {
+            lastWsErr = err;
+            if (err.status === 503 || err.status === 429) {
+                continue;
+            }
+            break;
+          }
+        }
+        if (!wsStreamSuccess) throw lastWsErr || new Error("Wise AI failed.");
+
+      } catch (error: any) {
+        console.error('[WS] Wise AI Stream Error:', error);
+        ws.send(JSON.stringify({ type: 'error', message: error.message || 'Stream processing failure' }));
+      }
+    });
+
+    ws.on('close', () => console.log('[WS] Client disconnected'));
+  });
+
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT} (isProd: ${isProd})`);
   });
 

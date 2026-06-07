@@ -37,12 +37,14 @@ export default function DepositTab() {
     setVerifyStatus('verifying');
     setLoading(true);
     try {
+      const urlAmount = searchParams.get('amount');
       const response = await axios.post('/api/paystack/verify-deposit', {
         reference: ref,
-        userId: user?.uid
+        userId: user?.uid,
+        amount: urlAmount || amount
       });
       if (response.data.status === 'success') {
-        const depositAmt = response.data.amount || Number(amount) || 5000;
+        const depositAmt = response.data.amount || Number(urlAmount) || Number(amount) || 500;
         if (response.data.useClientFallback) {
           console.warn("[PAYMENT] Server deposit write denied. Engaging Client SDK fallback execution...");
           
@@ -259,7 +261,7 @@ export default function DepositTab() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-white border border-slate-100 rounded-[2.5rem] py-8 pl-18 pr-8 text-4xl font-display font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:text-slate-100 placeholder:italic appearance-none shadow-sm"
+                className="w-full border border-slate-600 rounded-[2.5rem] py-8 pl-18 pr-8 text-4xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:italic appearance-none shadow-sm"
               />
             </div>
           </div>

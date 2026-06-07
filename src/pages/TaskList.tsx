@@ -11,19 +11,17 @@ import {
   Filter, 
   SlidersHorizontal, 
   Dices,
-  Play, 
+  Play,
   Target, 
-  ArrowRight,
   ChevronRight,
   ShieldCheck,
   Zap,
-  Globe,
   TrendingUp
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { MonetagBanner } from '../components/MonetagBanner';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
-import { CpxWidget } from '../components/CpxWidget';
 
 const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string }[] = [
   { id: 'all', label: 'All Jobs', icon: SlidersHorizontal, color: 'bg-slate-900' },
@@ -36,13 +34,25 @@ const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: strin
 export default function TaskList() {
   const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
-  const initialCategory = searchParams.get('category') as TaskType | 'all' || 'all';
+  const category = searchParams.get('category');
+
+  useEffect(() => {
+    if (category === 'ad') {
+      const script = document.createElement('script');
+      script.dataset.zone = '11109247';
+      script.src = 'https://n6wxm.com/vignette.min.js';
+      document.body.appendChild(script);
+    }
+  }, [category]);
+  
+  const initialCategory = (category as TaskType | 'all') || 'all';
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<TaskType | 'all'>(initialCategory);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isZeydooModalOpen, setZeydooModalOpen] = useState(false);
 
   const taskCounts = {
     survey: 'LIVE', 
@@ -121,9 +131,15 @@ export default function TaskList() {
             {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
               <button
                 key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => {
+                  if (cat.id === 'app_download') {
+                    setZeydooModalOpen(true);
+                  } else {
+                    setActiveCategory(cat.id);
+                  }
+                }}
                 className={`p-4 sm:p-5 rounded-3xl sm:rounded-[2rem] border transition-all flex flex-col items-start gap-4 relative overflow-hidden group ${
-                  activeCategory === cat.id 
+                  (activeCategory === cat.id && cat.id !== 'app_download') || (cat.id === 'app_download' && isZeydooModalOpen)
                     ? 'bg-slate-950 border-slate-900 shadow-2xl scale-[1.02]' 
                     : 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-lg shadow-sm'
                 }`}
@@ -182,53 +198,65 @@ export default function TaskList() {
           {loading ? (
             [1, 2, 3].map(i => <div key={`skeleton-${i}`} className="h-32 bg-white rounded-[2.5rem] animate-pulse border border-slate-100 shadow-sm" />)
           ) : filteredTasks.length > 0 ? (
-            filteredTasks.map((task, index) => (
-              <Link 
-                key={task.id || index} 
-                to={`/tasks/${task.id}`}
-                className="block group bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
-                
-                <div className="flex justify-between items-center relative z-10">
-                  <div className="flex gap-4 items-center">
-                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500">
-                      <Zap size={24} className="group-hover:fill-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{task.type.replace('_', ' ')} Network</span>
-                        {task.isRepeatable && (
-                          <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">
-                             <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
-                             <span className="text-[8px] font-black uppercase tracking-tighter">Unlimited</span>
-                          </div>
-                        )}
-                      </div>
-                      <h4 className="font-display font-black text-slate-900 text-lg leading-tight uppercase italic group-hover:text-blue-600 transition-colors">
-                        {task.title}
-                      </h4>
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <div className="flex flex-col items-end">
-                      <p className="text-2xl font-display font-black text-slate-900 tracking-tighter">
-                        ₦{((task.userPayout || 0) * multiplier).toFixed(0)}
-                      </p>
-                      {multiplier > 1 ? (
-                        <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 mt-1">
-                           <TrendingUp size={10} />
-                           <span className="text-[9px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
+            <motion.div 
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+              }}
+              className="space-y-4"
+            >
+              {filteredTasks.map((task, index) => (
+                <motion.div key={task.id || index} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
+                  <Link 
+                    to={`/tasks/${task.id}`}
+                    className="block group bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
+                    
+                    <div className="flex justify-between items-center relative z-10">
+                      <div className="flex gap-4 items-center">
+                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500">
+                          <Zap size={24} className="group-hover:fill-white" />
                         </div>
-                      ) : (
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Verified Rate</span>
-                      )}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{task.type.replace('_', ' ')} Network</span>
+                            {task.isRepeatable && (
+                              <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">
+                                <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
+                                <span className="text-[8px] font-black uppercase tracking-tighter">Unlimited</span>
+                              </div>
+                            )}
+                          </div>
+                          <h4 className="font-display font-black text-slate-900 text-lg leading-tight uppercase italic group-hover:text-blue-600 transition-colors">
+                            {task.title}
+                          </h4>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <div className="flex flex-col items-end">
+                          <p className="text-2xl font-display font-black text-slate-900 tracking-tighter">
+                            ₦{((task.userPayout || 0) * multiplier).toFixed(0)}
+                          </p>
+                          {multiplier > 1 ? (
+                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 mt-1">
+                               <TrendingUp size={10} />
+                               <span className="text-[9px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
+                            </div>
+                          ) : (
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Verified Rate</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Link>
-            ))
+                  </Link>
+                  {(index === 0 || index === 1 || index === 2) && <MonetagBanner />}
+                </motion.div>
+              ))}
+            </motion.div>
           ) : (activeCategory === 'ad' || activeCategory === 'survey') ? null : (
             <div className="text-center py-24 bg-white border border-slate-100 rounded-[3rem] shadow-sm relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,0,0,0.02),transparent)]" />
@@ -257,6 +285,28 @@ export default function TaskList() {
            />
         </Link>
       </div>
+
+      {/* Target Modal for Zeydoo */}
+      {isZeydooModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl h-[80vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col relative animate-in fade-in zoom-in duration-300">
+            <div className="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-950/50">
+               <h3 className="text-white font-display font-black uppercase tracking-widest text-sm">Premium Apps & Jobs</h3>
+               <button onClick={() => setZeydooModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition">
+                  <span className="text-xl leading-none -mt-0.5">×</span>
+               </button>
+            </div>
+            <div className="flex-1 bg-white relative">
+              <iframe 
+                src={`https://smrturl.co/o/xxxxxx?ymid=${user?.uid || 'guest'}`}
+                className="w-full h-full border-0 absolute inset-0"
+                allow="autoplay; fullscreen; microphone; camera"
+                title="Zeydoo Offers"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

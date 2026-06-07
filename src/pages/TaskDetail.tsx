@@ -14,9 +14,11 @@ import {
   AlertCircle, 
   ArrowRight,
   Info,
-  ShieldCheck
+  ShieldCheck,
+  Upload
 } from 'lucide-react';
 import { playRewardSound } from './sounds';
+import { triggerOnclikaPush } from '../lib/adManager';
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -31,8 +33,101 @@ export default function TaskDetail() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showContent, setShowContent] = useState(false);
   const [proof, setProof] = useState(''); // Added state for proof
+  const [shake, setShake] = useState(false);
   const [preTaskTimer, setPreTaskTimer] = useState(300); // 5 minutes in seconds
   const [isPreTimerActive, setIsPreTimerActive] = useState(true);
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  const isCampaignTask = !!(task?.advertiserId && task?.advertiserId !== 'internal_platform' && task?.advertiserId !== 'admin');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Screenshot size must be under 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setScreenshot(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith('image/')) {
+        setError('Please drop an image file (PNG, JPG, JPEG).');
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Screenshot size must be under 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setScreenshot(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCampaignSubmit = async () => {
+    if (!task || !user || alreadyCompleted || submitted) return;
+    if (!screenshot) {
+      setError('Please upload a screenshot of your completed task as proof.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    
+    try {
+      await addDoc(collection(db, 'completions'), {
+        userId: user.uid,
+        taskId: task.id,
+        status: 'pending',
+        rewardEarned: calculatedReward,
+        submittedAt: serverTimestamp(),
+        proofText: proof || 'No additional text provided.',
+        screenshot: screenshot, // Base64 data URL
+        isCampaignTask: true,
+        advertiserId: task.advertiserId,
+        taskTitle: task.title,
+        taskType: task.type,
+        taskPlatform: task.tag || ''
+      });
+      
+      playRewardSound();
+      setSubmitted(true);
+      setWiseAiMessage("Your proof has been successfully submitted to the admin panel for review. Rewards will be credited upon approval.");
+      setTimeout(() => navigate('/earnings'), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Error submitting campaign completion');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!task) return;
@@ -157,21 +252,43 @@ export default function TaskDetail() {
     }
   };
 
+  const [wiseAiMessage, setWiseAiMessage] = useState<string>('');
+
   const handleProofSubmit = async () => {
     if (!task || !user || alreadyCompleted || submitted || !proof) return;
     setSubmitting(true);
+    setError('');
+    setWiseAiMessage('');
     try {
-      await addDoc(collection(db, 'completions'), {
-        userId: user.uid,
-        taskId: task.id,
-        status: 'pending',
-        rewardEarned: calculatedReward,
-        submittedAt: serverTimestamp(),
-        proof: proof // Save the proof
+      const response = await fetch('/api/v1/tasks/verify-proof', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          taskId: task.id,
+          taskTitle: task.title,
+          proof: proof,
+          rewardAmount: calculatedReward
+        })
       });
-      playRewardSound();
-      setSubmitted(true);
-      setTimeout(() => navigate('/earnings'), 2000);
+
+      if (!response.ok) {
+        throw new Error('Verification request failed. Please try again.');
+      }
+
+      const data = await response.json();
+
+      if (data.approved) {
+        setWiseAiMessage(`Wise AI: ${data.message}`);
+        playRewardSound();
+        setSubmitted(true);
+        setTimeout(() => navigate('/earnings'), 3000);
+      } else {
+        setError(`Wise AI Rejected: ${data.message}`);
+      }
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -180,6 +297,9 @@ export default function TaskDetail() {
   };
 
   const startTask = () => {
+    // Programmatically activate push notification offer as Content Locker
+    triggerOnclikaPush();
+
     if (task?.link) {
       window.open(task.link, '_blank');
     }
@@ -382,22 +502,128 @@ export default function TaskDetail() {
                     <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Verifying Activity...</h4>
                     <p className="text-[10px] text-slate-400 mt-1">Please stay on this page</p>
                  </div>
-               ) : task?.requiresProof ? (
-                 <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
-                   <h4 className="font-black text-lg">Submit Proof</h4>
+               ) : isCampaignTask ? (
+                 <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-md space-y-4">
+                   <div className="flex items-center gap-2 mb-2">
+                     <span className="w-8 h-8 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">★</span>
+                     <h4 className="font-black text-lg text-slate-900">Campaign Verification Proof</h4>
+                   </div>
+                   
+                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                     This is an advertiser-sponsored campaign task. You must upload a screenshot matching the requirements to be approved and rewarded by the administrator.
+                   </p>
+
+                   {/* Drag and Drop Zone */}
+                   <div 
+                     onDragEnter={handleDrag}
+                     onDragOver={handleDrag}
+                     onDragLeave={handleDrag}
+                     onDrop={handleDrop}
+                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer relative group ${
+                       dragActive 
+                         ? 'border-blue-500 bg-blue-50/50' 
+                         : screenshot 
+                         ? 'border-emerald-500/50 bg-emerald-50/20' 
+                         : 'border-slate-200 hover:border-blue-400 bg-slate-50/50'
+                     }`}
+                   >
+                     <input 
+                       type="file" 
+                       accept="image/*" 
+                       onChange={handleFileChange} 
+                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                     />
+                     
+                     {screenshot ? (
+                       <div className="space-y-3">
+                         <div className="relative inline-block z-20">
+                           <img 
+                             src={screenshot} 
+                             alt="Upload Preview" 
+                             className="h-28 mx-auto rounded-xl object-cover shadow-sm border border-slate-100" 
+                           />
+                           <button 
+                             type="button"
+                             onClick={(e) => {
+                               e.preventDefault();
+                               e.stopPropagation();
+                               setScreenshot(null);
+                             }} 
+                             className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-red-650 transition-all text-xs flex items-center justify-center font-bold"
+                           >
+                             ✕
+                           </button>
+                         </div>
+                         <p className="text-xs text-emerald-600 font-bold">✓ Screenshot Loaded Successfully</p>
+                         <p className="text-[10px] text-slate-400">Click or drag again to replace</p>
+                       </div>
+                     ) : (
+                       <div className="space-y-2 pointer-events-none">
+                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm text-slate-400 group-hover:text-blue-500 transition-colors">
+                           <Upload size={24} />
+                         </div>
+                         <p className="text-sm font-bold text-slate-700">Drag & drop your screenshot proof here</p>
+                         <p className="text-xs text-slate-400">or <span className="text-blue-600 underline">browse files</span></p>
+                         <p className="text-[10px] text-slate-400 italic">Supports PNG, JPG, JPEG (Max 2MB)</p>
+                       </div>
+                     )}
+                   </div>
+
                    <textarea
-                     className="w-full p-4 rounded-xl border border-gray-200 text-sm"
-                     placeholder="Enter proof (e.g., screenshot link, username)..."
+                     className="w-full p-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                     placeholder="Optional: Enter your username, handle, or comment details here..."
                      value={proof}
                      onChange={(e) => setProof(e.target.value)}
                    />
-                   <button
-                     onClick={handleProofSubmit}
-                     disabled={submitting || !proof}
-                     className="w-full py-4 rounded-2xl font-black text-lg bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all"
+
+                   <motion.button
+                     animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
+                     transition={{ duration: 0.4 }}
+                     onClick={() => {
+                       if (submitting || !screenshot) {
+                         setShake(true);
+                         setTimeout(() => setShake(false), 400);
+                       } else {
+                         handleCampaignSubmit();
+                       }
+                     }}
+                     className={`w-full py-4 rounded-2xl font-black text-lg text-white active:scale-[0.98] transition-all ${
+                       submitting || !screenshot ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100'
+                     }`}
+                   >
+                     {submitting ? 'Submitting Proof...' : 'Submit Verification Proof'}
+                   </motion.button>
+                 </div>
+               ) : task?.requiresProof ? (
+                 <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
+                   <div className="flex items-center gap-2 mb-2">
+                     <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">W</span>
+                     <h4 className="font-black text-lg">Wise AI Verification</h4>
+                   </div>
+                   <p className="text-xs text-slate-500 font-medium">Please provide proof of completion. Wise AI will review your submission instantly.</p>
+                   <textarea
+                     className="w-full p-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                     placeholder="Paste screenshot URL, your username, or activity link here..."
+                     value={proof}
+                     onChange={(e) => setProof(e.target.value)}
+                   />
+                   <motion.button
+                     animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
+                     transition={{ duration: 0.4 }}
+                     onClick={() => {
+                       if (submitting || !proof) {
+                         setShake(true);
+                         setTimeout(() => setShake(false), 400);
+                       } else {
+                         handleProofSubmit();
+                       }
+                     }}
+                     className={`w-full py-4 rounded-2xl font-black text-lg text-white active:scale-[0.98] transition-all ${
+                       submitting || !proof ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                     }`}
                    >
                      {submitting ? 'Submitting...' : 'Submit Proof'}
-                   </button>
+                   </motion.button>
                  </div>
                ) : (
                  <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2.5rem] text-center">
@@ -431,7 +657,8 @@ export default function TaskDetail() {
               <CheckCircle2 size={48} />
             </motion.div>
             <h2 className="text-3xl font-black mb-2">Great Job!</h2>
-            <p className="text-gray-500 font-medium mb-8">Your submission is being reviewed. Reward will be added to your balance shortly.</p>
+            <p className="text-gray-500 font-medium mb-2">Verified by Wise AI.</p>
+            {wiseAiMessage && <p className="text-sm text-green-600 font-bold mb-8 bg-green-50 p-4 rounded-xl border border-green-100">{wiseAiMessage}</p>}
             <p className="text-xs text-blue-600 font-bold animate-pulse">Redirecting to earnings...</p>
           </motion.div>
         )}

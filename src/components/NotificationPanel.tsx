@@ -18,8 +18,8 @@ export default function NotificationList({ onClose }: { onClose: () => void }) {
         const notifs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         // Local sort by createdAt descending
         notifs.sort((a: any, b: any) => {
-            const timeA = a.createdAt?.toMillis?.() || 0;
-            const timeB = b.createdAt?.toMillis?.() || 0;
+            const timeA = a.createdAt?.toMillis?.() || Date.now();
+            const timeB = b.createdAt?.toMillis?.() || Date.now();
             return timeB - timeA;
         });
         setNotifications(notifs);
@@ -48,7 +48,7 @@ export default function NotificationList({ onClose }: { onClose: () => void }) {
   const markAllAsRead = async () => {
     try {
       for (const n of notifications) {
-        const isRead = n.read || (n.readBy && user && n.readBy.includes(user.uid));
+        const isRead = n.userId === 'all' ? (n.readBy && user && n.readBy.includes(user.uid)) : n.read;
         if (!isRead) {
           await markAsRead(n);
         }
@@ -83,7 +83,7 @@ export default function NotificationList({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           notifications.map(n => {
-            const isRead = n.read || (n.readBy && user && n.readBy.includes(user.uid));
+            const isRead = n.userId === 'all' ? (n.readBy && user && n.readBy.includes(user.uid)) : n.read;
             return (
               <div 
                 key={n.id} 

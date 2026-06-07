@@ -55,6 +55,35 @@ export default function Profile() {
   const [currentTime, setCurrentTime] = useState('09:00');
   const [currentDate, setCurrentDate] = useState('Today');
   const [subscribingAll, setSubscribingAll] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+
+  useEffect(() => {
+    // Check if we can show install prompt
+    const checkInstall = () => {
+      if ((window as any).deferredPrompt) {
+        setCanInstall(true);
+      }
+    };
+    checkInstall();
+    window.addEventListener('beforeinstallprompt', checkInstall);
+    return () => window.removeEventListener('beforeinstallprompt', checkInstall);
+  }, []);
+
+  const handleInstallClick = async () => {
+    const promptEvent = (window as any).deferredPrompt;
+    if (!promptEvent) return;
+    
+    // Show the install prompt
+    promptEvent.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await promptEvent.userChoice;
+    console.log(`Earnwise: Install outcome: ${outcome}`);
+    
+    // We've used the prompt, and can't use it again, throw it away
+    (window as any).deferredPrompt = null;
+    setCanInstall(false);
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -219,6 +248,7 @@ export default function Profile() {
     { label: 'Upgrade Membership', icon: Crown, path: '/upgrade' },
     { label: 'Payment Details', icon: CreditCard, path: '/withdrawal' },
     { label: 'Refer & Earn', icon: Share2, path: '/referral' },
+    ...(canInstall ? [{ label: 'Install App (PWA)', icon: Smartphone, action: handleInstallClick }] : []),
     { label: 'Privacy Policy', icon: Shield, path: '/privacy' },
     { label: 'Terms of Service', icon: FileText, path: '/terms' },
     { label: 'Help & Support', icon: HelpCircle, path: '/support' },
@@ -492,7 +522,13 @@ export default function Profile() {
                 return (
                   <button
                     key={index}
-                    onClick={() => item.path ? navigate(item.path) : null}
+                    onClick={() => {
+                      if (item.action) {
+                        item.action();
+                      } else if (item.path) {
+                        navigate(item.path);
+                      }
+                    }}
                     className="group w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition-all rounded-2xl"
                   >
                     <div className="flex items-center gap-4">

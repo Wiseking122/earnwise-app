@@ -8,6 +8,8 @@ import axios from 'axios';
 import { collection, query, where, limit, onSnapshot } from 'firebase/firestore';
 import { WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import AnimatedNumber from '../components/AnimatedNumber';
+import Confetti from '../components/Confetti';
 import { 
   Building2, 
   CreditCard, 
@@ -26,6 +28,7 @@ import {
   Search
 } from 'lucide-react';
 import DepositTab from '../components/DepositTab';
+import WithdrawalTimeline from '../components/WithdrawalTimeline';
 
 export default function Withdrawal() {
   const { profile } = useAuth();
@@ -40,6 +43,7 @@ export default function Withdrawal() {
   const [accountNumber, setAccountNumber] = useState(profile?.bankDetails?.accountNumber || '');
   const [accountName, setAccountName] = useState(profile?.bankDetails?.accountName || '');
   const [loading, setLoading] = useState(false);
+  const [withdrawalType, setWithdrawalType] = useState<'task' | 'referral'>('task');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [banks, setBanks] = useState<{name: string, code: string}[]>([]);
@@ -161,6 +165,7 @@ export default function Withdrawal() {
       const response = await axios.post('/api/paystack/withdraw', {
         userId: profile.uid,
         amount: withdrawAmount,
+        withdrawalType,
         bankDetails: { bankName, bankCode, accountNumber, accountName }
       });
 
@@ -181,6 +186,7 @@ export default function Withdrawal() {
 
   return (
     <Layout title="Wallet Protocol" showBack>
+      {success && <Confetti />}
       <div className="p-5 pb-24 space-y-8 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
 
@@ -222,15 +228,73 @@ export default function Withdrawal() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Institutional Grade Balance</p>
                     <h3 className="text-5xl font-display font-black tracking-tighter italic">
-                      ₦{(profile?.withdrawableBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₦<AnimatedNumber value={profile?.withdrawableBalance || 0} fractionDigits={2} />
                     </h3>
                   </div>
                   <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform">
                     <Wallet size={28} className="text-blue-500" />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-tight">Payout protocol active via Paystack Node</p>
+                <div className="flex gap-2">
+                  <div className="bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Referral: ₦{(profile as any)?.referralEarnings || 0}</p>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-tight mt-1">Payout protocol active via Paystack Node</p>
+                </div>
               </div>
+            </div>
+
+            {/* Withdrawal Type Selection */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setWithdrawalType('task')}
+                className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-3 relative overflow-hidden ${
+                  withdrawalType === 'task' 
+                    ? 'bg-blue-600 border-blue-500 text-white shadow-xl scale-[1.02]' 
+                    : 'bg-white border-slate-100 text-slate-900 hover:border-blue-200'
+                }`}
+              >
+                <div className="flex items-center justify-between relative z-10">
+                  <Zap size={20} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-600'} />
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${withdrawalType === 'task' ? 'bg-white/20' : 'bg-blue-50'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${new Date().getDate() === 30 && new Date().getUTCHours() + 1 === 17 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${withdrawalType === 'task' ? 'text-white' : 'text-blue-600'}`}>
+                      30th
+                    </span>
+                  </div>
+                </div>
+                <div className="relative z-10">
+                  <span className="text-sm font-black uppercase tracking-tighter block">Task Payout</span>
+                  <span className={`text-[9px] font-bold uppercase opacity-80 mt-1 block ${withdrawalType === 'task' ? 'text-blue-100' : 'text-slate-400'}`}>5PM - 6PM • Monthly</span>
+                </div>
+                {withdrawalType === 'task' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setWithdrawalType('referral')}
+                className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-3 relative overflow-hidden ${
+                  withdrawalType === 'referral' 
+                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl scale-[1.02]' 
+                    : 'bg-white border-slate-100 text-slate-900 hover:border-emerald-200'
+                }`}
+              >
+                <div className="flex items-center justify-between relative z-10">
+                  <User size={20} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-600'} />
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${withdrawalType === 'referral' ? 'bg-white/20' : 'bg-emerald-50'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${new Date().getUTCHours() + 1 === 17 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${withdrawalType === 'referral' ? 'text-white' : 'text-emerald-600'}`}>
+                      Live
+                    </span>
+                  </div>
+                </div>
+                <div className="relative z-10">
+                  <span className="text-sm font-black uppercase tracking-tighter block">Referral Payout</span>
+                  <span className={`text-[9px] font-bold uppercase opacity-80 mt-1 block ${withdrawalType === 'referral' ? 'text-emerald-100' : 'text-slate-400'}`}>5PM - 6PM • Daily</span>
+                </div>
+                {withdrawalType === 'referral' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -244,7 +308,7 @@ export default function Withdrawal() {
                     required
                     min="1000"
                     step="0.01"
-                    className="w-full bg-white border border-slate-100 rounded-[2.5rem] py-8 pl-18 pr-8 text-3xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm"
+                    className="w-full bg-white border border-slate-100 rounded-[2.5rem] py-8 pl-18 pr-8 text-3xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
@@ -275,79 +339,71 @@ export default function Withdrawal() {
 
                       <AnimatePresence>
                         {isOpenBankDropdown && (
-                          <>
-                            {/* Backdrop overlay to close when clicking outside */}
+                          <motion.div
+                            key="bank-dropdown-portal"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
+                            className="absolute left-0 right-0 mt-2 bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden z-[500] max-h-80 flex flex-col"
+                          >
+                            {/* Backdrop overlay inside the motion div for better coordination */}
                             <div 
-                              className="fixed inset-0 z-40 bg-transparent" 
+                              className="fixed inset-0 -z-1 bg-black/5" 
                               onClick={() => {
                                 setIsOpenBankDropdown(false);
                                 setBankSearch('');
                               }} 
                             />
                             
-                            {/* Dropdown panel */}
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              transition={{ duration: 0.15 }}
-                              className="absolute left-0 right-0 mt-2 bg-white border border-slate-100 rounded-3xl shadow-xl overflow-hidden z-50 max-h-80 flex flex-col"
-                            >
-                              {/* Search Bar Input */}
-                              <div className="p-4 border-b border-slate-100 relative flex items-center bg-slate-50/50">
-                                <Search className="absolute left-8 text-slate-400" size={16} />
-                                <input
-                                  type="text"
-                                  autoFocus
-                                  placeholder="Search bank name..."
-                                  className="w-full bg-white border border-slate-100 rounded-xl py-2.5 pl-11 pr-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
-                                  value={bankSearch}
-                                  onChange={(e) => setBankSearch(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Escape') {
-                                      setIsOpenBankDropdown(false);
-                                      setBankSearch('');
-                                    }
-                                  }}
-                                />
-                              </div>
+                            {/* Search Bar Input */}
+                            <div className="p-4 border-b border-slate-100 relative flex items-center bg-slate-50/50 z-10">
+                              <Search className="absolute left-8 text-slate-400" size={16} />
+                              <input
+                                type="text"
+                                autoFocus
+                                placeholder="Search bank name..."
+                                className="w-full bg-white border border-slate-100 rounded-xl py-2.5 pl-11 pr-4 text-xs font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+                                value={bankSearch}
+                                onChange={(e) => setBankSearch(e.target.value)}
+                              />
+                            </div>
 
-                              {/* Banks list */}
-                              <div className="overflow-y-auto max-h-56 no-scrollbar p-2 space-y-1">
-                                {filteredBanks.length > 0 ? (
-                                  filteredBanks.map((bank, index) => {
-                                    const isSelected = bank.code === bankCode;
-                                    return (
-                                      <button
-                                        key={`${bank.code}-${index}`}
-                                        type="button"
-                                        onClick={() => {
-                                          setBankCode(bank.code);
-                                          setBankName(bank.name);
-                                          setIsOpenBankDropdown(false);
-                                          setBankSearch('');
-                                        }}
-                                        className={`w-full text-left px-5 py-3.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
-                                          isSelected 
-                                            ? 'bg-blue-50/80 text-blue-700 font-extrabold' 
-                                            : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
-                                        }`}
-                                      >
-                                        <span className="truncate">{bank.name}</span>
-                                        {isSelected && (
-                                          <CheckCircle2 size={16} className="text-blue-600 flex-shrink-0" />
-                                        )}
-                                      </button>
-                                    );
-                                  })
-                                ) : (
-                                  <div className="text-center py-6 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                                    No protocol bank found
-                                  </div>
-                                )}
-                              </div>
-                            </motion.div>
-                          </>
+                            {/* Banks list */}
+                            <div className="overflow-y-auto max-h-56 no-scrollbar p-2 space-y-1 z-10">
+                              {filteredBanks.length > 0 ? (
+                                filteredBanks.map((bank, index) => {
+                                  const isSelected = bank.code === bankCode;
+                                  return (
+                                    <button
+                                      key={`${bank.code}-${index}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setBankCode(bank.code);
+                                        setBankName(bank.name);
+                                        setIsOpenBankDropdown(false);
+                                        setBankSearch('');
+                                      }}
+                                      className={`w-full text-left px-5 py-3.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
+                                        isSelected 
+                                          ? 'bg-blue-50/80 text-blue-700 font-extrabold' 
+                                          : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
+                                      }`}
+                                    >
+                                      <span className="truncate">{bank.name}</span>
+                                      {isSelected && (
+                                        <CheckCircle2 size={16} className="text-blue-600 flex-shrink-0" />
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <div className="text-center py-6 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                                  No protocol bank found
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
@@ -360,7 +416,7 @@ export default function Withdrawal() {
                         type="text" 
                         placeholder="Enter 10-digit account number"
                         required
-                        className="w-full bg-slate-50 border-none rounded-2xl py-5 pl-14 pr-6 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 text-sm font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
                       />
@@ -370,13 +426,13 @@ export default function Withdrawal() {
                     <div className="flex justify-between items-center ml-4 mr-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verified Identity</label>
                       {resolvingName && (
-                        <span className="text-[9px] text-blue-500 font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                        <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse">
                           <Loader2 size={10} className="animate-spin" /> Resolving Name
                         </span>
                       )}
                       {!resolvingName && resolveFeedback && (
                         <span className={`text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
-                          resolveFeedback.includes('Verified') ? 'text-emerald-500' : 'text-amber-500'
+                          resolveFeedback.includes('Verified') ? 'text-emerald-600' : 'text-amber-600'
                         }`}>
                           {resolveFeedback.includes('Verified') ? <CheckCircle2 size={10} /> : <AlertCircle size={10} />} {resolveFeedback}
                         </span>
@@ -388,7 +444,7 @@ export default function Withdrawal() {
                         type="text" 
                         placeholder={resolvingName ? "Querying secure gateway..." : "Full name as on bank record"}
                         required
-                        className={`w-full bg-slate-50 border-none rounded-2xl py-5 pl-14 pr-6 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all ${
+                        className={`w-full bg-slate-50 border-none rounded-2xl py-5 pl-14 pr-6 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 ${
                           resolvingName ? 'opacity-70 cursor-wait select-none' : ''
                         }`}
                         value={accountName}
@@ -472,6 +528,7 @@ export default function Withdrawal() {
                           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                             {w.requestedAt?.toDate?.()?.toLocaleDateString() || 'Recently'} • {w.status}
                           </p>
+                          <WithdrawalTimeline status={w.status || 'submitted'} />
                         </div>
                       </div>
                       <div className="hidden md:block">

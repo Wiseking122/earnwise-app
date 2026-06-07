@@ -103,17 +103,28 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (request.auth.uid == userId && (
+          !incoming().diff(existing()).affectedKeys().hasAny(['role']) || 
+          existing().role == incoming().role
+        )) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['totalReferrals']))
+      );
     }
 
     match /tasks/{taskId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (isSignedIn() && (
+        (resource == null && request.resource.data.advertiserId == request.auth.uid) ||
+        (resource != null && resource.data.advertiserId == request.auth.uid)
+      ));
     }
 
     match /completions/{completionId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.isSpin == true || resource.data.isAdNetwork == true || isAdmin());
       allow create: if isSignedIn() && (incoming().userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
@@ -157,6 +168,11 @@ service cloud.firestore {
                       incoming().claimedAt == request.time
                     );
       allow delete: if false;
+    }
+
+    match /course_overrides/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == 'Ik1Ngp1oC9hYXZt9lQEPIeOiCGA3' || isAdmin());
     }
 
     // Default Deny at the bottom

@@ -5,6 +5,7 @@ export type WithdrawalStatus = 'pending' | 'approved' | 'completed' | 'rejected'
 export type TransactionType = 'earning' | 'withdrawal' | 'referral' | 'staking' | 'bonus';
 export type UserRole = 'user' | 'admin' | 'advertiser';
 export type PlanType = 'free' | 'elite' | 'starter' | 'pro' | 'bronze' | 'diamond' | 'silver' | 'platinum' | 'golden';
+export type RankType = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
 
 export interface BankDetails {
   accountName: string;
@@ -36,6 +37,8 @@ export interface UserProfile {
   referralEarnings?: number;
   bonusEarnings?: number;
   balance: number;
+  wiseCoins: number;
+  rank: RankType;
   vaultBalance?: number;
   tasksCompleted?: number;
   xp?: number;
@@ -73,8 +76,15 @@ export interface UserProfile {
   };
   subscriptionTier: 'free' | 'premium';
   referralCode: string;
+  totalReferrals?: number;
+  hasReceivedReferralBonus?: boolean;
   freeCoursesUsed?: number;
   bankDetails?: BankDetails;
+  completedAds?: {
+    id: string;
+    timestamp: string;
+    reward: number;
+  }[];
   createdAt: any;
 }
 
@@ -114,6 +124,14 @@ export interface TaskCompletion {
   submittedAt: any;
   verifiedAt?: any;
   rejectionReason?: string;
+  screenshot?: string;
+  proofText?: string;
+  proof?: string;
+  isCampaignTask?: boolean;
+  advertiserId?: string;
+  taskTitle?: string;
+  taskType?: string;
+  taskPlatform?: string;
 }
 
 export interface WithdrawalRequest {
@@ -144,6 +162,7 @@ export interface Course {
   category: string;
   steps: string[];
   incomePotential: string;
+  image: string;
   imageUrl?: string;
 }
 

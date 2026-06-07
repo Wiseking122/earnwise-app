@@ -29,6 +29,7 @@ import {
   Zap,
   Sparkles
 } from 'lucide-react';
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function Vault() {
   const { user, profile } = useAuth();
@@ -202,7 +203,7 @@ export default function Vault() {
                     <div className="space-y-1">
                         <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Current Locked Funds</p>
                         <h3 className="text-4xl font-black tracking-tight">
-                            ₦{(profile?.vaultBalance || 0).toLocaleString()}
+                            ₦<AnimatedNumber value={profile?.vaultBalance || 0} />
                         </h3>
                     </div>
                     <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-2xl border border-white/10">

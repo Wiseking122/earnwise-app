@@ -12,16 +12,16 @@ export const Logo = ({ size = 48, className = "" }: { size?: number, className?:
       className={className}
     >
       <defs>
-        <linearGradient id="logo-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#F59E0B" />
-          <stop offset="50%" stopColor="#D97706" />
-          <stop offset="100%" stopColor="#2563EB" />
+        <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FB923C" />
+          <stop offset="60%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#EA580C" />
         </linearGradient>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-          <feOffset dx="2" dy="2" result="offsetblur" />
+        <filter id="logo-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="4" />
+          <feOffset dx="0" dy="4" result="offsetblur" />
           <feComponentTransfer>
-            <feFuncA type="linear" slope="0.4" />
+            <feFuncA type="linear" slope="0.3" />
           </feComponentTransfer>
           <feMerge>
             <feMergeNode />
@@ -32,7 +32,7 @@ export const Logo = ({ size = 48, className = "" }: { size?: number, className?:
       
       <motion.g
         animate={{ 
-          y: [0, -4, 0],
+          y: [0, -3, 0],
           rotate: [0, 1, 0]
         }}
         transition={{ 
@@ -41,35 +41,23 @@ export const Logo = ({ size = 48, className = "" }: { size?: number, className?:
           ease: "easeInOut" 
         }}
       >
-        {/* Background Glow */}
-        <circle cx="60" cy="60" r="50" fill="url(#logo-gradient)" fillOpacity="0.15" />
+        <circle cx="60" cy="65" r="45" fill="#FDE68A" fillOpacity="0.2" />
         
-        {/* Main W Path */}
         <path 
-          d="M20 40 L40 90 L60 60 L80 90 L100 30" 
+          d="M25 45 C 30 75, 35 95, 45 95 C 55 95, 55 65, 65 65 C 75 65, 75 95, 85 95 C 95 95, 100 75, 105 35" 
           stroke="url(#logo-gradient)" 
-          strokeWidth="14" 
+          strokeWidth="18" 
           strokeLinecap="round" 
           strokeLinejoin="round"
-          filter="url(#shadow)"
+          filter="url(#logo-shadow)"
         />
         
-        {/* Arrow Head */}
-        <path 
-          d="M90 35 L100 30 L105 40" 
-          stroke="url(#logo-gradient)" 
-          strokeWidth="14" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        />
-        
-        {/* Gold Coin at top */}
         <motion.g
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <circle cx="100" cy="30" r="14" fill="#F59E0B" stroke="white" strokeWidth="2" />
-          <text x="95" y="35" fill="white" fontSize="12" fontWeight="900" fontFamily="Inter, sans-serif">₦</text>
+          <circle cx="105" cy="35" r="15" fill="#F59E0B" stroke="white" strokeWidth="2.5" />
+          <text x="100" y="40" fill="white" fontSize="14" fontWeight="900" fontFamily="Inter, sans-serif">₦</text>
         </motion.g>
       </motion.g>
     </svg>

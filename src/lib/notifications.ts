@@ -23,16 +23,20 @@ export async function sendNotification({
   actionLink?: string;
 }) {
   try {
-    await addDoc(collection(db, 'notifications'), {
+    const data: any = {
       userId,
       title,
       message,
       type,
-      actionLink,
       read: false,
       createdAt: serverTimestamp(),
       readBy: []
-    });
+    };
+    if (actionLink !== undefined) {
+      data.actionLink = actionLink;
+    }
+    
+    await addDoc(collection(db, 'notifications'), data);
   } catch (error) {
     console.error("Failed to send notification:", error);
   }

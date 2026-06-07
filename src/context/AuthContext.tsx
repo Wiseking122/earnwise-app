@@ -117,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           badges: ['Rookie'],
           plan: 'free',
           subscriptionTier: 'free',
+          dailyEmailEnabled: true,
+          dailyPushEnabled: true,
           referralCode,
           referredBy: finalReferralCode || null,
           createdAt: serverTimestamp()

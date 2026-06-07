@@ -7,7 +7,7 @@ export default function TermsOfService() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent">
       <header className="p-6 flex items-center gap-4 bg-white sticky top-0 z-10 border-b border-slate-100">
         <button 
           onClick={() => navigate(-1)}

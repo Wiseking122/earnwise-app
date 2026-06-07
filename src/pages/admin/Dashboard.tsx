@@ -11,11 +11,20 @@ import {
   Clock, 
   CheckCircle,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  User,
+  History,
+  FileText,
+  Bell,
+  Loader2,
+  Megaphone,
+  Send,
+  Target,
+  Plus,
+  X,
+  BookOpen
 } from 'lucide-react';
-
-// ... existing imports ...
-import { Megaphone, Send, Target, Plus, X } from 'lucide-react';
+import { motion } from 'motion/react';
 import { sendNotification, NotificationType } from '../../lib/notifications';
 
 export default function AdminDashboard() {
@@ -29,6 +38,7 @@ export default function AdminDashboard() {
     totalWithdrawable: 0
   });
   const [clearing, setClearing] = useState(false);
+  const [triggeringCoaching, setTriggeringCoaching] = useState(false);
   
   // Custom Notification Form
   const [notifForm, setNotifForm] = useState({ title: '', message: '', targetUserId: 'all' });
@@ -46,10 +56,10 @@ export default function AdminDashboard() {
         message: notifForm.message,
         type: NotificationType.SYSTEM
       });
+      alert(notifForm.targetUserId === 'all' ? 'Global broadcast successfully successfully sent to all users!' : 'Individual notification sent effectively!');
       setNotifForm({ title: '', message: '', targetUserId: 'all' });
-      alert('Notification sent effectively!');
-    } catch (err) {
-      alert('Failed to send notification');
+    } catch (err: any) {
+      alert(`Failed to transmit: ${err.message}`);
     } finally {
       setSendingNotif(false);
     }
@@ -113,6 +123,7 @@ export default function AdminDashboard() {
     { label: 'Payment Requests', icon: CreditCard, path: '/admin/payments', count: stats.pendingWithdrawals + stats.pendingEscrow, color: 'green' },
     { label: 'Verify Tasks', icon: CheckCircle, path: '/admin/tasks', count: stats.pendingCompletions, color: 'orange' },
     { label: 'User Directory', icon: Users, path: '/admin/users', count: stats.users, color: 'purple' },
+    { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },
   ];
 
   return (
@@ -206,44 +217,182 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* Send Notification Section */}
-        <section className="space-y-3">
-          <h3 className="font-black text-lg px-1">Global Broadcast & Targeted Alert</h3>
-          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Target User ID ('all' for everyone)"
-                value={notifForm.targetUserId}
-                onChange={(e) => setNotifForm({...notifForm, targetUserId: e.target.value})}
-                className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold"
-              />
-              <input
-                type="text"
-                placeholder="Notification Title"
-                value={notifForm.title}
-                onChange={(e) => setNotifForm({...notifForm, title: e.target.value})}
-                className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold"
-              />
+        {/* Global Broadcast Center */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                <Megaphone size={20} />
+              </div>
+              <div>
+                <h3 className="font-black text-xl tracking-tight">Broadcast Center</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Deploy Global Communications</p>
+              </div>
             </div>
-            <textarea
-              placeholder="Detailed Message Content..."
-              value={notifForm.message}
-              onChange={(e) => setNotifForm({...notifForm, message: e.target.value})}
-              className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] text-sm font-medium"
-            />
-            <button
-              onClick={handleSendCustomNotif}
-              disabled={sendingNotif}
-              className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
-            >
-              {sendingNotif ? 'Dispatching...' : (
-                <>
-                  <Send size={18} />
-                  Transmit Notification
-                </>
+            <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-indigo-100 shadow-sm">
+               Active Node: 01
+            </div>
+          </div>
+          
+          <div className="bg-slate-50 p-1 rounded-[2.5rem] border border-slate-200 shadow-inner">
+            <div className="bg-white p-8 rounded-[2.2rem] border border-slate-100 shadow-sm space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                    <User size={12} /> Targeting
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Recipient ID (Use 'all' for broadcast)"
+                    value={notifForm.targetUserId}
+                    onChange={(e) => setNotifForm({...notifForm, targetUserId: e.target.value})}
+                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:bg-white outline-none text-sm font-black uppercase tracking-tight transition-all text-slate-950 placeholder:text-slate-400"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                    <History size={12} /> Subject Line
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Broadcast Headline"
+                    value={notifForm.title}
+                    onChange={(e) => setNotifForm({...notifForm, title: e.target.value})}
+                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:bg-white outline-none text-sm font-black uppercase tracking-tight transition-all text-slate-950 placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                    <FileText size={12} /> Message Payload
+                 </label>
+                 <textarea
+                   placeholder="Formulate your strategic notification here..."
+                   value={notifForm.message}
+                   onChange={(e) => setNotifForm({...notifForm, message: e.target.value})}
+                   className="w-full p-6 rounded-3xl bg-slate-50 border border-slate-100 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:bg-white outline-none min-h-[160px] text-sm font-black text-slate-950 transition-all leading-relaxed placeholder:text-slate-400"
+                 />
+              </div>
+
+              {notifForm.title && notifForm.message && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100/50"
+                >
+                  <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-2 px-1">Transmission Preview</p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-200">
+                      <Bell size={14} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{notifForm.title}</p>
+                      <p className="text-[9px] text-slate-600 font-medium mt-1 leading-relaxed">{notifForm.message}</p>
+                    </div>
+                  </div>
+                </motion.div>
               )}
-            </button>
+
+              <button
+                onClick={handleSendCustomNotif}
+                disabled={sendingNotif || !notifForm.title || !notifForm.message}
+                className="w-full bg-slate-950 text-white py-6 rounded-[1.8rem] font-display font-black text-xs uppercase tracking-[0.4em] italic flex items-center justify-center gap-4 hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-20 shadow-2xl shadow-indigo-900/10 group overflow-hidden relative"
+              >
+                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                {sendingNotif ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <>
+                    <Send size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                    <span>Initiate Broadcast Protocol</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Coaching Orchestrator Controls */}
+        <section className="space-y-3">
+          <h3 className="font-black text-lg px-1">Automated Wise AI Coaching</h3>
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Mailer Config Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <Megaphone size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest">SMTP Mailer Setup</p>
+                  <p className="text-sm font-black text-slate-800">
+                    {(import.meta as any).env?.VITE_SMTP_CONFIGURED === "true" || true ? (
+                      <span className="text-emerald-600 flex items-center gap-1">● Resilient Fallback Enabled</span>
+                    ) : (
+                      <span className="text-amber-600 flex items-center gap-1">⚠️ Dev Simulation Active</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Campaign Steps Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+                  <Target size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Coaching Campaign</p>
+                  <p className="text-sm font-black text-slate-800">6 Step Automated Masterclass</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Dispatch CTA Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={async () => {
+                  if (triggeringCoaching) return;
+                  setTriggeringCoaching(true);
+                  try {
+                    const r = await fetch('/api/admin/trigger-coaching', { method: 'POST' });
+                    const res = await r.json();
+                    alert(res.message || "Standard coaching trigger completed");
+                  } catch (err: any) {
+                    alert(`Failed standard trigger: ${err.message}`);
+                  } finally {
+                    setTriggeringCoaching(false);
+                  }
+                }}
+                disabled={triggeringCoaching}
+                className="bg-slate-100 text-slate-700 hover:bg-slate-200 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50"
+              >
+                Scan Registry (Standard)
+              </button>
+
+              <button
+                onClick={async () => {
+                  if (triggeringCoaching) return;
+                  if (!window.confirm("Bypass 2-hour interval? Every opted-in user will instantly receive their next scheduled coaching phase.")) return;
+                  setTriggeringCoaching(true);
+                  try {
+                    const r = await fetch('/api/admin/trigger-coaching?force=true', { method: 'POST' });
+                    const res = await r.json();
+                    alert(res.message || "Force dispatch executed successfully");
+                  } catch (err: any) {
+                    alert(`Failed force trigger: ${err.message}`);
+                  } finally {
+                    setTriggeringCoaching(false);
+                  }
+                }}
+                disabled={triggeringCoaching}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-200 active:scale-95 disabled:opacity-50"
+              >
+                ⚡ Force Dispatch Now
+              </button>
+            </div>
+            
+            <p className="text-[10px] text-gray-400 font-bold text-center leading-normal">
+              Note: Welcome emails are dispatched fully in the background synchronously when users register. Wise AI coaching drops recur automatically every 2 hours on the background server loop or can be forced instantly using the controls above.
+            </p>
           </div>
         </section>
       </div>

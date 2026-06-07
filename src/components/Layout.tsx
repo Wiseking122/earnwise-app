@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, 
   List, 
@@ -14,12 +14,14 @@ import {
   Lock,
   Gift,
   ListTodo,
-  BookOpen
+  BookOpen,
+  Megaphone
 } from 'lucide-react';
 import { collection, query, where, onSnapshot, limit, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from './Logo';
+import InstallModal from './InstallModal';
 import NotificationPanel from './NotificationPanel';
 import { playNotificationSound } from '../pages/sounds';
 
@@ -65,14 +67,31 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
 
     const q = query(
       collection(db, 'notifications'), 
-      where('userId', 'in', ['all', user.uid]),
-      orderBy('createdAt', 'desc'),
-      limit(1)
+      where('userId', 'in', ['all', user.uid])
     );
 
     const unsub = onSnapshot(q, (snap) => {
       if (!snap.empty) {
-        const latestDoc = snap.docs[0];
+        const notifs = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        // Local sort by createdAt descending to find the latest
+        notifs.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis?.() || Date.now();
+            const timeB = b.createdAt?.toMillis?.() || Date.now();
+            return timeB - timeA;
+        });
+
+        const hasUnread = notifs.some((n: any) => {
+            if (n.userId === 'all') {
+                return !(n.readBy && user && n.readBy.includes(user.uid));
+            } else {
+                return !n.read;
+            }
+        });
+        setHasNewNotifs(hasUnread);
+
+        if (notifs.length === 0) return;
+
+        const latestDoc = notifs[0];
         const latestId = latestDoc.id;
 
         if (isInitialLoad.current) {
@@ -83,33 +102,31 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
 
         if (latestId !== lastNotifId.current) {
           lastNotifId.current = latestId;
-          setHasNewNotifs(true);
           playNotificationSound();
 
           // Dispatch native phone/browser OS notification banner
           try {
-            const notifData = latestDoc.data();
-            const title = notifData.title || "Earnwise Notification";
-            const message = notifData.message || "";
+            const title = latestDoc.title || "Earnwise Notification";
+            const message = latestDoc.message || "";
 
             if ('Notification' in window && Notification.permission === 'granted') {
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.ready.then((reg) => {
                   reg.showNotification(title, {
                     body: message,
-                    icon: '/favicon.ico',
-                    badge: '/favicon.ico',
+                    icon: '/icon.png',
+                    badge: '/icon.png',
                     tag: 'earnwise-' + latestId,
                     renotify: true,
                     vibrate: [200, 100, 200]
                   } as any).catch(() => {
-                    new Notification(title, { body: message, icon: '/favicon.ico' });
+                    new Notification(title, { body: message, icon: '/icon.png' });
                   });
                 }).catch(() => {
-                  new Notification(title, { body: message, icon: '/favicon.ico' });
+                  new Notification(title, { body: message, icon: '/icon.png' });
                 });
               } else {
-                new Notification(title, { body: message, icon: '/favicon.ico' });
+                new Notification(title, { body: message, icon: '/icon.png' });
               }
             }
           } catch (pushErr) {
@@ -130,27 +147,34 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
     { path: '/', label: 'Home', icon: Home, locked: isFree },
     { path: '/tasks', label: 'Tasks', icon: List, locked: isFree },
     { path: '/academy', label: 'Academy', icon: BookOpen, locked: isFree },
+    { path: '/advertiser', label: 'Post Ads', icon: Megaphone, locked: false },
     { path: '/upgrade', label: 'Upgrade', icon: Crown, locked: false },
     { path: '/earnings', label: 'Wallet', icon: Wallet, locked: isFree },
     { path: '/profile', label: 'Profile', icon: UserIcon, locked: false },
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3, type: "spring", bounce: 0 }}
+      className="flex flex-col h-screen bg-transparent text-white overflow-hidden font-sans relative"
+    >
       {/* Header */}
-      <header className="px-5 flex items-center justify-between bg-white border-b border-slate-100 shadow-sm sticky top-0 z-[100] h-14">
+      <header className="px-5 flex items-center justify-between bg-slate-900/50 backdrop-blur-3xl border-b border-white/5 shadow-xs sticky top-0 z-[100] h-14">
         <div className="flex items-center gap-2">
           {showBack && (
             <motion.button 
               whileTap={{ scale: 0.9 }}
               onClick={() => navigate(-1)} 
-              className="p-1.5 -ml-1.5 hover:bg-slate-50 rounded-xl transition-colors"
+              className="p-1.5 -ml-1.5 hover:bg-white/10 rounded-xl transition-colors"
             >
-              <ChevronLeft size={20} className="text-slate-600" />
+              <ChevronLeft size={20} className="text-slate-300" />
             </motion.button>
           )}
           <Logo size={24} />
-          <h1 className="font-display font-black text-lg tracking-tight text-slate-900 uppercase italic">Earnwise</h1>
+          <h1 className="font-display font-black text-lg tracking-tight text-white uppercase italic drop-shadow-sm">Earnwise</h1>
         </div>
         {profile && (
           <div className="flex items-center gap-2">
@@ -158,11 +182,11 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
               <motion.button
                 whileTap={{ scale: 0.9 }}
                 onClick={() => navigate('/admin')}
-                className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors relative group"
+                className="p-1.5 hover:bg-white/10 rounded-xl transition-colors relative group"
                 title="Admin Console"
               >
-                <LayoutDashboard size={18} className="text-blue-600 transition-colors" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                <LayoutDashboard size={18} className="text-blue-400 transition-colors" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
               </motion.button>
             )}
             <button
@@ -170,32 +194,33 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
                 setShowNotifications(!showNotifications);
                 setHasNewNotifs(false);
               }}
-              className="p-1.5 hover:bg-slate-50 rounded-xl transition-colors relative group"
+              className="p-1.5 hover:bg-white/10 rounded-xl transition-colors relative group"
             >
-              <Bell size={18} className="text-slate-600 active:rotate-12 transition-transform" />
+              <Bell size={18} className="text-slate-300 active:rotate-12 transition-transform" />
               {hasNewNotifs && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
               )}
             </button>
             {profile.plan !== 'free' && (
-              <div className="w-8 h-8 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg border border-white/10">
-                <Crown size={16} className="text-amber-400 fill-amber-400" />
+              <div className="w-8 h-8 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-xl flex items-center justify-center text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.3)] border border-amber-200/50">
+                <Crown size={16} className="text-amber-900 fill-amber-900" />
               </div>
             )}
           </div>
         )}
       </header>
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
-
+      <InstallModal />
+      
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-28 scroll-smooth no-scrollbar">
         {children}
       </main>
 
       {/* Premium Floating Navigation */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-[1000] px-2">
-        <nav className="bg-[#030712] border border-white/10 shadow-2xl rounded-3xl h-16 flex items-center justify-around px-1 relative overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-[1000] px-2 shadow-[0_20px_50px_-10px_rgba(37,99,235,0.2)] rounded-full">
+        <nav className="bg-[#050B1A]/80 backdrop-blur-3xl border border-blue-500/20 shadow-2xl rounded-full h-16 flex items-center justify-around px-2 relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
             
             {navItems.map((item) => {
             const Icon = item.icon;
@@ -204,26 +229,32 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
                 <Link 
                 key={item.path}
                 to={item.path}
-                className={`group relative flex flex-col items-center justify-center w-full h-full transition-all duration-500 rounded-2xl ${
-                    isActive ? 'text-white' : (item.locked ? 'text-slate-600' : 'text-slate-500 hover:text-slate-300')
+                className={`group relative flex flex-col items-center justify-center w-full h-full transition-all duration-300 rounded-full ${
+                    isActive ? 'text-blue-400' : (item.locked ? 'text-slate-600' : 'text-slate-400 hover:text-slate-200')
                 }`}
                 >
-                <div className={`p-1.5 rounded-xl transition-all duration-500 relative ${isActive ? 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)]' : (item.locked ? 'opacity-40' : 'group-hover:bg-white/5')}`}>
-                    <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'animate-pulse' : ''} />
-                    {item.locked && (
-                      <div className="absolute -top-1 -right-1 bg-slate-800 border-2 border-slate-950 text-white rounded-full p-0.5 shadow-sm">
-                        <Lock size={7} />
-                      </div>
-                    )}
-                </div>
-                <span className={`text-[8px] font-black uppercase mt-1 tracking-widest transition-opacity duration-300 ${isActive ? 'opacity-100' : 'hidden'}`}>
-                    {item.label}
-                </span>
+                  <motion.div 
+                    whileTap={{ scale: 0.85 }}
+                    className={`p-1.5 rounded-full transition-all duration-300 relative flex flex-col items-center justify-center ${isActive ? '' : (item.locked ? 'opacity-40' : '')}`}
+                  >
+                      {isActive && (
+                        <motion.div layoutId="nav-pill" className="absolute inset-0 bg-blue-500/10 rounded-full -z-10 shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
+                      )}
+                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
+                      {item.locked && (
+                        <div className="absolute top-0 right-0 bg-slate-900 border border-slate-700 text-slate-400 rounded-full p-[1px] shadow-sm">
+                          <Lock size={8} />
+                        </div>
+                      )}
+                  </motion.div>
+                  <span className={`text-[9px] font-bold mt-1 tracking-wider transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto group-hover:mt-1'}`}>
+                      {item.label}
+                  </span>
                 </Link>
             );
             })}
         </nav>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -97,6 +97,20 @@ export default function Referral() {
           </p>
         </div>
 
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white border border-slate-100 p-5 rounded-[2rem] shadow-sm flex flex-col items-center text-center">
+            <Users size={20} className="text-blue-500 mb-2" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Referred</span>
+            <span className="text-2xl font-display font-black text-slate-900 mt-1">{profile?.totalReferrals || 0}</span>
+          </div>
+          <div className="bg-white border border-slate-100 p-5 rounded-[2rem] shadow-sm flex flex-col items-center text-center">
+            <Zap size={20} className="text-amber-500 mb-2" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Bonus Earned</span>
+            <span className="text-2xl font-display font-black text-slate-900 mt-1">₦{(profile?.referralEarnings || 0).toLocaleString()}</span>
+          </div>
+        </div>
+
         {/* Hero Banner Part 2 */}
         <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-200">
           <div className="relative z-10 flex flex-col items-center">
@@ -218,8 +232,8 @@ export default function Referral() {
                 <Gift size={24} />
               </div>
               <div>
-                <h4 className="font-black text-green-900 text-sm">₦1,000 Welcome Bonus</h4>
-                <p className="text-xs text-green-700 font-medium">Earned when your friend completes their first 3 tasks.</p>
+                <h4 className="font-black text-green-900 text-sm">10% Upgrade Commission</h4>
+                <p className="text-xs text-green-700 font-medium">Earn 10% instantly when your friend successfully upgrades their plan.</p>
               </div>
             </div>
 

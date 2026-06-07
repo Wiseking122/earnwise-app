@@ -11,7 +11,8 @@ import {
   Calendar, 
   DollarSign,
   User as UserIcon,
-  SearchX
+  SearchX,
+  Zap
 } from 'lucide-react';
 
 export default function AdminUsers() {
@@ -127,9 +128,21 @@ export default function AdminUsers() {
                     <p className="text-amber-500 font-black text-sm leading-none">₦{user.pendingBalance?.toLocaleString() || '0'}</p>
                     <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Pending</p>
                   </div>
-                  <p className="text-[8px] text-gray-300 font-bold mt-2 flex items-center gap-1 justify-end">
-                    IP: {user.securityMetrics?.lastIp || 'N/A'}
-                  </p>
+                  <div className="flex border-t border-slate-50 pt-3 mt-3 items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Users size={12} className="text-slate-400" />
+                        <span className="text-[10px] font-black">{user.totalReferrals || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Zap size={12} className="text-emerald-400" />
+                        <span className="text-[10px] font-black text-emerald-600">₦{user.referralEarnings?.toLocaleString() || 0}</span>
+                      </div>
+                    </div>
+                    <p className="text-[8px] text-gray-300 font-bold flex items-center gap-1">
+                      IP: {user.securityMetrics?.lastIp || 'N/A'}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))
