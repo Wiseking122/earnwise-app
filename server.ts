@@ -2931,9 +2931,7 @@ Provide your response strictly in the JSON format requested.`;
     ws.on('close', () => console.log('[WS] Client disconnected'));
   });
 
-  export const handler = serverless(app);
-
-
+  module.exports = serverless(app);
   // Enable graceful stop
   process.once('SIGINT', () => bot?.stop('SIGINT'));
   process.once('SIGTERM', () => bot?.stop('SIGTERM'));
