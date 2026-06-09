@@ -1,3 +1,4 @@
+import serverless from 'serverless-http';
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -2930,9 +2931,8 @@ Provide your response strictly in the JSON format requested.`;
     ws.on('close', () => console.log('[WS] Client disconnected'));
   });
 
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT} (isProd: ${isProd})`);
-  });
+  export const handler = serverless(app);
+
 
   // Enable graceful stop
   process.once('SIGINT', () => bot?.stop('SIGINT'));
