@@ -3009,25 +3009,7 @@ Provide your response strictly in the JSON format requested.`;
       // Don't handle API routes here
       if (req.path.startsWith('/api')) return next();
       
-      const htmlPath = path.join(distPath, "index.html");
-      let html = fs.readFileSync(htmlPath, 'utf8');
-      
-      // Inject Monetag, mnd-ver verification tags and mbidadm script immediately after <head>
-      let injection = '';
-      if (!html.includes('9a5b19b8b82172a6ee65893e4062878a')) {
-        injection += '\n    <meta name="monetag" content="9a5b19b8b82172a6ee65893e4062878a">';
-      }
-      if (!html.includes('ugwx9rzpwokz49vyxa9ria')) {
-        injection += '\n    <meta name="mnd-ver" content="ugwx9rzpwokz49vyxa9ria" />';
-      }
-      if (!html.includes('js.mbidadm.com')) {
-        injection += '\n    <script async src="https://js.mbidadm.com/static/scripts.js" data-admpid="443967"></script>';
-      }
-      if (injection) {
-        html = html.replace('<head>', '<head>' + injection);
-      }
-      
-      res.send(html);
+      res.json({ status: "online", message: "Earnwise API Gateway Active" });
     });
   }
 
