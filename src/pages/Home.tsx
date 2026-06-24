@@ -143,10 +143,11 @@ export default function Home() {
     setShowInsightsModal(true);
     setAiInsightsError(null);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/v1/ai/smart-insights`, {
+      const res = await fetch('/api/v1/ai/smart-insights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
         body: JSON.stringify({
           userId: profile?.uid,
           balance: profile?.balance || 0,
@@ -155,16 +156,16 @@ export default function Home() {
           plan: profile?.plan || 'free'
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setAiInsights(data);
-      } else {
-        const errorData = await res.json().catch(() => null);
-        throw new Error(errorData?.error || 'Failed to fetch insights');
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
       }
-    } catch(err: any) {
-      console.error(err);
-      setAiInsightsError(err.message || 'An error occurred while generating insights.');
+
+      const data = await res.json();
+      setAiInsights(data);
+    } catch (err: any) {
+      console.error("AI Insights fetch error:", err);
+      setAiInsightsError("Could not connect to AI service. Please try again later.");
     } finally {
       setLoadingInsights(false);
     }

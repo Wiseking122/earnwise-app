@@ -242,7 +242,6 @@ export default function Profile() {
     ...(profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com' ? [{ label: 'Admin Terminal', icon: Shield, path: '/admin' }] : []),
     { label: 'Deposit Funds', icon: Zap, path: '/deposit' },
     { label: 'Vault & Staking', icon: Lock, path: '/vault' },
-    { label: 'Google Tasks Sync', icon: ListTodo, path: '/google-tasks' },
     { label: 'Achievement Rewards', icon: Trophy, path: '/achievements' },
     { label: 'Post Ads (Advertiser)', icon: Megaphone, path: '/advertiser' },
     { label: 'Transaction History', icon: History, path: '/transactions' },
