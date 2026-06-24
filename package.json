@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "start": "ts-node server.ts",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
@@ -41,6 +41,8 @@
     "sharp": "^0.35.1",
     "tailwind-merge": "^3.6.0",
     "telegraf": "^4.16.3",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8.2",
     "video.js": "^8.23.7",
     "videojs-contrib-ads": "^7.5.2",
     "videojs-ima": "^2.6.0",
@@ -55,7 +57,6 @@
     "glob": "^13.0.6",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
     "vite": "^6.2.3"
   }
 }
