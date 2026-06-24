@@ -62,18 +62,8 @@ export function getMonetagLink(
 }
 
 /**
- * Programmatically triggers the onclika push notification advertiser activation prompt
+ * Programmatically triggers the onclika push notification advertiser activation prompt (No-Op)
  */
 export function triggerOnclikaPush() {
-  try {
-    const win = window as any;
-    if (typeof win.pushONclsuboffer !== "undefined") {
-      win.pushONclsuboffer.activate();
-    } else {
-      const event = new CustomEvent('pushONclStarted');
-      document.dispatchEvent(event);
-    }
-  } catch (err) {
-    console.warn("Push notification activation:", err);
-  }
+  // Completely removed Onclika integrations
 }

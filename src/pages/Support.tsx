@@ -60,7 +60,7 @@ export default function Support() {
               <p className="text-[8px] font-bold text-slate-400 mt-1 italic">Mail Team</p>
             </div>
           </div>
-          <a href="https://t.me/earnwise0" target="_blank" rel="noreferrer" className="bg-white p-4 rounded-3xl border border-blue-100 shadow-sm flex flex-col items-center text-center gap-2 transition-all hover:bg-slate-50 ring-1 ring-blue-50">
+          <a href="https://t.me/Earnwise01" target="_blank" rel="noreferrer" className="bg-white p-4 rounded-3xl border border-blue-100 shadow-sm flex flex-col items-center text-center gap-2 transition-all hover:bg-slate-50 ring-1 ring-blue-50">
             <div className="w-10 h-10 bg-[#0088cc]/10 text-[#0088cc] rounded-xl flex items-center justify-center">
               <Users size={20} />
             </div>

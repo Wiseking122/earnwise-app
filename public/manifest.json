@@ -1,24 +1,31 @@
 {
-  "name": "EARNWISE",
+  "name": "Earnwise",
   "short_name": "Earnwise",
-  "description": "Premium Fintech Rewards & Social Ecosystem",
-  "start_url": "/",
+  "description": "Unlock your earning potential with Earnwise. The most trusted task-based platform in Nigeria.",
+  "start_url": "/?utm_source=pwa",
   "display": "standalone",
   "background_color": "#020617",
-  "theme_color": "#2563eb",
+  "theme_color": "#020617",
+  "orientation": "portrait",
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ],
-  "orientation": "portrait"
+  ]
 }

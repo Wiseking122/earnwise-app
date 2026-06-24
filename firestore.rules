@@ -30,6 +30,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
+        (request.auth.uid == 'Ik1Ngp1oC9hYXZt9lQEPIeOiCGA3') ||
         (request.auth.token.email == 'wiseking7890@gmail.com') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
@@ -47,6 +48,8 @@ service cloud.firestore {
              data.pendingBalance is number &&
              data.withdrawableBalance is number &&
              data.referralCode is string &&
+             data.taskBalance is number &&
+             data.referralBalance is number &&
              (data.createdAt == request.time || data.createdAt is timestamp);
     }
 
@@ -173,6 +176,11 @@ service cloud.firestore {
     match /course_overrides/{courseId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == 'Ik1Ngp1oC9hYXZt9lQEPIeOiCGA3' || isAdmin());
+    }
+
+    match /system_settings/{settingsId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Default Deny at the bottom

@@ -10,6 +10,7 @@
         "role": { "type": "string", "enum": ["user", "admin", "advertiser"] },
         "pendingBalance": { "type": "number", "description": "Funds awaiting cooldown/verification" },
         "withdrawableBalance": { "type": "number", "description": "Cleared funds available for withdrawal" },
+        "depositBalance": { "type": "number", "description": "Funds deposited directly from personal banks" },
         "behavioralTags": { "type": "array", "items": { "type": "string" }, "description": "Interests like tech, finance, etc." },
         "demographics": {
           "type": "object",

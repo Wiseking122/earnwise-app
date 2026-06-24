@@ -19,7 +19,7 @@ export default function Leaderboard() {
           limit(20)
         );
         const snap = await getDocs(q);
-        setTopUsers(snap.docs.map(doc => doc.data() as UserProfile));
+        setTopUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
       } finally {
@@ -46,35 +46,35 @@ export default function Leaderboard() {
             {/* Rank 2 */}
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 rounded-full bg-gray-100 border-4 border-gray-200 flex items-center justify-center mb-2 overflow-hidden">
-                <span className="text-xl font-bold">{topUsers[1].displayName[0]}</span>
+                <span className="text-xl font-bold">{(topUsers[1]?.displayName || 'U')[0]}</span>
               </div>
               <div className="h-24 w-20 bg-gray-200 rounded-t-xl flex flex-col items-center justify-center p-2">
                 <span className="text-2xl font-black text-gray-600">2nd</span>
               </div>
-              <p className="text-xs font-bold mt-2 truncate w-20 text-center">{topUsers[1].displayName}</p>
+              <p className="text-xs font-bold mt-2 truncate w-20 text-center">{topUsers[1]?.displayName || 'User'}</p>
             </div>
 
             {/* Rank 1 */}
             <div className="flex flex-col items-center scale-110">
               <div className="w-20 h-20 rounded-full bg-yellow-50 border-4 border-yellow-400 flex items-center justify-center mb-2 overflow-hidden shadow-lg shadow-yellow-100">
-                <span className="text-2xl font-bold">{topUsers[0].displayName[0]}</span>
+                <span className="text-2xl font-bold">{(topUsers[0]?.displayName || 'U')[0]}</span>
               </div>
               <div className="h-32 w-24 bg-yellow-400 rounded-t-xl flex flex-col items-center justify-center p-2 text-white">
                 <Medal size={32} className="mb-1" />
                 <span className="text-3xl font-black">1st</span>
               </div>
-              <p className="text-sm font-black mt-2 truncate w-24 text-center">{topUsers[0].displayName}</p>
+              <p className="text-sm font-black mt-2 truncate w-24 text-center">{topUsers[0]?.displayName || 'User'}</p>
             </div>
 
             {/* Rank 3 */}
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 rounded-full bg-orange-50 border-4 border-orange-200 flex items-center justify-center mb-2 overflow-hidden">
-                <span className="text-xl font-bold">{topUsers[2].displayName[0]}</span>
+                <span className="text-xl font-bold">{(topUsers[2]?.displayName || 'U')[0]}</span>
               </div>
               <div className="h-20 w-20 bg-orange-200 rounded-t-xl flex flex-col items-center justify-center p-2">
                 <span className="text-2xl font-black text-orange-600">3rd</span>
               </div>
-              <p className="text-xs font-bold mt-2 truncate w-20 text-center">{topUsers[2].displayName}</p>
+              <p className="text-xs font-bold mt-2 truncate w-20 text-center">{topUsers[2]?.displayName || 'User'}</p>
             </div>
           </div>
         )}
@@ -114,10 +114,10 @@ export default function Leaderboard() {
                   {index + 1}
                 </span>
                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-600">
-                  {user.displayName[0]}
+                  {(user.displayName || 'U')[0]}
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 text-sm">{user.displayName}</h4>
+                  <h4 className="font-bold text-gray-900 text-sm">{user.displayName || 'Anonymous User'}</h4>
                   <p className="text-[10px] text-gray-400 font-bold uppercase">Level {user.level || 1}</p>
                 </div>
                 <div className="text-right">

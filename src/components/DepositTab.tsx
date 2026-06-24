@@ -24,7 +24,8 @@ export default function DepositTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'verifying' | 'success' | 'failed'>('idle');
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+
+  const paystackPublicKey = (import.meta as any).env.VITE_PAYSTACK_PUBLIC_KEY;
 
   useEffect(() => {
     const reference = searchParams.get('reference') || searchParams.get('trxref');
@@ -44,7 +45,14 @@ export default function DepositTab() {
         amount: urlAmount || amount
       });
       if (response.data.status === 'success') {
-        const depositAmt = response.data.amount || Number(urlAmount) || Number(amount) || 500;
+        let depositAmt = response.data.amount || Number(urlAmount) || Number(amount) || 500;
+        
+        // Anti-conversion multiplier safety guard (e.g. if we get Kobo instead of Naira, convert safely)
+        if (depositAmt >= 100000 && !ref.startsWith('SIM_PAY_')) {
+          console.warn("[PAYMENT] Extremely large deposit amount detected. Applying Kobo-to-Naira conversion as safeguard.", depositAmt);
+          depositAmt = depositAmt / 100;
+        }
+
         if (response.data.useClientFallback) {
           console.warn("[PAYMENT] Server deposit write denied. Engaging Client SDK fallback execution...");
           
@@ -53,6 +61,7 @@ export default function DepositTab() {
             await updateDoc(userRef, {
               balance: increment(depositAmt),
               withdrawableBalance: increment(depositAmt),
+              depositBalance: increment(depositAmt),
               updatedAt: serverTimestamp()
             });
 
@@ -102,6 +111,16 @@ export default function DepositTab() {
 
   const amounts = [1000, 2000, 5000, 10000, 25000, 50000];
 
+  useEffect(() => {
+    // Pre-load Paystack script
+    if (typeof (window as any).PaystackPop === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
   const handleDeposit = async () => {
     if (!user?.uid || !user?.email) {
       setError("Please log in first");
@@ -114,33 +133,50 @@ export default function DepositTab() {
       return;
     }
 
+    if (!paystackPublicKey) {
+      setError("Payment gateway not configured. Please contact support.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    try {
-      const response = await axios.post('/api/paystack/initialize-deposit', {
-        userId: user.uid,
-        amount: numAmount,
-        email: user.email
-      });
-
-      if (response.data.data.authorization_url) {
-        const url = response.data.data.authorization_url;
-        setCheckoutUrl(url);
-        // Attempt to launch automatically in a new window/tab
-        window.open(url, '_blank');
+    
+    const initPaystack = () => {
+      if (typeof (window as any).PaystackPop !== 'undefined') {
+        const handler = (window as any).PaystackPop.setup({
+          key: paystackPublicKey,
+          email: user.email,
+          amount: Math.floor(numAmount * 100),
+          ref: `DEP_${Date.now()}_${Math.floor(Math.random() * 1000000)}`,
+          callback: (response: any) => {
+            verifyDeposit(response.reference);
+          },
+          onClose: () => {
+            setLoading(false);
+          }
+        });
+        handler.openIframe();
       } else {
-        throw new Error("Failed to initialize payment");
+        console.warn("Paystack JS not loaded, retrying...");
+        const script = document.createElement('script');
+        script.src = 'https://js.paystack.co/v1/inline.js';
+        script.async = true;
+        script.onload = () => {
+          initPaystack();
+        };
+        script.onerror = () => {
+          setLoading(false);
+          setError("Failed to load payment gateway. Please check your internet connection and try again.");
+        };
+        document.head.appendChild(script);
       }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.error || "Payment initialization failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    initPaystack();
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Verification States */}
       <AnimatePresence>
         {verifyStatus === 'verifying' && (
@@ -148,18 +184,18 @@ export default function DepositTab() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-blue-950 rounded-[2.5rem] p-10 text-center relative overflow-hidden border border-blue-900 shadow-2xl"
+            className="bg-blue-950 rounded-2xl p-6 text-center relative overflow-hidden border border-blue-900 shadow-2xl"
           >
             <div className="absolute inset-0 bg-linear-to-br from-blue-600/10 to-transparent" />
             <motion.div 
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-              className="w-20 h-20 border-t-2 border-r-2 border-blue-500 rounded-full mx-auto mb-6 flex items-center justify-center p-2"
+              className="w-12 h-12 border-t-2 border-r-2 border-blue-500 rounded-full mx-auto mb-4 flex items-center justify-center p-1"
             >
-              <Zap size={32} className="text-blue-500 animate-pulse" />
+              <Zap size={20} className="text-blue-500 animate-pulse" />
             </motion.div>
-            <h3 className="text-2xl font-display font-black text-white uppercase italic tracking-tighter">Syncing Protocol</h3>
-            <p className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em] mt-2">Confirming network ledger response</p>
+            <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tighter">Syncing Protocol</h3>
+            <p className="text-slate-400 text-[9px] uppercase font-black tracking-[0.2em] mt-1">Confirming network ledger response</p>
           </motion.div>
         )}
 
@@ -167,17 +203,17 @@ export default function DepositTab() {
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-emerald-500 rounded-[3rem] p-12 text-white text-center shadow-2xl shadow-emerald-900/20 relative overflow-hidden group mb-6"
+            className="bg-emerald-500 rounded-2xl p-8 text-white text-center shadow-2xl shadow-emerald-900/20 relative overflow-hidden group mb-4"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%)' }} />
-            <CheckCircle size={56} className="mx-auto mb-6 drop-shadow-2xl" />
-            <h3 className="text-3xl font-display font-black uppercase italic tracking-tighter">Capital Secured</h3>
-            <p className="text-emerald-50 text-xs font-black uppercase tracking-[0.2em] mt-2 opacity-80 leading-relaxed">Your global ledger has been updated</p>
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%)' }} />
+            <CheckCircle size={36} className="mx-auto mb-4 drop-shadow-2xl" />
+            <h3 className="text-xl font-display font-black uppercase italic tracking-tighter">Capital Secured</h3>
+            <p className="text-emerald-50 text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-80 leading-relaxed">Your global ledger has been updated</p>
             <button 
               onClick={() => {
                 navigate(`/earnings?deposit_success=true&amount=${amount}`);
               }}
-              className="mt-10 bg-slate-950 text-white px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl border border-white/10"
+              className="mt-6 bg-slate-950 text-white px-6 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl border border-white/10"
             >
               Go to Wallet
             </button>
@@ -185,96 +221,40 @@ export default function DepositTab() {
         )}
       </AnimatePresence>
 
-      {checkoutUrl ? (
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-xl text-center space-y-6 relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
-          
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner relative">
-            <span className="absolute inset-0 bg-blue-400/20 rounded-2xl animate-ping scale-110 opacity-70" style={{ animationDuration: '2.5s' }} />
-            <CreditCard size={28} />
-          </div>
-
-          <div className="space-y-2 max-w-md mx-auto">
-            <h3 className="text-xl font-display font-black text-slate-900 uppercase tracking-tight italic">Secure Gateway Generated</h3>
-            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider leading-relaxed">
-              Paystack requires checkout inside a secure primary document context. Because builder sandbox iframe boundaries restrict in-app redirects, click below to open your secure portal.
-            </p>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex items-center justify-between text-xs font-bold uppercase">
-            <span className="text-slate-400">Transaction Quantum</span>
-            <span className="text-slate-900 font-extrabold">₦{Number(amount).toLocaleString()}</span>
-          </div>
-
-          <div className="pt-2 space-y-3">
-            <a 
-              href={checkoutUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                // Direct to verify check status
-                setVerifyStatus('verifying');
-              }}
-              className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-display font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/10 flex items-center justify-center gap-3 active:scale-[0.99] transition-all"
-              id="tab-proceed-to-paystack-btn"
-            >
-              <Zap size={16} className="fill-white" />
-              Proceed to Secure Payment (New Tab)
-              <ChevronRight size={16} />
-            </a>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCheckoutUrl(null);
-                setError(null);
-              }}
-              className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-colors"
-              id="tab-cancel-checkout-btn"
-            >
-              Cancel / Change Amount
-            </button>
-          </div>
-        </motion.div>
-      ) : (
+      {/* Form Container */}
         <>
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div className="flex justify-between items-center px-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Transfer Quantum</label>
-              <div className="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                <CreditCard size={12} className="text-slate-400" />
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Global Gateway</span>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Transfer Quantum</label>
+              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                <CreditCard size={10} className="text-slate-400" />
+                <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Global Gateway</span>
               </div>
             </div>
             
             <div className="relative group">
-              <div className="absolute inset-y-0 left-8 flex items-center">
-                <span className="text-3xl font-display font-black text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
+              <div className="absolute inset-y-0 left-5 flex items-center">
+                <span className="text-xl font-display font-black text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
               </div>
               <input 
                 type="number" 
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full border border-slate-600 rounded-[2.5rem] py-8 pl-18 pr-8 text-4xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:italic appearance-none shadow-sm"
+                className="w-full border border-slate-600 rounded-2xl py-4 pl-12 pr-4 text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:italic appearance-none shadow-sm"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 px-1">
+          <div className="grid grid-cols-3 gap-2 px-1">
             {amounts.map((amt) => (
               <button
                 key={amt}
                 onClick={() => setAmount(amt.toString())}
-                className={`py-4 rounded-2xl font-display font-black text-xs italic tracking-tight transition-all active:scale-90 border-2 ${
+                className={`py-2 rounded-xl font-display font-black text-[11px] italic tracking-tight transition-all active:scale-90 border-2 ${
                   amount === amt.toString() 
-                    ? "bg-slate-950 border-slate-950 text-white shadow-2xl shadow-slate-900/40" 
-                    : "bg-white border-slate-100 text-slate-400 hover:border-blue-200 hover:text-slate-900"
+                    ? "bg-slate-950 border-slate-950 text-white shadow-xl shadow-slate-900/40" 
+                    : "bg-white border-slate-100 text-slate-450 hover:border-blue-200 hover:text-slate-900"
                 }`}
               >
                 ₦{amt.toLocaleString()}
@@ -286,44 +266,43 @@ export default function DepositTab() {
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] flex items-center gap-4 text-rose-700 shadow-xl"
+              className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700 shadow-md"
             >
-              <AlertCircle size={24} />
-              <p className="text-sm font-black uppercase tracking-tight">{error}</p>
+              <AlertCircle size={18} />
+              <p className="text-xs font-black uppercase tracking-tight">{error}</p>
             </motion.div>
           )}
 
           <button
             onClick={handleDeposit}
             disabled={loading || !amount}
-            className={`w-full py-8 rounded-[2.5rem] font-display font-black text-sm uppercase tracking-[0.2em] italic flex items-center justify-center gap-4 transition-all relative overflow-hidden group/btn ${
+            className={`w-full py-4 rounded-2xl font-display font-black text-xs uppercase tracking-[0.2em] italic flex items-center justify-center gap-3 transition-all relative overflow-hidden group/btn ${
               loading || !amount
                 ? 'bg-slate-100 text-slate-300 cursor-default border border-slate-200'
                 : 'bg-slate-950 text-white hover:bg-blue-600 active:scale-[0.98] shadow-2xl border border-white/5'
             }`}
           >
             {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <Zap size={24} className="group-hover/btn:fill-white transition-all" />
+                <Zap size={16} className="group-hover/btn:fill-white transition-all" />
                 <span>Execute Protocol</span>
-                <ChevronRight size={20} className="group-hover/btn:translate-x-1 transition-transform opacity-50" />
+                <ChevronRight size={16} className="group-hover/btn:translate-x-1 transition-transform opacity-50" />
               </>
             )}
           </button>
         </>
-      )}
 
-      <div className="p-8 bg-slate-50 rounded-[3rem] border border-slate-100 relative overflow-hidden group">
+      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden group">
         <div className="absolute -top-12 -right-12 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)' }} />
-        <div className="flex items-center gap-5 relative z-10">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 text-blue-600">
-            <ShieldCheck size={24} />
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 text-blue-600 flex-shrink-0">
+            <ShieldCheck size={20} />
           </div>
           <div>
-            <h5 className="text-[11px] font-black text-slate-900 uppercase tracking-widest italic">Automated Ledger System</h5>
-            <p className="text-[10px] text-slate-500 font-bold leading-relaxed mt-1 uppercase tracking-tighter opacity-80">
+            <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest italic">Automated Ledger System</h5>
+            <p className="text-[9px] text-slate-500 font-bold leading-relaxed mt-0.5 uppercase tracking-tighter opacity-80">
               Network consensus required for instant wallet realization. Secure node verification active.
             </p>
           </div>

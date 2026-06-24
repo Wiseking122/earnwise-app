@@ -18,7 +18,6 @@ import {
   Upload
 } from 'lucide-react';
 import { playRewardSound } from './sounds';
-import { triggerOnclikaPush } from '../lib/adManager';
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -297,9 +296,6 @@ export default function TaskDetail() {
   };
 
   const startTask = () => {
-    // Programmatically activate push notification offer as Content Locker
-    triggerOnclikaPush();
-
     if (task?.link) {
       window.open(task.link, '_blank');
     }

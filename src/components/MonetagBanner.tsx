@@ -9,6 +9,7 @@ export const MonetagBanner = () => {
       script.dataset.zone = '11109974';
       script.src = scriptSrc;
       script.async = true;
+      script.crossOrigin = 'anonymous';
       document.head.appendChild(script);
     }
   }, []);

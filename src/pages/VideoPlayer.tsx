@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
 import { playRewardSound } from './sounds';
-import { triggerOnclikaPush } from '../lib/adManager';
 import VastVideoPlayer from '../components/VastVideoPlayer';
 
 export const VAST_ADS = [
@@ -67,45 +66,9 @@ export default function VideoPlayer() {
   }, [timeLeft, timerStarted, rewarded]);
 
   useEffect(() => {
-    // Programmatically trigger Onclika ad locker manually on user action
-    triggerOnclikaPush();
-
     // Explicitly set standard lowercase 'class' attribute to be safe and ensure ad-network scan detection
     if (containerRef.current) {
       containerRef.current.classList.add('video-ad-container');
-    }
-
-    const win = window as any;
-    const triggerAdScript = () => {
-      try {
-        const adObject = win.a3klsam || win.a3k1sam;
-        if (adObject && typeof adObject.init === 'function') {
-          console.log('Earnwise: Re-initializing Onclicka ad network with Spot ID 6120553...');
-          try {
-            adObject.init(6120553);
-            return true;
-          } catch (initErr) {
-            console.error('Earnwise: Failed inside adObject.init call:', initErr);
-          }
-        }
-      } catch (err) {
-        console.error('Earnwise: Exception during Onclicka target check/re-initialization:', err);
-      }
-      return false;
-    };
-
-    // Attempt to trigger immediately
-    if (!triggerAdScript()) {
-      // If not yet available or failed, poll every 500ms up to 10 times to wait for the script to load and bind
-      let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        const initialized = triggerAdScript();
-        if (initialized || attempts >= 10) {
-          clearInterval(interval);
-        }
-      }, 500);
-      return () => clearInterval(interval);
     }
   }, []);
 

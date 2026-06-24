@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, collection, query, where, limit, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { collection, query, where, limit, onSnapshot } from 'firebase/firestore';
 import { WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import AnimatedNumber from '../components/AnimatedNumber';
@@ -53,6 +52,108 @@ export default function Withdrawal() {
   const [bankSearch, setBankSearch] = useState('');
   const [isOpenBankDropdown, setIsOpenBankDropdown] = useState(false);
 
+  const [payoutSettings, setPayoutSettings] = useState<any>(null);
+  const [timeRemainingStr, setTimeRemainingStr] = useState('');
+  const [isWindowOpen, setIsWindowOpen] = useState(false);
+
+  // Poll system setting payouts variables
+  useEffect(() => {
+    if (!profile) return;
+    const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (docSnap) => {
+      if (docSnap.exists()) {
+        setPayoutSettings(docSnap.data());
+      }
+    }, (error) => {
+      console.warn("Retrying system settings read...", error);
+    });
+    return () => unsub();
+  }, [profile]);
+
+  // Window ticking remains handler
+  useEffect(() => {
+    const getInterval = () => {
+      const now = new Date();
+
+      if (payoutSettings && payoutSettings.payoutsForceClosed) {
+        setIsWindowOpen(false);
+        setTimeRemainingStr('Admin Kill-Switch Active');
+        return;
+      }
+
+      const isTaskOverride = !!payoutSettings?.taskOverrideOpen;
+      const isReferralOverride = !!payoutSettings?.referralOverrideOpen;
+      
+      if (withdrawalType === 'task') {
+        const is30th = now.getDate() === 30;
+        if (isTaskOverride) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('🔓 Special Admin Task Withdrawal Window Active!');
+        } else if (is30th) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('Task Payout Window Active (Ends Midnight)');
+        } else {
+          setIsWindowOpen(false);
+          setTimeRemainingStr('📺 Video Task portal opens monthly on the 30th');
+        }
+      } else if (withdrawalType === 'referral') {
+        const isSaturday = now.getDay() === 6;
+        const currentHour = now.getHours();
+        const isOpenHours = currentHour >= 8 && currentHour < 18; // 8:00 AM to 6:00 PM
+        
+        if (isReferralOverride) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('🔓 Special Admin Referral Withdrawal Window Active!');
+        } else if (isSaturday && isOpenHours) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('Referral Payout Window Active (Ends 6:00 PM)');
+        } else {
+          setIsWindowOpen(false);
+          setTimeRemainingStr('🗓️ Referral portal opens Saturdays 8:00 AM – 6:00 PM');
+        }
+      }
+    };
+
+    getInterval();
+    const intervalId = setInterval(getInterval, 1000);
+    return () => clearInterval(intervalId);
+  }, [payoutSettings, withdrawalType]);
+
+  // Help tier calculation limits
+  function getPlanWithdrawalCap(plan: string): number {
+    switch (plan) {
+      case 'elite': return 3000;
+      case 'starter': return 6000;
+      case 'pro': return 9000;
+      case 'bronze': return 15000;
+      case 'diamond': return 21000;
+      case 'silver': return 30000;
+      case 'platinum': return 45000;
+      case 'golden': return 75000;
+      default: return 0; // Free cannot execute withdrawals
+    }
+  }
+
+  const getCumulativeWithdrawalsInWindow = () => {
+    if (!payoutSettings?.payoutStartDate || !payoutSettings?.payoutEndDate) return 0;
+    const start = new Date(payoutSettings.payoutStartDate);
+    const end = new Date(payoutSettings.payoutEndDate);
+    
+    return withdrawals
+      .filter(w => {
+        if (w.status === 'rejected') return false;
+        const reqDate = w.requestedAt ? new Date((w.requestedAt as any).toDate?.() || w.requestedAt) : new Date();
+        return reqDate >= start && reqDate <= end;
+      })
+      .reduce((sum, w) => sum + w.amount, 0);
+  };
+
+  // Cumulative pending requests to dodge double-spend attempts
+  const getPendingWithdrawalTotal = (type: 'task' | 'referral') => {
+    return withdrawals
+      .filter(w => w.status === 'pending' && w.withdrawalType === type)
+      .reduce((sum, w) => sum + w.amount, 0);
+  };
+
   // Auto-resolve account name when both bankCode and a 10-digit account number are provided
   useEffect(() => {
     const cleanNum = accountNumber.replace(/\D/g, '');
@@ -77,7 +178,7 @@ export default function Withdrawal() {
         } catch (err: any) {
           if (!isCurrent) return;
           const backendErr = err.response?.data?.error;
-          console.warn("Account name resolution resulted in mismatch (expected for wrong inputs):", backendErr || err.message);
+          console.warn("Account name resolution resulted in mismatch:", backendErr || err.message);
           setAccountName('');
           if (backendErr && (backendErr.includes('resolve') || backendErr.includes('validation') || backendErr.includes('check'))) {
             setResolveFeedback('Verification mismatch: Check number/bank');
@@ -89,7 +190,7 @@ export default function Withdrawal() {
             setResolvingName(false);
           }
         }
-      }, 400); // 400ms debounce to avoid spam while typing
+      }, 400);
       return () => {
         isCurrent = false;
         clearTimeout(rDelay);
@@ -137,13 +238,42 @@ export default function Withdrawal() {
     e.preventDefault();
     if (!profile) return;
     
+    // Guard: Check if window is open
+    if (!isWindowOpen) {
+      setError("Payout Gateway Closed. Processing windows are strictly scheduled by Administration.");
+      return;
+    }
+
     const withdrawAmount = parseFloat(amount);
     if (isNaN(withdrawAmount) || withdrawAmount < 1000) {
       setError('Minimum withdrawal is ₦1,000.00');
       return;
     }
-    if (withdrawAmount > (profile.withdrawableBalance || 0)) {
-      setError('Insufficient balance');
+
+    // Check Plan Cap Limit for Window
+    const plan = profile.plan || 'free';
+    const cap = getPlanWithdrawalCap(plan);
+    if (plan === 'free' || cap === 0) {
+      setError('Free plans do not have payout capacity. Please upgrade to a verified plan.');
+      return;
+    }
+
+    const currentWindowRequests = getCumulativeWithdrawalsInWindow();
+    if (currentWindowRequests + withdrawAmount > cap) {
+      setError(`Payout request exceeds your plan's window limit. Your maximum window capacity is ₦${cap.toLocaleString()}, and you have already requested ₦${currentWindowRequests.toLocaleString()} in this session.`);
+      return;
+    }
+
+    // Direct Wallet selection checks (taskBalance vs referralBalance)
+    const walletBalance = withdrawalType === 'task' 
+      ? (profile.taskBalance || 0) 
+      : (profile.referralBalance || 0);
+
+    const pendingRequestsTotal = getPendingWithdrawalTotal(withdrawalType);
+    const availableFunds = Math.max(0, walletBalance - pendingRequestsTotal);
+
+    if (withdrawAmount > availableFunds) {
+      setError(`Insufficient balance. Selected ${withdrawalType === 'task' ? 'Task' : 'Referral'} balance is ₦${walletBalance.toLocaleString()}. After accounting for ₦${pendingRequestsTotal.toLocaleString()} in other pending requests, you can only withdraw up to ₦${availableFunds.toLocaleString()}.`);
       return;
     }
 
@@ -156,29 +286,34 @@ export default function Withdrawal() {
     setError('');
 
     try {
-      // 1. Update user bank details for future use
+      // 1. Save user bank information for future requests
       await updateDoc(doc(db, 'users', profile.uid), {
         bankDetails: { bankName, bankCode, accountNumber, accountName }
       });
 
-      // 2. Call automated withdrawal API
-      const response = await axios.post('/api/paystack/withdraw', {
+      // 2. Submit new pending manual payout request directly to firestore
+      const newWithdrawalRef = doc(collection(db, 'withdrawals'));
+      await setDoc(newWithdrawalRef, {
         userId: profile.uid,
         amount: withdrawAmount,
+        status: 'pending',
         withdrawalType,
-        bankDetails: { bankName, bankCode, accountNumber, accountName }
+        bankDetails: { bankName, bankCode, accountNumber, accountName },
+        requestedAt: serverTimestamp()
       });
 
-      if (response.data.status === "success") {
-        setSuccess(true);
-        setTimeout(() => navigate('/earnings'), 3000);
-      }
+      setSuccess(true);
+      setTimeout(() => navigate('/earnings'), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.error || "Automated withdrawal failed. Please check your bank details.");
+      console.error("Manual withdrawal dispatch failed", err);
+      setError(err?.message || "Manual request compilation failed. Try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  const planCap = getPlanWithdrawalCap(profile?.plan || 'free');
+  const currentWindowRequestsTotal = getCumulativeWithdrawalsInWindow();
 
   const filteredBanks = banks.filter(bank =>
     bank.name.toLowerCase().includes(bankSearch.toLowerCase())
@@ -218,6 +353,31 @@ export default function Withdrawal() {
 
         {activeTab === 'withdraw' ? (
           <>
+            {/* Real-time Status Alert Banner */}
+            <div className={`p-6 rounded-[2rem] border transition-all flex items-center gap-4 ${
+              isWindowOpen 
+                ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                : 'bg-rose-50 border-rose-100 text-rose-800'
+            }`}>
+              <span className={`w-3 h-3 rounded-full flex-shrink-0 ${isWindowOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <div className="flex-1 text-left">
+                <p className="text-xs font-black uppercase tracking-wider">
+                  {isWindowOpen ? "Settlement Window Open" : "Payout Gateway Closed"}
+                </p>
+                <p className="text-[10px] font-bold uppercase opacity-85 mt-0.5 leading-relaxed">
+                  {isWindowOpen ? (
+                    timeRemainingStr || "Processing windows are strictly scheduled by Administration."
+                  ) : (
+                    `🔒 Payout portal is currently closed. Next scheduled window: ${
+                      payoutSettings?.payoutStartDate 
+                        ? new Date(payoutSettings.payoutStartDate).toLocaleString() 
+                        : 'Unscheduled'
+                    }`
+                  )}
+                </p>
+              </div>
+            </div>
+
             {/* Available Balance Header */}
             <div className="bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group border border-white/5">
               <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-600/20" />
@@ -226,115 +386,136 @@ export default function Withdrawal() {
               <div className="relative z-10 space-y-6">
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Institutional Grade Balance</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
+                      {withdrawalType === 'task' ? 'Task Wallet Balance' : 'Referral Wallet Balance'}
+                    </p>
                     <h3 className="text-5xl font-display font-black tracking-tighter italic">
-                      ₦<AnimatedNumber value={profile?.withdrawableBalance || 0} fractionDigits={2} />
+                      ₦<AnimatedNumber value={withdrawalType === 'task' ? (profile?.taskBalance || 0) : (profile?.referralBalance || 0)} fractionDigits={2} />
                     </h3>
                   </div>
                   <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform">
                     <Wallet size={28} className="text-blue-500" />
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <div className="bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Referral: ₦{(profile as any)?.referralEarnings || 0}</p>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                  <div>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-left">Task Balance</p>
+                    <p className="text-sm font-black text-slate-200 text-left">₦{(profile?.taskBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-tight mt-1">Payout protocol active via Paystack Node</p>
+                  <div>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-left">Referral Balance</p>
+                    <p className="text-sm font-black text-slate-200 text-left">₦{(profile?.referralBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider pt-2 border-t border-white/5">
+                  <span>Current Cap: ₦{planCap.toLocaleString()} ({profile?.plan || 'free'} tier)</span>
+                  <span>Session Requested: ₦{currentWindowRequestsTotal.toLocaleString()}</span>
                 </div>
               </div>
             </div>
 
             {/* Withdrawal Type Selection */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
+                disabled={!isWindowOpen}
                 onClick={() => setWithdrawalType('task')}
-                className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-3 relative overflow-hidden ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden disabled:opacity-50 ${
                   withdrawalType === 'task' 
                     ? 'bg-blue-600 border-blue-500 text-white shadow-xl scale-[1.02]' 
                     : 'bg-white border-slate-100 text-slate-900 hover:border-blue-200'
                 }`}
               >
                 <div className="flex items-center justify-between relative z-10">
-                  <Zap size={20} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-600'} />
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${withdrawalType === 'task' ? 'bg-white/20' : 'bg-blue-50'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${new Date().getDate() === 30 && new Date().getUTCHours() + 1 === 17 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${withdrawalType === 'task' ? 'text-white' : 'text-blue-600'}`}>
-                      30th
+                  <Zap size={16} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-600'} />
+                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${withdrawalType === 'task' ? 'bg-white/20' : 'bg-blue-50'}`}>
+                    <span className={`w-1 h-1 rounded-full ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className={`text-[7px] font-black uppercase tracking-widest ${withdrawalType === 'task' ? 'text-white' : 'text-blue-600'}`}>
+                      Task
                     </span>
                   </div>
                 </div>
-                <div className="relative z-10">
-                  <span className="text-sm font-black uppercase tracking-tighter block">Task Payout</span>
-                  <span className={`text-[9px] font-bold uppercase opacity-80 mt-1 block ${withdrawalType === 'task' ? 'text-blue-100' : 'text-slate-400'}`}>5PM - 6PM • Monthly</span>
+                <div className="relative z-10 text-left">
+                  <span className="text-xs font-black uppercase tracking-tighter block">Task Payout</span>
+                  <span className={`text-[8px] font-bold uppercase opacity-80 mt-0.5 block ${withdrawalType === 'task' ? 'text-blue-100' : 'text-slate-400'}`}>Schedule Enabled</span>
                 </div>
                 {withdrawalType === 'task' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
               </button>
 
               <button
                 type="button"
+                disabled={!isWindowOpen}
                 onClick={() => setWithdrawalType('referral')}
-                className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-3 relative overflow-hidden ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden disabled:opacity-50 ${
                   withdrawalType === 'referral' 
                     ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl scale-[1.02]' 
                     : 'bg-white border-slate-100 text-slate-900 hover:border-emerald-200'
                 }`}
               >
                 <div className="flex items-center justify-between relative z-10">
-                  <User size={20} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-600'} />
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${withdrawalType === 'referral' ? 'bg-white/20' : 'bg-emerald-50'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${new Date().getUTCHours() + 1 === 17 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${withdrawalType === 'referral' ? 'text-white' : 'text-emerald-600'}`}>
-                      Live
+                  <User size={16} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-600'} />
+                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${withdrawalType === 'referral' ? 'bg-white/20' : 'bg-emerald-50'}`}>
+                    <span className={`w-1 h-1 rounded-full ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className={`text-[7px] font-black uppercase tracking-widest ${withdrawalType === 'referral' ? 'text-white' : 'text-emerald-600'}`}>
+                      Referral
                     </span>
                   </div>
                 </div>
-                <div className="relative z-10">
-                  <span className="text-sm font-black uppercase tracking-tighter block">Referral Payout</span>
-                  <span className={`text-[9px] font-bold uppercase opacity-80 mt-1 block ${withdrawalType === 'referral' ? 'text-emerald-100' : 'text-slate-400'}`}>5PM - 6PM • Daily</span>
+                <div className="relative z-10 text-left">
+                  <span className="text-xs font-black uppercase tracking-tighter block">Referral Payout</span>
+                  <span className={`text-[8px] font-bold uppercase opacity-80 mt-0.5 block ${withdrawalType === 'referral' ? 'text-emerald-100' : 'text-slate-400'}`}>Schedule Enabled</span>
                 </div>
                 {withdrawalType === 'referral' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-4">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Transfer Quantum</h3>
+              <div className="space-y-2 text-left">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Transfer Quantum</h3>
                 <div className="relative group">
-                  <span className="absolute left-8 top-1/2 -translate-y-1/2 font-display font-black text-3xl text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 font-display font-black text-xl text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
                   <input 
                     type="number" 
                     placeholder="0.00"
                     required
                     min="1000"
                     step="0.01"
-                    className="w-full bg-white border border-slate-100 rounded-[2.5rem] py-8 pl-18 pr-8 text-3xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950"
+                    disabled={!isWindowOpen}
+                    className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </div>
+                {parseFloat(amount) >= 1000 && (
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider px-4">
+                    A 5% processing fee applies. You will receive: ₦{(parseFloat(amount) * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })} (Fee: ₦{(parseFloat(amount) * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                  </p>
+                )}
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Ledger Information</h3>
-                <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm space-y-6">
+              <div className="space-y-4 text-left">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Ledger Information</h3>
+                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
                   <div className="space-y-1.5 relative">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Target Bank</label>
                     <div className="relative">
                       {/* Trigger Button */}
                       <button
                         type="button"
+                        disabled={!isWindowOpen}
                         onClick={() => {
                           setIsOpenBankDropdown(!isOpenBankDropdown);
                           setBankSearch('');
                         }}
-                        className="w-full text-left bg-slate-50 border border-transparent rounded-2xl py-5 pl-14 pr-12 text-xs font-black uppercase tracking-tight hover:bg-slate-100/80 active:scale-[0.99] transition-all flex items-center justify-between relative"
+                        className="w-full text-left bg-slate-50 border border-transparent rounded-xl py-3 pl-11 pr-8 text-xs font-black uppercase tracking-tight hover:bg-slate-100/80 active:scale-[0.99] transition-all flex items-center justify-between relative disabled:opacity-50"
                       >
-                        <Building2 className={`absolute left-6 top-1/2 -translate-y-1/2 transition-colors ${isOpenBankDropdown ? 'text-blue-600' : 'text-slate-400'}`} size={20} />
+                        <Building2 className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isOpenBankDropdown ? 'text-blue-600' : 'text-slate-400'}`} size={16} />
                         <span className={bankCode ? 'text-slate-900 font-black' : 'text-slate-500 font-bold normal-case'}>
                           {bankName || 'Select Protocol Bank'}
                         </span>
-                        <ChevronDown className={`text-slate-400 transition-transform duration-200 ${isOpenBankDropdown ? 'rotate-180 text-blue-600' : ''}`} size={18} />
+                        <ChevronDown className={`text-slate-400 transition-transform duration-200 ${isOpenBankDropdown ? 'rotate-180 text-blue-600' : ''}`} size={16} />
                       </button>
 
                       <AnimatePresence>
@@ -345,7 +526,7 @@ export default function Withdrawal() {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.2 }}
-                            className="absolute left-0 right-0 mt-2 bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden z-[500] max-h-80 flex flex-col"
+                            className="absolute left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden z-[500] max-h-80 flex flex-col"
                           >
                             {/* Backdrop overlay inside the motion div for better coordination */}
                             <div 
@@ -357,13 +538,13 @@ export default function Withdrawal() {
                             />
                             
                             {/* Search Bar Input */}
-                            <div className="p-4 border-b border-slate-100 relative flex items-center bg-slate-50/50 z-10">
-                              <Search className="absolute left-8 text-slate-400" size={16} />
+                            <div className="p-3 border-b border-slate-100 relative flex items-center bg-slate-50/50 z-10">
+                              <Search className="absolute left-6 text-slate-400" size={14} />
                               <input
                                 type="text"
                                 autoFocus
                                 placeholder="Search bank name..."
-                                className="w-full bg-white border border-slate-100 rounded-xl py-2.5 pl-11 pr-4 text-xs font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+                                className="w-full bg-white border border-slate-100 rounded-xl py-2 pl-9 pr-4 text-xs font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
                                 value={bankSearch}
                                 onChange={(e) => setBankSearch(e.target.value)}
                               />
@@ -384,7 +565,7 @@ export default function Withdrawal() {
                                         setIsOpenBankDropdown(false);
                                         setBankSearch('');
                                       }}
-                                      className={`w-full text-left px-5 py-3.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
+                                      className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
                                         isSelected 
                                           ? 'bg-blue-50/80 text-blue-700 font-extrabold' 
                                           : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
@@ -392,13 +573,13 @@ export default function Withdrawal() {
                                     >
                                       <span className="truncate">{bank.name}</span>
                                       {isSelected && (
-                                        <CheckCircle2 size={16} className="text-blue-600 flex-shrink-0" />
+                                        <CheckCircle2 size={14} className="text-blue-600 flex-shrink-0" />
                                       )}
                                     </button>
                                   );
                                 })
                               ) : (
-                                <div className="text-center py-6 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                                <div className="text-center py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
                                   No protocol bank found
                                 </div>
                               )}
@@ -411,12 +592,13 @@ export default function Withdrawal() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Account Coordinate</label>
                     <div className="relative group">
-                      <CreditCard className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={20} />
+                      <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={16} />
                       <input 
                         type="text" 
                         placeholder="Enter 10-digit account number"
                         required
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 text-sm font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400"
+                        disabled={!isWindowOpen}
+                        className="w-full bg-slate-50 border border-slate-250 rounded-xl py-3 pl-11 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
                       />
@@ -439,17 +621,17 @@ export default function Withdrawal() {
                       )}
                     </div>
                     <div className="relative group">
-                      <User className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={20} />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={16} />
                       <input 
                         type="text" 
                         placeholder={resolvingName ? "Querying secure gateway..." : "Full name as on bank record"}
                         required
-                        className={`w-full bg-slate-50 border-none rounded-2xl py-5 pl-14 pr-6 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 ${
+                        disabled={!isWindowOpen || resolvingName}
+                        className={`w-full bg-slate-50 border-none rounded-xl py-3 pl-11 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
                           resolvingName ? 'opacity-70 cursor-wait select-none' : ''
                         }`}
                         value={accountName}
                         onChange={(e) => setAccountName(e.target.value)}
-                        disabled={resolvingName}
                       />
                     </div>
                   </div>
@@ -460,31 +642,38 @@ export default function Withdrawal() {
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] flex items-center gap-4 text-rose-700 shadow-xl"
+                  className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700 shadow-md"
                 >
-                  <AlertCircle size={24} />
-                  <p className="text-sm font-black uppercase tracking-tight">{error || "Automated withdrawal failed. Check bank details."}</p>
+                  <AlertCircle size={20} />
+                  <p className="text-xs font-black uppercase tracking-tight">{error || "Automated withdrawal failed. Check bank details."}</p>
                 </motion.div>
               )}
 
               <button 
-                disabled={loading || success}
-                className={`w-full py-8 rounded-[2.5rem] font-display font-black text-sm uppercase tracking-[0.2em] italic shadow-2xl transition-all flex items-center justify-center gap-4 group/btn ${
+                type="submit"
+                disabled={loading || success || !isWindowOpen}
+                className={`w-full py-4 rounded-2xl font-display font-black text-xs uppercase tracking-[0.2em] italic shadow-2xl transition-all flex items-center justify-center gap-3 group/btn ${
                   success 
                     ? 'bg-emerald-500 text-white shadow-emerald-900/20' 
-                    : 'bg-slate-950 text-white hover:bg-blue-600 active:scale-[0.98]'
+                    : !isWindowOpen
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] shadow-emerald-900/10'
                 }`}
               >
                 {loading ? (
-                  <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : success ? (
                   <>
-                    <CheckCircle2 size={24} /> Protocol Finalized
+                    <CheckCircle2 size={16} /> Protocol Finalized
+                  </>
+                ) : !isWindowOpen ? (
+                  <>
+                    <span>🔒 Closed: Gateway Locked</span>
                   </>
                 ) : (
                   <>
-                    <span>Execute Payout</span>
-                    <ArrowUpRight size={20} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform opacity-50" />
+                    <span>🟢 Active: Withdraw Now</span>
+                    <ArrowUpRight size={16} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform opacity-50" />
                   </>
                 )}
               </button>

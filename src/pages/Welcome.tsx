@@ -68,7 +68,9 @@ export default function Welcome() {
         }
       } catch (err: any) {
         console.error("Redirect auth error:", err);
-        if (err.code === 'auth/account-exists-with-different-credential') {
+        if (err.message === "auth/telegram-duplicate") {
+            setError("Account already exists for this Telegram profile.");
+        } else if (err.code === 'auth/account-exists-with-different-credential') {
             setError("An account already exists with the same email. Please sign in using your original method.");
         } else if (err.code === 'auth/unauthorized-domain') {
             setError(`Unauthorized Domain: Please add "${window.location.hostname}" to Authorized Domains in your Firebase Console (Authentication > Settings).`);
@@ -82,6 +84,12 @@ export default function Welcome() {
     handleRedirectResult();
   }, [navigate]);
 
+  const checkTelegramIdDuplicate = async (tgId: string) => {
+    const q = query(collection(db, 'users'), where('telegramId', '==', tgId), limit(1));
+    const snap = await getDocs(q);
+    return !snap.empty;
+  };
+
   const handleUserDoc = async (user: any, extraData?: { firstName: string, lastName: string, phoneNumber: string, referralCode?: string }) => {
     try {
         const userDocRef = doc(db, 'users', user.uid);
@@ -89,6 +97,17 @@ export default function Welcome() {
         const isTargetAdmin = user.email === 'wiseking7890@gmail.com';
         
         if (!userDoc.exists()) {
+          const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+          const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
+          
+          if (telegramId) {
+             const duplicate = await checkTelegramIdDuplicate(telegramId);
+             if (duplicate) {
+                await user.delete();
+                throw new Error("auth/telegram-duplicate");
+             }
+          }
+
           const referralCodeFromUrl = searchParams.get('ref');
           const referralCodeFromStorage = safeStorage.getItem('referralCode');
           const finalReferralCode = referralCodeFromUrl || referralCodeFromStorage || extraData?.referralCode;
@@ -103,8 +122,12 @@ export default function Welcome() {
             phoneNumber: extraData?.phoneNumber || user.phoneNumber || '',
             role: isTargetAdmin ? 'admin' : 'user',
             balance: 0,
+            taskBalance: 0,
+            referralBalance: 0,
+            telegramId: telegramId,
             pendingBalance: 0,
             withdrawableBalance: 0,
+            depositBalance: 0,
             taskEarnings: 0,
             referralEarnings: 0,
             bonusEarnings: 0,
@@ -153,8 +176,11 @@ export default function Welcome() {
           await setDoc(userDocRef, { role: 'admin' }, { merge: true });
           console.log("Forced admin role for owner");
         }
-    } catch (dbErr) {
+    } catch (dbErr: any) {
         console.error("Firestore creation error:", dbErr);
+        if (dbErr.message === "auth/telegram-duplicate") {
+            throw dbErr;
+        }
         handleFirestoreError(dbErr, OperationType.CREATE, `users/${user.uid}`);
     }
   };
@@ -175,7 +201,10 @@ export default function Welcome() {
         // Create user profile
         try {
           await handleUserDoc(user, { firstName, lastName, phoneNumber, referralCode: referralCodeInput });
-        } catch (dbErr) {
+        } catch (dbErr: any) {
+          if (dbErr.message === "auth/telegram-duplicate") {
+             throw dbErr;
+          }
           handleFirestoreError(dbErr, OperationType.CREATE, `users/${user.uid}`);
         }
       }
@@ -183,7 +212,9 @@ export default function Welcome() {
       navigate('/');
     } catch (err: any) {
       console.error("Auth error:", err);
-      if (err.code === 'auth/invalid-credential') {
+      if (err.message === "auth/telegram-duplicate") {
+         setError("Account already exists for this Telegram profile.");
+      } else if (err.code === 'auth/invalid-credential') {
         setError('Invalid email or password. Please check your credentials and try again.');
       } else if (err.code === 'auth/user-not-found') {
         setError('No account found with this email. Please create an account.');
@@ -235,6 +266,23 @@ export default function Welcome() {
       // We try popup first, but if it fails with specific codes, we inform the user.
       try {
         const { user } = await signInWithPopup(auth, provider);
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        // If it's a completely new account, enforce duplicate Telegram ID check here
+        if (!userDoc.exists()) {
+            const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+            const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
+            if (telegramId) {
+                const isDuplicate = await checkTelegramIdDuplicate(telegramId);
+                if (isDuplicate) {
+                    await user.delete(); // Rollback account creation
+                    auth.signOut();
+                    setError("Account already exists for this Telegram profile.");
+                    setLoading(false);
+                    return;
+                }
+            }
+        }
         await handleUserDoc(user);
         navigate('/');
       } catch (popupErr: any) {
@@ -507,9 +555,9 @@ export default function Welcome() {
         {/* Community Links */}
         <div className="mt-8 space-y-3">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[.2em] text-center mb-1">Official Channels</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <a 
-              href="https://t.me/Earnwise01" 
+              href="https://t.me/earnwise0" 
               target="_blank" 
               rel="noreferrer"
               className="flex flex-col items-center justify-center gap-1.5 bg-[#0088cc]/5 hover:bg-[#0088cc]/10 border border-[#0088cc]/10 py-2.5 rounded-2xl transition-all group"
@@ -518,22 +566,13 @@ export default function Welcome() {
               <span className="text-[9px] font-black text-[#0088cc]/80 uppercase tracking-tighter">Channel</span>
             </a>
             <a 
-              href="https://t.me/earnwise0" 
+              href="https://t.me/Earnwise01" 
               target="_blank" 
               rel="noreferrer"
               className="flex flex-col items-center justify-center gap-1.5 bg-[#0088cc]/10 hover:bg-[#0088cc]/20 border border-[#0088cc]/20 py-2.5 rounded-2xl transition-all group shadow-sm"
             >
               <Users size={16} className="text-[#0088cc]" />
               <span className="text-[9px] font-black text-[#0088cc] uppercase tracking-tighter">Group</span>
-            </a>
-            <a 
-              href="https://chat.whatsapp.com/FvzXNEVSAUxLL06YOoLSWo" 
-              target="_blank" 
-              rel="noreferrer"
-              className="flex flex-col items-center justify-center gap-1.5 bg-[#25D366]/5 hover:bg-[#25D366]/10 border border-[#25D366]/10 py-2.5 rounded-2xl transition-all"
-            >
-              <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" className="w-4 h-4 opacity-80" alt="WhatsApp" />
-              <span className="text-[9px] font-black text-[#25D366]/80 uppercase tracking-tighter">WhatsApp</span>
             </a>
           </div>
         </div>

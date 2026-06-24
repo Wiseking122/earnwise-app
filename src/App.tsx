@@ -36,6 +36,7 @@ import AdminTasks from './pages/admin/Tasks';
 import AdminPayments from './pages/admin/Payments';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
+import InstallAppModal from './components/InstallAppModal';
 
 function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: { children: React.ReactNode, adminOnly?: boolean, bypassPlanCheck?: boolean }) {
   const { user, profile, loading } = useAuth();
@@ -115,18 +116,17 @@ export default function App() {
 
 function AppContent() {
   useAdsterraScript();
-  const { profile } = useAuth();
   
   React.useEffect(() => {
     try {
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
-        tg.ready();
-        tg.expand();
-        if (tg.enableClosingConfirmation) {
+        if (typeof tg.ready === 'function') tg.ready();
+        if (typeof tg.expand === 'function') tg.expand();
+        if (typeof tg.enableClosingConfirmation === 'function') {
            tg.enableClosingConfirmation();
-        }
-        if (tg.setHeaderColor) {
+         }
+        if (typeof tg.setHeaderColor === 'function') {
            tg.setHeaderColor('#0f172a'); // slate-900
         }
       }
@@ -139,6 +139,7 @@ function AppContent() {
     <>
       <AppRoutes />
       <FloatingAIAssistant />
+      <InstallAppModal />
     </>
   );
 }

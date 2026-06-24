@@ -1,4 +1,4 @@
-export type TaskType = 'survey' | 'ad' | 'app_download' | 'referral' | 'content_creation';
+export type TaskType = 'survey' | 'ad' | 'app_download' | 'referral' | 'content_creation' | 'video';
 export type TaskStatus = 'active' | 'inactive';
 export type CompletionStatus = 'pending' | 'approved' | 'rejected';
 export type WithdrawalStatus = 'pending' | 'approved' | 'completed' | 'rejected';
@@ -33,10 +33,14 @@ export interface UserProfile {
   role: UserRole;
   pendingBalance: number;
   withdrawableBalance: number;
+  depositBalance?: number;
   taskEarnings?: number;
   referralEarnings?: number;
   bonusEarnings?: number;
   balance: number;
+  taskBalance: number;
+  referralBalance: number;
+  telegramId?: string | null;
   wiseCoins: number;
   rank: RankType;
   vaultBalance?: number;
@@ -139,6 +143,7 @@ export interface WithdrawalRequest {
   userId: string;
   amount: number;
   status: WithdrawalStatus;
+  withdrawalType?: 'task' | 'referral';
   bankDetails: BankDetails;
   requestedAt: any;
   processedAt?: any;
@@ -152,6 +157,7 @@ export interface Transaction {
   status?: 'pending' | 'completed' | 'rejected' | 'failed';
   description: string;
   createdAt: any;
+  receiptDetails?: any;
 }
 
 export interface Course {

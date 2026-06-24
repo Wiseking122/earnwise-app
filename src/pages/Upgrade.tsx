@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { PLANS, PlanDetails } from '../constants/plans';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
-import { usePaystackPayment } from 'react-paystack';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';

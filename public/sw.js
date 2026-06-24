@@ -1,71 +1,85 @@
-const CACHE_NAME = 'earnwise-v3';
+const CACHE_NAME = 'earnwise-v6';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
-  '/icon.png'
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-512-maskable.png'
 ];
 
-// Install event
-self.addEventListener('install', (event) => {
-  event.waitUntil(
+self.addEventListener('install', (e) => {
+  e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map((asset) => {
+          return cache.add(asset).catch((err) => {
+            console.warn(`PWA: Pre-cache failed for ${asset}:`, err);
+          });
+        })
+      );
     })
   );
   self.skipWaiting();
 });
 
-// Activate event
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
           }
         })
       );
-    })
+    }).then(() => clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch event (Network First, fallback to cache)
-self.addEventListener('fetch', (event) => {
-  // We only want to intercept basic GET navigations
-  if (event.request.method !== 'GET') return;
-  
-  event.respondWith(
-    fetch(event.request).then((networkResponse) => {
-        // Optionally update cache if we want
-        return networkResponse;
-    }).catch(async () => {
-        const cachedResponse = await caches.match(event.request);
-        if (cachedResponse) return cachedResponse;
-        
-        // If it's a navigation request and both network and cache fail, maybe return index.html
-        if (event.request.mode === 'navigate') {
-            return caches.match('/');
+self.addEventListener('fetch', (e) => {
+  // Only handle GET requests
+  if (e.request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(e.request.url);
+
+  // CRITICAL: NEVER intercept or cache API requests
+  if (url.pathname.startsWith('/api')) {
+    return;
+  }
+
+  // Bypass for non-origin requests (monetization, analytics, external APIs)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Network first with cache fallback
+  e.respondWith(
+    fetch(e.request)
+      .then((networkResponse) => {
+        // Cache successful local resource requests
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
         }
-        return new Response('', { status: 404, statusText: 'Offline' });
-    })
+        return networkResponse;
+      })
+      .catch(async () => {
+        const cachedResponse = await caches.match(e.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        // If a client-side route navigation fails, serve the cached index root
+        if (e.request.mode === 'navigate') {
+          return caches.match('/') || new Response("Offline available", { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+
+        return new Response("Offline", { status: 503, statusText: "Service Unavailable" });
+      })
   );
 });
 
-// Push event
-self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : { title: 'Earnwise', body: 'New update available!' };
-  const options = {
-    body: data.body,
-    icon: '/icon.png',
-    badge: '/icon.png',
-    data: { url: data.url || '/' }
-  };
-  event.waitUntil(self.registration.showNotification(data.title, options));
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url || '/'));
-});

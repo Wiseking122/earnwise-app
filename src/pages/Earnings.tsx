@@ -23,6 +23,7 @@ import DepositTab from '../components/DepositTab';
 import { CpxWidget } from '../components/CpxWidget';
 import { CpxOfferwall } from '../components/CpxOfferwall';
 import AnimatedNumber from '../components/AnimatedNumber';
+import TransactionReceipt from '../components/TransactionReceipt';
 
 export default function Earnings() {
   const { user, profile } = useAuth();
@@ -31,9 +32,34 @@ export default function Earnings() {
   const [completions, setCompletions] = useState<TaskCompletion[]>([]);
   const [activeTab, setActiveTab] = useState<'history' | 'pending' | 'deposit'>('history');
   const [loading, setLoading] = useState(true);
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
 
   const depositSuccess = searchParams.get('deposit_success') === 'true';
   const depositAmount = searchParams.get('amount');
+  const receiptId = searchParams.get('receipt');
+
+  useEffect(() => {
+    if (receiptId && transactions.length > 0) {
+      const t = transactions.find(tx => tx.id === receiptId);
+      if (t && t.type === 'withdrawal' && t.receiptDetails) {
+        setSelectedReceipt({
+          id: t.id,
+          amount: t.amount,
+          fee: t.receiptDetails.fee || 0,
+          netPayout: t.receiptDetails.netPayout || t.amount,
+          processedAt: t.createdAt?.toDate() || new Date(),
+          bankName: t.receiptDetails.bankName,
+          accountName: t.receiptDetails.accountName
+        });
+        // Clear the URL param to prevent re-triggering
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.delete('receipt');
+          return newParams;
+        });
+      }
+    }
+  }, [receiptId, transactions, setSearchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -205,7 +231,23 @@ export default function Earnings() {
               >
                 {transactions.length > 0 ? (
                   transactions.map((t, index) => (
-                    <div key={t.id || index} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 flex items-center justify-between hover:shadow-xl hover:border-blue-100 transition-all group overflow-hidden relative">
+                    <div 
+                      key={t.id || index} 
+                      onClick={() => {
+                        if (t.type === 'withdrawal' && t.receiptDetails) {
+                          setSelectedReceipt({
+                            id: t.id,
+                            amount: t.amount,
+                            fee: t.receiptDetails.fee || 0,
+                            netPayout: t.receiptDetails.netPayout || t.amount,
+                            processedAt: t.createdAt?.toDate() || new Date(),
+                            bankName: t.receiptDetails.bankName,
+                            accountName: t.receiptDetails.accountName
+                          });
+                        }
+                      }}
+                      className={`bg-white p-6 rounded-[2.5rem] border border-slate-100 flex items-center justify-between hover:shadow-xl transition-all group overflow-hidden relative ${t.type === 'withdrawal' && t.receiptDetails ? 'cursor-pointer hover:border-blue-200' : ''}`}
+                    >
                       <div className="absolute inset-y-0 left-0 w-1 bg-linear-to-b from-transparent via-slate-200 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                       
                       <div className="flex items-center gap-5 relative z-10">
@@ -227,6 +269,9 @@ export default function Earnings() {
                         }`}>
                           {t.type === 'earning' || t.type === 'referral' ? '+' : '-'}₦{t.amount.toFixed(0)}
                         </p>
+                        {t.type === 'withdrawal' && t.receiptDetails && (
+                          <p className="text-[8px] font-black uppercase tracking-widest text-blue-500 mt-1 text-right">View Receipt</p>
+                        )}
                       </div>
                     </div>
                   ))
@@ -285,6 +330,14 @@ export default function Earnings() {
           </AnimatePresence>
         </div>
       </div>
+      <AnimatePresence>
+        {selectedReceipt && (
+          <TransactionReceipt 
+            receipt={selectedReceipt} 
+            onClose={() => setSelectedReceipt(null)} 
+          />
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }

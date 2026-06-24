@@ -37,10 +37,12 @@ import {
 } from 'lucide-react';
 
 import { DailyCheckIn } from '../components/DailyCheckIn';
+import { useLiveActivities } from '../hooks/useLiveActivities';
 import { DailyGoal } from './DailyGoal';
 import { CpxWidget } from '../components/CpxWidget';
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
+import PayoutTicker from '../components/PayoutTicker';
 
 export default function Home() {
   const { user, profile } = useAuth();
@@ -55,11 +57,7 @@ export default function Home() {
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [aiInsightsError, setAiInsightsError] = useState<string | null>(null);
 
-  const globalActivities = [
-    { id: '1', title: 'New Member', message: 'Tunde just joined from Lagos', time: '2m' },
-    { id: '2', title: 'Payout', message: 'Sarah withdrew ₦5,000 via Paystack', time: '5m' },
-    { id: '3', title: 'Task Completed', message: 'Musa earned ₦150 on Instagram task', time: '12m' }
-  ];
+  const globalActivities = useLiveActivities(3);
 
   // Monitor level up
   useEffect(() => {
@@ -185,6 +183,8 @@ export default function Home() {
       <div className="p-5 pb-24 space-y-8 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
         
+        <PayoutTicker />
+
         {/* Header Section */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -412,6 +412,9 @@ export default function Home() {
           </motion.div>
         </motion.div>
 
+        {/* Daily Check-in Dashboard */}
+        <DailyCheckIn />
+
         {/* Daily Tasks Goal Progression */}
         <DailyGoal />
 
@@ -541,39 +544,72 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="space-y-4 relative z-10">
-                {globalActivities.map((item, i) => (
-                    <motion.div 
-                        key={item.id} 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="flex items-center justify-between bg-white/5 p-5 rounded-[2rem] border border-white/5 hover:bg-white/10 transition-colors group"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center border border-white/5 overflow-hidden group-hover:border-blue-500/50 transition-colors">
-                                <div className="w-full h-full bg-linear-to-br from-blue-600/20 to-indigo-600/20 flex items-center justify-center">
-                                    <TrendingUp size={20} className="text-blue-500 opacity-50" />
+            <div className="space-y-4 relative z-10 overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false}>
+                    {globalActivities.map((item) => {
+                        let iconColor = 'text-blue-500';
+                        let bgGradient = 'from-blue-600/20 to-indigo-600/20';
+                        let IconComponent = TrendingUp;
+
+                        if (item.actionType === 'joined') {
+                            iconColor = 'text-cyan-400';
+                            bgGradient = 'from-cyan-500/20 to-teal-500/20';
+                            IconComponent = Users;
+                        } else if (item.actionType === 'deposited') {
+                            iconColor = 'text-emerald-400';
+                            bgGradient = 'from-emerald-500/20 to-green-500/20';
+                            IconComponent = Wallet;
+                        } else if (item.actionType === 'withdrew') {
+                            iconColor = 'text-amber-400';
+                            bgGradient = 'from-amber-500/20 to-orange-500/20';
+                            IconComponent = Trophy;
+                        } else if (item.actionType === 'task_completed') {
+                            iconColor = 'text-fuchsia-400';
+                            bgGradient = 'from-fuchsia-500/20 to-pink-500/20';
+                            IconComponent = Zap;
+                        }
+
+                        return (
+                            <motion.div 
+                                key={item.id} 
+                                layout
+                                initial={{ opacity: 0, y: -30, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 30, scale: 0.95 }}
+                                transition={{ 
+                                    type: "spring",
+                                    stiffness: 300,
+                                    damping: 25,
+                                    opacity: { duration: 0.25 }
+                                }}
+                                className="flex items-center justify-between bg-white/5 p-5 rounded-[2rem] border border-white/5 hover:bg-white/10 hover:border-blue-500/20 transition-all group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center border border-white/5 overflow-hidden group-hover:border-blue-500/50 transition-colors">
+                                        <div className={`w-full h-full bg-linear-to-br ${bgGradient} flex items-center justify-center`}>
+                                            <IconComponent size={20} className={`${iconColor} opacity-90 group-hover:scale-110 transition-transform`} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-sm font-black text-white">{item.title}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{item.message}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-0.5">
-                                <p className="text-sm font-black text-white">{item.title}</p>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{item.message}</p>
-                            </div>
-                        </div>
-                        <span className="text-[10px] font-black text-slate-600 uppercase italic">
-                            {item.time || 'Recently'}
-                        </span>
-                    </motion.div>
-                ))}
+                                <span className="text-[10px] font-black text-slate-600 uppercase italic whitespace-nowrap">
+                                    {item.time || 'Recently'}
+                                </span>
+                            </motion.div>
+                        );
+                    })}
+                </AnimatePresence>
             </div>
             
             <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full -mr-40 -mb-40 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%)' }} />
         </section>
 
         {/* Community Links */}
-        <div className="grid grid-cols-3 gap-3">
-            <a href="https://t.me/Earnwise01" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-white/5 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:bg-slate-900/80 hover:border-[#0088cc]/30 transition-all group shadow-sm">
+        <div className="grid grid-cols-2 gap-3">
+            <a href="https://t.me/earnwise0" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-white/5 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:bg-slate-900/80 hover:border-[#0088cc]/30 transition-all group shadow-sm">
                 <div className="w-10 h-10 bg-[#0088cc]/10 border border-[#0088cc]/20 rounded-xl flex items-center justify-center group-hover:bg-[#0088cc] group-hover:border-[#0088cc] transition-colors duration-500 shadow-inner">
                     <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png" className="w-5 h-5 brightness-200 contrast-200 grayscale-0 opacity-80 group-hover:brightness-0 group-hover:invert group-hover:opacity-100 transition-all" alt="Telegram" />
                 </div>
@@ -582,22 +618,13 @@ export default function Home() {
                     <p className="text-[8px] text-[#0088cc] font-bold uppercase tracking-tighter mt-0.5">Updates</p>
                 </div>
             </a>
-            <a href="https://t.me/earnwise0" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-blue-500/20 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)] hover:bg-slate-900/80 hover:border-blue-400/40 transition-all group shadow-sm ring-1 ring-blue-500/10">
+            <a href="https://t.me/Earnwise01" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-blue-500/20 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)] hover:bg-slate-900/80 hover:border-blue-400/40 transition-all group shadow-sm ring-1 ring-blue-500/10">
                 <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-600 transition-colors duration-500 shadow-inner">
                     <Users size={20} className="text-blue-400 group-hover:text-white transition-all" />
                 </div>
                 <div className="text-center mt-1">
                     <h5 className="font-display font-black text-white text-[10px] drop-shadow-sm">Chat Group</h5>
                     <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tighter mt-0.5">Community</p>
-                </div>
-            </a>
-            <a href="https://chat.whatsapp.com/FvzXNEVSAUxLL06YOoLSWo" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-white/5 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:bg-slate-900/80 hover:border-[#25D366]/30 transition-all group shadow-sm">
-                <div className="w-10 h-10 bg-[#25D366]/10 border border-[#25D366]/20 rounded-xl flex items-center justify-center group-hover:bg-[#25D366] transition-colors duration-500 shadow-inner">
-                    <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" className="w-5 h-5 brightness-200 contrast-200 grayscale-0 opacity-80 group-hover:brightness-0 group-hover:invert group-hover:opacity-100 transition-all" alt="WhatsApp" />
-                </div>
-                <div className="text-center mt-1">
-                    <h5 className="font-display font-black text-white text-[10px] drop-shadow-sm">WhatsApp</h5>
-                    <p className="text-[8px] text-emerald-400 font-black uppercase tracking-widest mt-0.5">VIP Alerts</p>
                 </div>
             </a>
         </div>

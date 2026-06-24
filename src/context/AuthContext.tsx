@@ -96,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!userDoc.exists()) {
         const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         const finalReferralCode = safeStorage.getItem('referralCode');
+        const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+        const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
         const userData = {
           uid: user.uid,
           email: user.email,
@@ -105,8 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phoneNumber: user.phoneNumber || '',
           role: user.email === 'wiseking7890@gmail.com' ? 'admin' : 'user',
           balance: 0,
+          taskBalance: 0,
+          referralBalance: 0,
+          telegramId: telegramId,
           pendingBalance: 0,
           withdrawableBalance: 0,
+          depositBalance: 0,
           taskEarnings: 0,
           referralEarnings: 0,
           bonusEarnings: 0,

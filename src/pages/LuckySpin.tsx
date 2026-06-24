@@ -19,7 +19,6 @@ import { db } from '../lib/firebase';
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp, getDocs, query, where, limit, orderBy, arrayUnion } from 'firebase/firestore';
 import { PLANS } from '../constants/plans';
 import { playRewardSound } from './sounds';
-import { triggerOnclikaPush } from '../lib/adManager';
 import Confetti from '../components/Confetti';
 import VideoAd from '../components/VideoAd';
 
@@ -122,8 +121,6 @@ export default function LuckySpin() {
     // Open required ad link
     window.open('https://omg10.com/4/11110033', '_blank');
 
-    // Programmatically trigger Onclika ad locker manually on user action
-    triggerOnclikaPush();
     setAdLoading(true);
   };
 
@@ -147,9 +144,6 @@ export default function LuckySpin() {
 
   const spin = async () => {
     if (!user || spinning || mustWatchAd) return;
-    
-    // Final check locker execution
-    triggerOnclikaPush();
 
     setSpinning(true);
     setResult(null);

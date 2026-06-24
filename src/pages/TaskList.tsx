@@ -12,6 +12,7 @@ import {
   SlidersHorizontal, 
   Dices,
   Play,
+  Video,
   Target, 
   ChevronRight,
   ShieldCheck,
@@ -22,12 +23,13 @@ import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
+import VideoAdsSection from '../components/VideoAdsSection';
 
-const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string }[] = [
+const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string, subtext?: string }[] = [
   { id: 'all', label: 'All Jobs', icon: SlidersHorizontal, color: 'bg-slate-900' },
   { id: 'survey', label: 'Surveys', icon: Search, color: 'bg-orange-500' },
   { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500' },
-  { id: 'app_download', label: 'Apps & Jobs', icon: Filter, color: 'bg-blue-500' },
+  { id: 'video', label: 'WATCH VIDEOS', icon: Video, color: 'bg-blue-500', subtext: 'WATCH & EARN' },
   { id: 'referral', label: 'Affiliate', icon: ShieldCheck, color: 'bg-purple-500' },
 ];
 
@@ -57,7 +59,7 @@ export default function TaskList() {
   const taskCounts = {
     survey: 'LIVE', 
     ad: 9, 
-    app_download: tasks.filter(t => t.type === 'app_download').length,
+    video: tasks.filter(t => t.type === 'video').length,
     referral: tasks.filter(t => t.type === 'referral').length,
   };
 
@@ -132,14 +134,10 @@ export default function TaskList() {
               <button
                 key={cat.id}
                 onClick={() => {
-                  if (cat.id === 'app_download') {
-                    setZeydooModalOpen(true);
-                  } else {
-                    setActiveCategory(cat.id);
-                  }
+                  setActiveCategory(cat.id);
                 }}
                 className={`p-4 sm:p-5 rounded-3xl sm:rounded-[2rem] border transition-all flex flex-col items-start gap-4 relative overflow-hidden group ${
-                  (activeCategory === cat.id && cat.id !== 'app_download') || (cat.id === 'app_download' && isZeydooModalOpen)
+                  activeCategory === cat.id
                     ? 'bg-slate-950 border-slate-900 shadow-2xl scale-[1.02]' 
                     : 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-lg shadow-sm'
                 }`}
@@ -162,7 +160,7 @@ export default function TaskList() {
                   </h4>
                   <p className={`text-[9px] font-bold uppercase tracking-widest leading-none mt-1 ${
                     activeCategory === cat.id ? 'text-slate-500' : 'text-slate-400'
-                  }`}>Explore Global</p>
+                  }`}>{cat.subtext || 'Explore Global'}</p>
                 </div>
 
                 {activeCategory === cat.id && (
@@ -189,8 +187,9 @@ export default function TaskList() {
         {/* Task List */}
         <div className="space-y-4">
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
+          {activeCategory === 'video' && <VideoAdsSection />}
           {activeCategory === 'survey' && user && (
-            <div className="space-y-4">
+            <div className="space-y-6">
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
             </div>
           )}
@@ -257,7 +256,7 @@ export default function TaskList() {
                 </motion.div>
               ))}
             </motion.div>
-          ) : (activeCategory === 'ad' || activeCategory === 'survey') ? null : (
+          ) : (activeCategory === 'ad' || activeCategory === 'survey' || activeCategory === 'video') ? null : (
             <div className="text-center py-24 bg-white border border-slate-100 rounded-[3rem] shadow-sm relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,0,0,0.02),transparent)]" />
               <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-slate-100 shadow-sm relative z-10">

@@ -16,7 +16,7 @@ import { useAuth } from './context/AuthContext';
 import { playRewardSound } from './pages/sounds';
 import VideoAd from './components/VideoAd';
 import VastVideoPlayer from './components/VastVideoPlayer';
-import { MONETAG_LINKS, getMonetagLink, triggerOnclikaPush } from './lib/adManager';
+import { MONETAG_LINKS, getMonetagLink } from './lib/adManager';
 
 export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022826',
@@ -25,10 +25,7 @@ export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022829',
 ];
 
-// Programmatically triggers the onclika push notification advertiser activation prompt
-const triggerPushNotificationAd = () => {
-  triggerOnclikaPush();
-};
+// Ads Config Block
 
 interface AdTask {
   id: string;
@@ -164,10 +161,6 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       setRewardMsg("You've already earned from this ad today!");
       setTimeout(() => setRewardMsg(null), 3000);
       return;
-    }
-
-    if (task.provider === 'Monetag Smart' || task.type === 'click') {
-      triggerPushNotificationAd();
     }
 
     if (task.type === 'video') {

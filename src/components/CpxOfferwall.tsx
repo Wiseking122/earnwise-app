@@ -15,6 +15,7 @@ export const CpxOfferwall: React.FC<CpxOfferwallProps> = ({ userId, userName, us
     script.id = 'cpx-script';
     script.src = 'https://wasabi-cpx.s3.eu-central-1.amazonaws.com/sdk.js';
     script.defer = true;
+    script.crossOrigin = 'anonymous';
     
     (window as any).config = {
       appId: 21696,

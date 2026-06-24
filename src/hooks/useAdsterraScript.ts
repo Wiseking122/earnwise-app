@@ -23,6 +23,7 @@ export function useAdsterraScript() {
     script.src = 'https://sturgeonvelocity.com/82/1e/dc/821edc4ecc9d8933eb617e91c4ea9249.js';
     script.async = true;
     script.defer = true;
+    script.crossOrigin = 'anonymous';
     document.body.appendChild(script);
 
     return () => {

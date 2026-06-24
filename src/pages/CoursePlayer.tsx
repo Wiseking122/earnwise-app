@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronLeft, 
@@ -30,7 +30,6 @@ import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import { COURSES } from '../data/courses';
 import { getEnrichedStep } from '../data/courseEnrichment';
-import { triggerOnclikaPush } from '../lib/adManager';
 import axios from 'axios';
 
 export default function CoursePlayer() {
@@ -42,6 +41,7 @@ export default function CoursePlayer() {
   const [loading, setLoading] = useState(true);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{role: 'user' | 'ai', content: string}[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -107,9 +107,16 @@ export default function CoursePlayer() {
 
   const handlePurchase = async () => {
     if (!user || !course) return;
+
+    if (!hasFreeCredit && (profile?.depositBalance || 0) < 7000) {
+      const errStr = `Insufficient deposited balance. Your deposited balance from your personal bank is ₦${(profile?.depositBalance || 0).toLocaleString()}, but ₦7,000 is required to unlock this course. Only bank deposits are accepted for Academy courses, not task earnings.`;
+      setPurchaseError(errStr);
+      alert(errStr);
+      return;
+    }
+
+    setPurchaseError(null);
     setPurchaseLoading(true);
-    // Programmatically lock content & pop Onclika push ad
-    triggerOnclikaPush();
     try {
       const res = await axios.post('/api/v1/academy/purchase', {
         userId: user.uid,
@@ -141,7 +148,8 @@ export default function CoursePlayer() {
           } else {
             await updateDoc(userRef, {
               balance: increment(-7000),
-              withdrawableBalance: increment(-7000)
+              withdrawableBalance: increment(-7000),
+              depositBalance: increment(-7000)
             });
           }
         }
@@ -156,9 +164,6 @@ export default function CoursePlayer() {
 
   const handleDownload = () => {
     if (!course) return;
-    
-    // Lock downloading the strategy with a sponsor content check
-    triggerOnclikaPush();
 
     const content = `
 REVENUE ACADEMY: STRATEGY NODE
@@ -186,9 +191,6 @@ Generated via Earnwise Academy
   };
 
   const triggerResourceDownload = (name: string, type: string, description: string) => {
-    // Pop push ad prompt on premium asset requisition
-    triggerOnclikaPush();
-
     const fileContent = `
 =========================================
 EARNWISE PREMIUM ACADEMY STRATEGY ASSET
@@ -435,6 +437,27 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
                >
                  {purchaseLoading ? <Loader2 className="animate-spin text-slate-950" /> : <>{hasFreeCredit ? 'Decrypt Strategy Access' : 'Purchase Decryption'} <ArrowRight size={16} /></>}
                </button>
+
+               {!hasFreeCredit && (profile?.depositBalance || 0) < 7000 && (
+                 <div className="w-full max-w-xs bg-red-950/40 p-4 rounded-xl border border-red-500/20 text-center space-y-2 mt-4">
+                   <p className="text-xs text-red-500 font-bold">
+                     ⚠️ Deposited balance is too low (₦{(profile?.depositBalance || 0).toLocaleString()})
+                   </p>
+                   <p className="text-[10px] text-slate-400">
+                     You need at least ₦7,000 in bank-deposited funds to purchase this course. (Note: Task earnings cannot be used).
+                   </p>
+                   <Link 
+                     to="/deposit" 
+                     className="inline-block text-[10px] uppercase tracking-wider font-extrabold text-amber-500 hover:underline hover:text-amber-400"
+                   >
+                     Deposit Funds & Unlock Course →
+                   </Link>
+                 </div>
+               )}
+
+               {purchaseError && (
+                 <p className="text-xs text-red-500 font-bold mt-3 text-center max-w-xs">{purchaseError}</p>
+               )}
             </div>
           ) : (
             <div className="p-4 sm:p-8 space-y-8 pb-32 max-w-5xl mx-auto w-full">

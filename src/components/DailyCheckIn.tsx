@@ -1,15 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gift, Calendar, CheckCircle2, Sparkles, X } from 'lucide-react';
-import { doc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { 
+  Gift, 
+  Calendar, 
+  CheckCircle2, 
+  Sparkles, 
+  X, 
+  Lock, 
+  Flame, 
+  Coins, 
+  Trophy, 
+  HelpCircle,
+  Clock,
+  ArrowRight,
+  Info
+} from 'lucide-react';
+import { doc, updateDoc, increment, serverTimestamp, setDoc, collection } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
+import Confetti from './Confetti';
+
+// Daily Rewards configuration mapping to 7-day cycle
+const DAILY_REWARDS = [
+  { day: 1, amount: 50, xp: 20, description: "Day 1 Bonus" },
+  { day: 2, amount: 60, xp: 25, description: "Day 2 Boost" },
+  { day: 3, amount: 75, xp: 30, description: "Day 3 Boost" },
+  { day: 4, amount: 95, xp: 40, description: "Day 4 Multiplier" },
+  { day: 5, amount: 120, xp: 50, description: "Day 5 Mega Bonus" },
+  { day: 6, amount: 155, xp: 60, description: "Day 6 Ultra Reward" },
+  { day: 7, amount: 250, xp: 120, description: "Day 7 Legendary Chest", isChest: true }
+];
 
 export const DailyCheckIn: React.FC = () => {
   const { profile } = useAuth();
   const [showReward, setShowReward] = useState(false);
   const [canCheckIn, setCanCheckIn] = useState(false);
+  const [lastCheckInTime, setLastCheckInTime] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showRuleModal, setShowRuleModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'grid' | 'rewards'>('grid');
 
   useEffect(() => {
     if (!profile) return;
@@ -17,12 +46,15 @@ export const DailyCheckIn: React.FC = () => {
     const lastCheckIn = profile.lastCheckIn?.toDate?.() || profile.lastCheckIn;
     if (!lastCheckIn) {
       setCanCheckIn(true);
+      setLastCheckInTime(null);
       return;
     }
 
     const lastDate = new Date(lastCheckIn);
+    setLastCheckInTime(lastDate);
     const now = new Date();
     
+    // Check if the last check-in occurred on the same calendar day
     const isSameDay = lastDate.getDate() === now.getDate() && 
                       lastDate.getMonth() === now.getMonth() && 
                       lastDate.getFullYear() === now.getFullYear();
@@ -30,110 +62,418 @@ export const DailyCheckIn: React.FC = () => {
     setCanCheckIn(!isSameDay);
   }, [profile]);
 
+  // Derived Values
+  const rawStreak = profile?.streak || 0;
+  // Map streak to current 7-day cycle index (0 to 6)
+  const cycleIndex = rawStreak > 0 ? (rawStreak - 1) % 7 : 0;
+  // Current Day in our 7-day UI cycle (1 to 7)
+  const cycleDayNumber = cycleIndex + 1;
+
+  // The active claim reward for today's check-in
+  const currentReward = DAILY_REWARDS[cycleIndex] || DAILY_REWARDS[0];
+
   const handleCheckIn = async () => {
     if (!profile || !canCheckIn || loading) return;
     
     setLoading(true);
-    const reward = 50; // ₦50 daily reward
+    const rewardAmount = currentReward.amount;
+    const xpAmount = currentReward.xp;
     
     try {
-      await updateDoc(doc(db, 'users', profile.uid), {
-        balance: increment(reward),
-        taskEarnings: increment(reward),
-        xp: increment(25),
+      // 1. Transactionally update user profile document
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        balance: increment(rewardAmount),
+        withdrawableBalance: increment(rewardAmount),
+        taskEarnings: increment(rewardAmount), // classified under task earnings
+        xp: increment(xpAmount),
         lastCheckIn: serverTimestamp(),
-        streak: increment(1)
+      });
+
+      // 2. Add an audit log entry in the user's transactions collection
+      const transRef = doc(collection(db, 'transactions'));
+      await setDoc(transRef, {
+        userId: profile.uid,
+        amount: rewardAmount,
+        type: 'bonus',
+        status: 'completed',
+        description: `Consecutive Day ${cycleDayNumber} Check-In Bonus`,
+        createdAt: serverTimestamp()
       });
       
       setShowReward(true);
       setCanCheckIn(false);
     } catch (err) {
       console.error("Check-in failed:", err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/dailyCheckIn`);
     } finally {
       setLoading(false);
     }
   };
 
+  // Human friendly formatting for check-in time countdown
+  const timeUntilNextCheckIn = () => {
+    if (!lastCheckInTime) return "Now";
+    const now = new Date();
+    const nextClaimDate = new Date(lastCheckInTime);
+    nextClaimDate.setHours(0, 0, 0, 0);
+    nextClaimDate.setDate(nextClaimDate.getDate() + 1); // Next calendar day midnight
+    
+    const diffMs = nextClaimDate.getTime() - now.getTime();
+    if (diffMs <= 0) return "Ready Now";
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${mins}m`;
+  };
+
   return (
     <>
       <motion.div 
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-indigo-200 relative overflow-hidden group"
+        className="bg-slate-950 p-[2px] rounded-[3rem] border border-slate-900 shadow-2xl relative overflow-hidden group"
       >
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-16 -mt-16" style={{ background: 'radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%)' }} />
+        {/* Glow effect on the borders */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-blue-500/10 rounded-[3rem] pointer-events-none" />
         
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
-              <Calendar size={24} className={canCheckIn ? "animate-pulse" : ""} />
+        <div className="bg-[#020617] rounded-[2.9rem] p-5 sm:p-7 space-y-6 relative z-10">
+          
+          {/* Header section with streak badge */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-lg shadow-amber-500/10 relative">
+                <Flame size={26} className="text-white animate-pulse" />
+                {canCheckIn && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 border-2 border-slate-950 rounded-full animate-ping" />
+                )}
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-extrabold text-base text-white tracking-tight">Earning Streak Dashboard</h4>
+                  <button 
+                    onClick={() => setShowRuleModal(true)}
+                    className="text-slate-500 hover:text-slate-300 transition-colors"
+                    title="Streak Rules"
+                  >
+                    <Info size={14} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-extrabold text-xs flex items-center gap-1 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                    {rawStreak} Days Streak
+                  </span>
+                  <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                    {canCheckIn ? "Claim Daily Reward" : `Next Claim in ${timeUntilNextCheckIn()}`}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h4 className="font-black text-lg">Daily Reward</h4>
-              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest leading-none">
-                {canCheckIn ? "Ready to collect today's bonus" : "Come back tomorrow for more"}
-              </p>
+
+            {/* Quick stats / Mode Toggles */}
+            <div className="flex items-center bg-slate-900/60 p-1 rounded-xl border border-white/5 w-fit self-start sm:self-auto">
+              <button
+                onClick={() => setActiveTab('grid')}
+                className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                  activeTab === 'grid' 
+                    ? 'bg-amber-500 text-slate-950 shadow-md' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                7-Day Grid
+              </button>
+              <button
+                onClick={() => setActiveTab('rewards')}
+                className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                  activeTab === 'rewards' 
+                    ? 'bg-amber-500 text-slate-950 shadow-md' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Tiers Info
+              </button>
             </div>
           </div>
-          
-          <button
-            onClick={handleCheckIn}
-            disabled={!canCheckIn || loading}
-            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg ${
-              canCheckIn 
-                ? "bg-white text-indigo-600 hover:bg-slate-50" 
-                : "bg-white/10 text-white/50 cursor-not-allowed border border-white/10"
-            }`}
-          >
-            {loading ? "..." : canCheckIn ? "Claim ₦50" : "Claimed"}
-          </button>
+
+          {/* Subtitle description */}
+          <p className="text-slate-400 text-xs leading-relaxed max-w-xl">
+            Maximize your daily allowance! Completing consecutive claims scales your base payout. If you miss a day, your streak reverts to Day 1.
+          </p>
+
+          {/* Tab 1: Grid Visualization */}
+          {activeTab === 'grid' && (
+            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2.5">
+              {DAILY_REWARDS.map((item) => {
+                // Determine claim state relative to cycle indexes
+                const isClaimed = canCheckIn ? item.day < cycleDayNumber : item.day <= cycleDayNumber;
+                const isToday = canCheckIn && item.day === cycleDayNumber;
+                const isLocked = item.day > cycleDayNumber;
+
+                return (
+                  <motion.div
+                    key={item.day}
+                    whileHover={!isLocked ? { scale: 1.02 } : {}}
+                    className={`relative p-3 rounded-2xl border transition-all flex flex-col items-center text-center justify-between min-h-[92px] ${
+                      isToday 
+                        ? 'bg-amber-500/10 border-amber-400 shadow-lg shadow-amber-400/5 ring-1 ring-amber-400' 
+                        : isClaimed 
+                          ? 'bg-slate-900/40 border-emerald-500/30 opacity-75' 
+                          : 'bg-slate-900/20 border-slate-900 opacity-50'
+                    }`}
+                  >
+                    {/* Top indicator icons */}
+                    <div className="absolute top-1 right-1.5">
+                      {isClaimed ? (
+                        <CheckCircle2 size={12} className="text-emerald-400" />
+                      ) : isLocked ? (
+                        <Lock size={9} className="text-slate-600" />
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      )}
+                    </div>
+
+                    {/* Day identifier */}
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${
+                      isToday ? 'text-amber-400' : isClaimed ? 'text-emerald-400/80' : 'text-slate-500'
+                    }`}>
+                      Day {item.day}
+                    </span>
+
+                    {/* Day Main Reward Graphic */}
+                    <div className="py-2.5">
+                      {item.isChest ? (
+                        <div className="relative group/chest">
+                          <Trophy 
+                            size={22} 
+                            className={`mx-auto ${isToday ? 'text-amber-400 animate-bounce' : isClaimed ? 'text-emerald-400' : 'text-slate-600'}`} 
+                          />
+                        </div>
+                      ) : (
+                        <Coins 
+                          size={18} 
+                          className={`mx-auto ${isToday ? 'text-yellow-400 animate-pulse' : isClaimed ? 'text-emerald-500' : 'text-slate-600'}`} 
+                        />
+                      )}
+                    </div>
+
+                    {/* Value Badge label */}
+                    <div className="space-y-0.5">
+                      <span className={`text-xs font-black block ${
+                        isToday ? 'text-white' : isClaimed ? 'text-slate-400' : 'text-slate-400'
+                      }`}>
+                        ₦{item.amount}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-500 block">
+                        +{item.xp} XP
+                      </span>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Tab 2: Detailed rewards multiplier benefits */}
+          {activeTab === 'rewards' && (
+            <div className="bg-slate-900/40 rounded-2xl border border-slate-800 p-4 space-y-3.5">
+              <h5 className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Trophy size={14} className="text-amber-400" /> High Loyalty Booster Multipliers
+              </h5>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5">
+                    <span className="text-slate-400 font-medium">Standard Daily Base</span>
+                    <span className="text-white font-black">₦50.00 / 20 XP</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5">
+                    <span className="text-slate-400 font-medium">Peak High Yield (Day 6)</span>
+                    <span className="text-amber-400 font-black">₦155.00 / 60 XP</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-amber-400/20">
+                    <span className="text-amber-400 font-extrabold">Day 7 Grand Reward</span>
+                    <span className="text-yellow-300 font-black">₦250.00 + 120 XP 👑</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium italic pl-1 leading-normal">
+                    * The absolute cycle restarts automatically immediately upon Day 7 claim execution. Or breaks instantly if you miss any daily check-in sequence slot.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reward Status Progress Strip */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <span>7-Day Progress Goal</span>
+              <span className="text-amber-400">{Math.round((cycleDayNumber / 7) * 100)}% Complete</span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${(cycleDayNumber / 7) * 100}%` }}
+                className="h-full bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-300 rounded-full"
+              />
+            </div>
+          </div>
+
+          {/* Action Trigger Button */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+            <div className="flex items-center gap-2.5 text-slate-400">
+              <Clock size={16} className="text-slate-500" />
+              <div className="text-left">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Last Check-In Time</p>
+                <p className="text-xs font-bold text-slate-300 italic">
+                  {lastCheckInTime ? lastCheckInTime.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : "Never Claimed"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleCheckIn}
+              disabled={!canCheckIn || loading}
+              className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all text-center flex items-center justify-center gap-2 group/btn ${
+                canCheckIn 
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg shadow-orange-500/10 active:scale-98" 
+                  : "bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed"
+              }`}
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+              ) : canCheckIn ? (
+                <>
+                  Claim Day {cycleDayNumber} Reward (+₦{currentReward.amount})
+                  <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                </>
+              ) : (
+                "Today's Reward Secured ✓"
+              )}
+            </button>
+          </div>
+
         </div>
       </motion.div>
 
+      {/* Success Reward Celebration Backdrop Modal */}
       <AnimatePresence>
         {showReward && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-sm bg-black/40">
+          <div className="fixed inset-0 z-[2002] flex items-center justify-center p-6 backdrop-blur-md bg-slate-950/80">
+            {/* Inject live celebratory particles inside the modal bounds container */}
+            <Confetti />
+            
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-              className="bg-white rounded-[3rem] p-8 max-w-xs w-full text-center space-y-6 relative overflow-hidden"
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              className="bg-[#020617] border border-slate-800 rounded-[3rem] p-8 max-w-sm w-full text-center space-y-6 relative overflow-hidden"
             >
-              <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-emerald-50 to-white -z-10" />
+              {/* Decorative radial gradients */}
+              <div className="absolute top-0 left-0 w-full h-36 bg-gradient-to-b from-amber-500/10 to-transparent -z-10" />
               
-              <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-emerald-200 relative">
-                <Sparkles size={40} className="text-white" />
+              <div className="w-22 h-22 bg-gradient-to-tr from-amber-500 to-yellow-400 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-amber-500/20 relative">
+                <Sparkles size={40} className="text-slate-950 animate-pulse" />
                 <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                    className="absolute inset-0 border-2 border-white/30 rounded-3xl border-dashed"
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 6, ease: "linear" }}
+                  className="absolute inset-2 border border-white/40 rounded-2xl border-dashed"
                 />
               </div>
 
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900">Success!</h3>
-                <p className="text-slate-500 text-sm font-medium">
-                  You've successfully claimed your daily reward and earned <span className="text-emerald-600 font-bold">₦50.00</span>
+              <div className="space-y-1.5">
+                <h3 className="text-2xl font-black text-white tracking-tight">Claim Succeeded!</h3>
+                <p className="text-slate-400 text-xs">
+                  Your Day {cycleDayNumber} reward has been securely added to your cleared earnings:
                 </p>
+                <div className="text-2xl font-black text-amber-400 py-1">
+                  +₦{currentReward.amount}.00
+                </div>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-center gap-3">
+              {/* Bonus logs visual audit trail block */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 flex items-center justify-center gap-4">
                 <div className="flex flex-col items-center">
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Bonus</p>
-                    <p className="font-black text-slate-900">+₦50</p>
+                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-widest">Added Funds</p>
+                  <p className="font-extrabold text-white text-sm">₦{currentReward.amount}</p>
                 </div>
-                <div className="w-[1px] h-8 bg-slate-200" />
+                <div className="w-px h-8 bg-slate-850" />
                 <div className="flex flex-col items-center">
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Exp</p>
-                    <p className="font-black text-blue-600">+25 XP</p>
+                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-widest">Growth Exp</p>
+                  <p className="font-extrabold text-blue-400 text-sm">+{currentReward.xp} XP</p>
+                </div>
+                <div className="w-px h-8 bg-slate-850" />
+                <div className="flex flex-col items-center">
+                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-widest">Active Streak</p>
+                  <p className="font-extrabold text-amber-400 text-sm">{rawStreak} Days</p>
+                </div>
+              </div>
+
+              {/* Next Day teaser motivator box */}
+              {cycleIndex < 6 && (
+                <div className="bg-slate-900/30 p-3 rounded-xl border border-white/5 text-[10px] text-slate-400 font-medium leading-relaxed">
+                  🔥 Keep up your streak to claim <span className="text-white font-extrabold">₦{DAILY_REWARDS[cycleIndex + 1]?.amount}.00</span> on Day {(cycleIndex + 2)}!
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowReward(false)}
+                className="w-full bg-white text-slate-950 py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-xl hover:bg-slate-100"
+              >
+                Let me Earn more!
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Daily streak Rules explanations Modal */}
+      <AnimatePresence>
+        {showRuleModal && (
+          <div className="fixed inset-0 z-[2002] flex items-center justify-center p-6 backdrop-blur-md bg-slate-950/80">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#020617] border border-slate-850 rounded-[3rem] p-7 max-w-sm w-full space-y-5 relative"
+            >
+              <button 
+                onClick={() => setShowRuleModal(false)}
+                className="absolute top-5 right-5 p-1.5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="space-y-1">
+                <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
+                  <Trophy size={18} className="text-amber-400" /> Streak Rewards Policy
+                </h3>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-extrabold">Increase retention, maximize payouts</p>
+              </div>
+
+              <div className="space-y-3.5 text-slate-300 text-xs leading-relaxed max-h-[300px] overflow-y-auto pr-1">
+                <div className="flex gap-2.5">
+                  <div className="font-extrabold text-amber-400">01.</div>
+                  <p>Check in every <span className="text-white font-bold">24 calendar hours</span> (same day slots) to keep your streak count alive.</p>
+                </div>
+                <div className="flex gap-2.5">
+                  <div className="font-extrabold text-amber-400">02.</div>
+                  <p>Failing to open and check in before the active day ends breaks the consecutive sequence. Your streak automatically reverts back to Day 1.</p>
+                </div>
+                <div className="flex gap-2.5">
+                  <div className="font-extrabold text-amber-400">03.</div>
+                  <p>XP values awarded during daily claims help upgrade your account tier rank, multiplying other system payouts (Surveys, Follow actions, and Video play ads).</p>
+                </div>
+                <div className="flex gap-2.5">
+                  <div className="font-extrabold text-amber-400">04.</div>
+                  <p>Bonus payouts are distributed immediately to high-security cleared <span className="text-emerald-400 font-bold">withdrawable balance</span> ledger books.</p>
                 </div>
               </div>
 
               <button
-                onClick={() => setShowReward(false)}
-                className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all shadow-xl"
+                onClick={() => setShowRuleModal(false)}
+                className="w-full bg-slate-900 border border-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
               >
-                Awesome!
+                I understand the rules
               </button>
             </motion.div>
           </div>

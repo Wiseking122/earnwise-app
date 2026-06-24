@@ -3,9 +3,11 @@ import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp }
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Bell, X, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function NotificationList({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
@@ -87,7 +89,13 @@ export default function NotificationList({ onClose }: { onClose: () => void }) {
             return (
               <div 
                 key={n.id} 
-                onClick={() => !isRead && markAsRead(n)}
+                onClick={async () => {
+                  if (!isRead) await markAsRead(n);
+                  if (n.actionUrl) {
+                    onClose();
+                    navigate(n.actionUrl);
+                  }
+                }}
                 className={`p-4 border-b border-gray-50 cursor-pointer transition-colors relative group ${isRead ? 'bg-white opacity-60' : 'bg-blue-50/40'}`}
               >
                 {!isRead && (
