@@ -181,7 +181,8 @@ async function startServer() {
   app.use(cors({
     origin: [
       'http://localhost:5173',
-      'https://earnwise1.vercel.app'
+      'https://earnwise1.vercel.app',
+      'https://ais-dev-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'
     ],
     credentials: true
   }));

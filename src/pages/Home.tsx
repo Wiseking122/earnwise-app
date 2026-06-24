@@ -143,7 +143,7 @@ export default function Home() {
     setShowInsightsModal(true);
     setAiInsightsError(null);
     try {
-      const res = await fetch('/api/v1/ai/smart-insights', {
+      const res = await fetch('https://earnwise-o30u.onrender.com/api/ai/insights', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json' 
