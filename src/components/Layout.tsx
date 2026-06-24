@@ -24,6 +24,7 @@ import { Logo } from './Logo';
 import InstallModal from './InstallModal';
 import NotificationPanel from './NotificationPanel';
 import { playNotificationSound } from '../pages/sounds';
+import TransactionReceipt from './TransactionReceipt';
 
 interface LayoutProps {
   children: ReactNode;
@@ -37,6 +38,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
   const { profile, user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotifs, setHasNewNotifs] = useState(false);
+  const [activeReceipt, setActiveReceipt] = useState<any>(null);
   const lastNotifId = useRef<string | null>(null);
   const isInitialLoad = useRef(true);
 
@@ -141,6 +143,78 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
     return unsub;
   }, [user]);
 
+  // Global Completed Withdrawal Transaction Listener (for automatic receipt pop-up)
+  useEffect(() => {
+    if (!user) return;
+
+    const getSeenIds = (): string[] => {
+      try {
+        const stored = localStorage.getItem('earnwise_seen_receipts');
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const addSeenId = (id: string) => {
+      try {
+        const current = getSeenIds();
+        if (!current.includes(id)) {
+          localStorage.setItem('earnwise_seen_receipts', JSON.stringify([...current, id]));
+        }
+      } catch (err) {
+        console.error("Error storing seen receipt ID:", err);
+      }
+    };
+
+    const q = query(
+      collection(db, 'transactions'),
+      where('userId', '==', user.uid),
+      where('type', '==', 'withdrawal'),
+      where('status', '==', 'completed')
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const seenIds = getSeenIds();
+      let newReceiptToPop: any = null;
+
+      snap.docs.forEach((doc) => {
+        const txId = doc.id;
+        const data = doc.data();
+
+        if (seenIds.includes(txId)) return;
+
+        // Check if transaction is recent (within 5 minutes)
+        const createdAtMs = data.createdAt?.toMillis?.() || Date.now();
+        const isRecent = (Date.now() - createdAtMs) < 5 * 60 * 1000;
+
+        if (isRecent) {
+          newReceiptToPop = {
+            id: txId,
+            amount: data.amount,
+            fee: data.receiptDetails?.fee || (data.amount * 0.05),
+            netPayout: data.receiptDetails?.netPayout || (data.amount * 0.95),
+            processedAt: data.createdAt?.toDate?.() || new Date(),
+            bankName: data.receiptDetails?.bankName || 'N/A',
+            accountName: data.receiptDetails?.accountName || 'N/A'
+          };
+        } else {
+          // Silence older ones by marking them seen
+          addSeenId(txId);
+        }
+      });
+
+      if (newReceiptToPop) {
+        setActiveReceipt(newReceiptToPop);
+        addSeenId(newReceiptToPop.id);
+      }
+    }, (err) => {
+      console.warn("Transaction listener error in Layout:", err);
+    });
+
+    return unsub;
+  }, [user]);
+
   const isFree = profile?.plan === 'free' && profile?.role !== 'admin';
 
   const navItems = [
@@ -211,6 +285,13 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       </header>
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
       <InstallModal />
+      
+      {activeReceipt && (
+        <TransactionReceipt 
+          receipt={activeReceipt} 
+          onClose={() => setActiveReceipt(null)} 
+        />
+      )}
       
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-28 scroll-smooth no-scrollbar">

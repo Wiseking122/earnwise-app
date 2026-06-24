@@ -49,6 +49,7 @@ export default function Profile() {
 
   // Daily Encouragement reminder states
   const [triggeringEncouragement, setTriggeringEncouragement] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<any>(null);
   const [triggerSuccess, setTriggerSuccess] = useState(false);
   const [lastEncouragement, setLastEncouragement] = useState<{ headline: string; quote: string; tip: string } | null>(null);
   const [simulatedNotifications, setSimulatedNotifications] = useState<any[]>([]);
@@ -667,24 +668,73 @@ export default function Profile() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {[
-                    { stepIndex: 0, title: '💸 Chapter 1: How to Earn Higher', desc: 'Active compounding systems, team royalties & multiplier scaling.' },
-                    { stepIndex: 1, title: '⚡ Chapter 2: How to Upgrade Tier', desc: 'Bypassing hold times and activating elite withdrawal limits.' },
-                    { stepIndex: 2, title: '🏦 Chapter 3: How to Deposit Funds', desc: 'Secure Paystack Virtual Account gateways and instant balance deposits.' },
-                    { stepIndex: 3, title: '📢 Chapter 4: How to Run Ad Campaigns', desc: 'Multiplying WhatsApp buyer leads and user attraction engines.' },
-                    { stepIndex: 4, title: '🎯 Chapter 5: How to Earn from Tasks', desc: 'Speedrun micro-gigs, and proper compliance validation workflows.' },
-                    { stepIndex: 5, title: '📚 Chapter 6: Sourcing Academy Courses', desc: 'Unlocking high-yield developer, copywriting, and design materials.' }
+                    { 
+                      stepIndex: 0, 
+                      title: '💸 Chapter 1: How to Earn Higher', 
+                      desc: 'Active compounding systems, team royalties & multiplier scaling.',
+                      topicId: 'earn_higher',
+                      headline: "The Compound Earning Framework",
+                      quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
+                      tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 10% cash bonus on all their task approval reserves!"
+                    },
+                    { 
+                      stepIndex: 1, 
+                      title: '⚡ Chapter 2: How to Upgrade Tier', 
+                      desc: 'Bypassing hold times and activating elite withdrawal limits.',
+                      topicId: 'upgrade',
+                      headline: "Level Up Your Task Multipliers",
+                      quote: "Upgraded accounts secure preferential automated validation and unlimited submission limits.",
+                      tip: "Navigate to your Dashboard, click 'Upgrade Tier', and select from the available premium plans. Upgrading instantly increases your task ceiling, grants priority customer support, and shaves withdrawal hold times down to under 10 minutes!"
+                    },
+                    { 
+                      stepIndex: 2, 
+                      title: '🏦 Chapter 3: How to Deposit Funds', 
+                      desc: 'Secure Paystack Virtual Account gateways and instant balance deposits.',
+                      topicId: 'deposit',
+                      headline: "Fund Your Direct Operations Securely",
+                      quote: "Your wallet is the engine that funds advertising budgets and registers course activations.",
+                      tip: "Hover over the Home panel and tap 'Deposit'. Enter your desired amount and click proceed. Our gateway integrates with Paystack, allowing safe bank transfers or card payments instantly. Make sure you copy the single-use virtual account details correctly."
+                    },
+                    { 
+                      stepIndex: 3, 
+                      title: '📢 Chapter 4: How to Run Ad Campaigns', 
+                      desc: 'Multiplying WhatsApp buyer leads and user attraction engines.',
+                      topicId: 'run_ads',
+                      headline: "The Earnwise Self-Serve Advertising Pipeline",
+                      quote: "If you have a great solution, the crowd must hear it. Ads grant you the megaphone.",
+                      tip: "Click on 'Advertise' or 'Create Ad Campaign' in your panel. Choose your daily budget, write a catchy hook, and paste your direct WhatsApp link. Our network of 50,000+ certified Nigerian scholars will begin reviewing and engaging with your campaign within minutes!"
+                    },
+                    { 
+                      stepIndex: 4, 
+                      title: '🎯 Chapter 5: How to Earn from Tasks', 
+                      desc: 'Speedrun micro-gigs, and proper compliance validation workflows.',
+                      topicId: 'earn_tasks',
+                      headline: "The Ultimate Micro-Task Speedrunning Cheat Sheet",
+                      quote: "Success on tasks comes down to speed and unmanipulated compliance proof.",
+                      tip: "Log in around 8 AM and 6 PM when new corporate advertising audits and social follow tasks are assigned. Read task instructions carefully, perform the follow, like, or subscription, and upload the exact screenshot. Our system approves honest submissions instantly!"
+                    },
+                    { 
+                      stepIndex: 5, 
+                      title: '📚 Chapter 6: Sourcing Academy Courses', 
+                      desc: 'Unlocking high-yield developer, copywriting, and design materials.',
+                      topicId: 'buy_course',
+                      headline: "Unlock Permanent High-Yield Strategy Blueprints",
+                      quote: "An investment in knowledge always pays the best interest dividend.",
+                      tip: "Head to the 'Academy' page, browse top blueprints like 'Smartphone Canva & Mobile Design Mastery' or 'WhatsApp Organic Lead Siphon'. Make sure your wallet has sufficient balance, and click 'Enroll Now'. This instantly unlocks the offline lesson plans, strategy guides, and files!"
+                    }
                   ].map((chapter) => {
                     const isPassed = (profile?.coachingStep ?? 0) > chapter.stepIndex;
                     const isActive = (profile?.coachingStep ?? 0) % 6 === chapter.stepIndex;
                     return (
                       <div
                         key={chapter.stepIndex}
-                        className={`border rounded-xl p-4 flex flex-col justify-between transition-all relative overflow-hidden ${
+                        onClick={() => setSelectedLesson(chapter)}
+                        className={`border rounded-xl p-4 flex flex-col justify-between transition-all relative overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-[0.98] duration-300 ${
                           isActive
                             ? 'bg-blue-600/10 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
                             : isPassed
-                            ? 'bg-slate-900/40 border-emerald-500/20 opacity-80'
-                            : 'bg-slate-900/60 border-white/5 opacity-60'
+                            ? 'bg-slate-900/40 border-emerald-500/20 opacity-80 hover:border-emerald-500/40'
+                            : 'bg-slate-900/60 border-white/5 opacity-60 hover:opacity-90'
                         }`}
                       >
                         {isActive && (
@@ -714,6 +764,94 @@ export default function Profile() {
                   })}
                 </div>
               </div>
+
+              {/* Lesson Modal */}
+              <AnimatePresence>
+                {selectedLesson && (
+                  <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setSelectedLesson(null)}
+                      className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                    />
+                    
+                    {/* Modal Card */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                      className="relative bg-slate-900 border border-white/10 rounded-[2.5rem] w-full max-w-lg p-6 md:p-8 shadow-2xl overflow-hidden text-left z-10"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                      
+                      <button
+                        onClick={() => setSelectedLesson(null)}
+                        className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-2xl cursor-pointer"
+                      >
+                        <X size={18} />
+                      </button>
+
+                      <div className="space-y-6">
+                        <div>
+                          <span className="bg-blue-500/10 text-blue-400 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-blue-500/20">
+                            Wise AI Coaching Academy
+                          </span>
+                          <h3 className="text-sm font-display font-black tracking-tight text-white mt-4 uppercase leading-tight">
+                            {selectedLesson.title}
+                          </h3>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">
+                            {selectedLesson.headline}
+                          </p>
+                        </div>
+
+                        <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-4 italic relative overflow-hidden">
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500" />
+                          <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">
+                            "{selectedLesson.quote}"
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Strategic Execution Tip:
+                          </h4>
+                          <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                            {selectedLesson.tip}
+                          </p>
+                        </div>
+
+                        <div className="pt-4 flex flex-col sm:flex-row gap-3">
+                          <button
+                            onClick={async () => {
+                              if (triggeringEncouragement) return;
+                              await handleTriggerSpecificTopic(selectedLesson.topicId);
+                            }}
+                            disabled={triggeringEncouragement}
+                            className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black py-4 px-6 rounded-2xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 cursor-pointer"
+                          >
+                            {triggeringEncouragement ? (
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <Mail size={14} /> Deliver Lesson Instantly
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setSelectedLesson(null)}
+                            className="sm:w-32 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white font-black py-4 px-6 rounded-2xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center border border-white/5 cursor-pointer"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
 
               {/* Animated Simulated Mobile Device Frame inside preview */}
               <div className="space-y-4 pt-4 border-t border-white/5 text-left">

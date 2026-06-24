@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { updateDoc, doc, collection, query, where, limit, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { updateDoc, doc, collection, query, where, limit, onSnapshot, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -56,6 +56,8 @@ export default function Withdrawal() {
   const [timeRemainingStr, setTimeRemainingStr] = useState('');
   const [isWindowOpen, setIsWindowOpen] = useState(false);
 
+  const [isSavingBank, setIsSavingBank] = useState(false);
+
   // Poll system setting payouts variables
   useEffect(() => {
     if (!profile) return;
@@ -83,11 +85,27 @@ export default function Withdrawal() {
       const isTaskOverride = !!payoutSettings?.taskOverrideOpen;
       const isReferralOverride = !!payoutSettings?.referralOverrideOpen;
       
+      let customScheduleStr = '';
+      const isCustomScheduleActive = (() => {
+        if (!payoutSettings?.payoutStartDate || !payoutSettings?.payoutEndDate) return false;
+        const start = new Date(payoutSettings.payoutStartDate);
+        const end = new Date(payoutSettings.payoutEndDate);
+        if (now >= start && now <= end) {
+          const hoursLeft = Math.max(0, Math.floor((end.getTime() - now.getTime()) / (1000 * 60 * 60)));
+          customScheduleStr = `Scheduled Window Active (${hoursLeft}h left)`;
+          return true;
+        }
+        return false;
+      })();
+      
       if (withdrawalType === 'task') {
         const is30th = now.getDate() === 30;
         if (isTaskOverride) {
           setIsWindowOpen(true);
           setTimeRemainingStr('🔓 Special Admin Task Withdrawal Window Active!');
+        } else if (isCustomScheduleActive) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('📅 ' + customScheduleStr);
         } else if (is30th) {
           setIsWindowOpen(true);
           setTimeRemainingStr('Task Payout Window Active (Ends Midnight)');
@@ -103,6 +121,9 @@ export default function Withdrawal() {
         if (isReferralOverride) {
           setIsWindowOpen(true);
           setTimeRemainingStr('🔓 Special Admin Referral Withdrawal Window Active!');
+        } else if (isCustomScheduleActive) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('📅 ' + customScheduleStr);
         } else if (isSaturday && isOpenHours) {
           setIsWindowOpen(true);
           setTimeRemainingStr('Referral Payout Window Active (Ends 6:00 PM)');
@@ -150,7 +171,7 @@ export default function Withdrawal() {
   // Cumulative pending requests to dodge double-spend attempts
   const getPendingWithdrawalTotal = (type: 'task' | 'referral') => {
     return withdrawals
-      .filter(w => w.status === 'pending' && w.withdrawalType === type)
+      .filter(w => w.status === 'pending' && w.withdrawalType === type && !(w as any).deductedAtRequest)
       .reduce((sum, w) => sum + w.amount, 0);
   };
 
@@ -164,7 +185,8 @@ export default function Withdrawal() {
         setResolvingName(true);
         setResolveFeedback('');
         try {
-          const response = await axios.get('/api/paystack/resolve', {
+          const apiUrl = (import.meta as any).env.VITE_API_URL || '';
+          const response = await axios.get(`${apiUrl}/api/paystack/resolve`, {
             params: { accountNumber: cleanNum, bankCode }
           });
           if (!isCurrent) return;
@@ -223,7 +245,8 @@ export default function Withdrawal() {
   useEffect(() => {
     async function fetchBanks() {
       try {
-        const response = await axios.get('/api/paystack/banks');
+        const apiUrl = (import.meta as any).env.VITE_API_URL || '';
+        const response = await axios.get(`${apiUrl}/api/paystack/banks`);
         if (response.data.status) {
           setBanks(response.data.data);
         }
@@ -233,6 +256,27 @@ export default function Withdrawal() {
     }
     fetchBanks();
   }, []);
+
+  const handleSaveBankDetails = async () => {
+    if (!profile) return;
+    if (!bankCode || !accountNumber || !accountName) {
+      setError('Please fill in all bank details to save');
+      return;
+    }
+    setIsSavingBank(true);
+    setError('');
+    try {
+      await updateDoc(doc(db, 'users', profile.uid), {
+        bankDetails: { bankName, bankCode, accountNumber, accountName }
+      });
+      setResolveFeedback('Bank details updated securely');
+    } catch (err: any) {
+      console.error("Failed to save bank details", err);
+      setError("Failed to save bank details");
+    } finally {
+      setIsSavingBank(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,14 +296,15 @@ export default function Withdrawal() {
 
     // Check Plan Cap Limit for Window
     const plan = profile.plan || 'free';
-    const cap = getPlanWithdrawalCap(plan);
-    if (plan === 'free' || cap === 0) {
+    const isAdmin = profile.role === 'admin';
+    const cap = isAdmin ? 1000000000 : getPlanWithdrawalCap(plan);
+    if (!isAdmin && (plan === 'free' || cap === 0)) {
       setError('Free plans do not have payout capacity. Please upgrade to a verified plan.');
       return;
     }
 
     const currentWindowRequests = getCumulativeWithdrawalsInWindow();
-    if (currentWindowRequests + withdrawAmount > cap) {
+    if (!isAdmin && (currentWindowRequests + withdrawAmount > cap)) {
       setError(`Payout request exceeds your plan's window limit. Your maximum window capacity is ₦${cap.toLocaleString()}, and you have already requested ₦${currentWindowRequests.toLocaleString()} in this session.`);
       return;
     }
@@ -286,20 +331,55 @@ export default function Withdrawal() {
     setError('');
 
     try {
-      // 1. Save user bank information for future requests
-      await updateDoc(doc(db, 'users', profile.uid), {
-        bankDetails: { bankName, bankCode, accountNumber, accountName }
-      });
+      // Submit manual payout request & deduct balance atomically via a transaction
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', profile.uid);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("Your user profile was not found.");
+        }
 
-      // 2. Submit new pending manual payout request directly to firestore
-      const newWithdrawalRef = doc(collection(db, 'withdrawals'));
-      await setDoc(newWithdrawalRef, {
-        userId: profile.uid,
-        amount: withdrawAmount,
-        status: 'pending',
-        withdrawalType,
-        bankDetails: { bankName, bankCode, accountNumber, accountName },
-        requestedAt: serverTimestamp()
+        const userData = userSnap.data();
+        const freshWalletBalance = withdrawalType === 'task' 
+          ? (userData.taskBalance || 0) 
+          : (userData.referralBalance || 0);
+
+        // Calculate available funds taking legacy (undeducted) pending ones into account
+        const freshPendingTotal = withdrawals
+          .filter(w => w.status === 'pending' && w.withdrawalType === withdrawalType && !(w as any).deductedAtRequest)
+          .reduce((sum, w) => sum + w.amount, 0);
+        
+        const freshAvailable = Math.max(0, freshWalletBalance - freshPendingTotal);
+
+        if (withdrawAmount > freshAvailable) {
+          throw new Error(`Insufficient funds. Your fresh available balance is ₦${freshAvailable.toLocaleString()}.`);
+        }
+
+        // Deduct balances immediately
+        const walletField = withdrawalType === 'task' ? 'taskBalance' : 'referralBalance';
+        const updatedWalletBalance = freshWalletBalance - withdrawAmount;
+        const updatedWithdrawableBalance = Math.max(0, (userData.withdrawableBalance || 0) - withdrawAmount);
+        const updatedTotalBalance = Math.max(0, (userData.balance || 0) - withdrawAmount);
+
+        // Update user balances and bankDetails
+        transaction.update(userRef, {
+          bankDetails: { bankName, bankCode, accountNumber, accountName },
+          [walletField]: updatedWalletBalance,
+          withdrawableBalance: updatedWithdrawableBalance,
+          balance: updatedTotalBalance
+        });
+
+        // Set the pending withdrawal document
+        const newWithdrawalRef = doc(collection(db, 'withdrawals'));
+        transaction.set(newWithdrawalRef, {
+          userId: profile.uid,
+          amount: withdrawAmount,
+          status: 'pending',
+          withdrawalType,
+          bankDetails: { bankName, bankCode, accountNumber, accountName },
+          requestedAt: serverTimestamp(),
+          deductedAtRequest: true
+        });
       });
 
       setSuccess(true);
@@ -312,7 +392,8 @@ export default function Withdrawal() {
     }
   };
 
-  const planCap = getPlanWithdrawalCap(profile?.plan || 'free');
+  const isAdminUser = profile?.role === 'admin';
+  const planCap = isAdminUser ? 1000000000 : getPlanWithdrawalCap(profile?.plan || 'free');
   const currentWindowRequestsTotal = getCumulativeWithdrawalsInWindow();
 
   const filteredBanks = banks.filter(bank =>
@@ -410,7 +491,7 @@ export default function Withdrawal() {
                 </div>
 
                 <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider pt-2 border-t border-white/5">
-                  <span>Current Cap: ₦{planCap.toLocaleString()} ({profile?.plan || 'free'} tier)</span>
+                  <span>Current Cap: {isAdminUser ? "Unlimited (Admin Bypass)" : `₦${planCap.toLocaleString()} (${profile?.plan || 'free'} tier)`}</span>
                   <span>Session Requested: ₦{currentWindowRequestsTotal.toLocaleString()}</span>
                 </div>
               </div>
@@ -420,9 +501,8 @@ export default function Withdrawal() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                disabled={!isWindowOpen}
                 onClick={() => setWithdrawalType('task')}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden disabled:opacity-50 ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
                   withdrawalType === 'task' 
                     ? 'bg-blue-600 border-blue-500 text-white shadow-xl scale-[1.02]' 
                     : 'bg-white border-slate-100 text-slate-900 hover:border-blue-200'
@@ -446,9 +526,8 @@ export default function Withdrawal() {
 
               <button
                 type="button"
-                disabled={!isWindowOpen}
                 onClick={() => setWithdrawalType('referral')}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden disabled:opacity-50 ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
                   withdrawalType === 'referral' 
                     ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl scale-[1.02]' 
                     : 'bg-white border-slate-100 text-slate-900 hover:border-emerald-200'
@@ -482,7 +561,6 @@ export default function Withdrawal() {
                     required
                     min="1000"
                     step="0.01"
-                    disabled={!isWindowOpen}
                     className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
@@ -496,7 +574,17 @@ export default function Withdrawal() {
               </div>
 
               <div className="space-y-4 text-left">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Ledger Information</h3>
+                <div className="flex items-center justify-between px-4">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Ledger Information</h3>
+                  <button
+                    type="button"
+                    onClick={handleSaveBankDetails}
+                    disabled={isSavingBank || !bankCode || !accountNumber || !accountName || resolvingName}
+                    className="text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                  >
+                    {isSavingBank ? 'Saving...' : 'Save Details'}
+                  </button>
+                </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
                   <div className="space-y-1.5 relative">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Target Bank</label>
@@ -504,7 +592,6 @@ export default function Withdrawal() {
                       {/* Trigger Button */}
                       <button
                         type="button"
-                        disabled={!isWindowOpen}
                         onClick={() => {
                           setIsOpenBankDropdown(!isOpenBankDropdown);
                           setBankSearch('');
@@ -597,7 +684,6 @@ export default function Withdrawal() {
                         type="text" 
                         placeholder="Enter 10-digit account number"
                         required
-                        disabled={!isWindowOpen}
                         className="w-full bg-slate-50 border border-slate-250 rounded-xl py-3 pl-11 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
@@ -626,7 +712,7 @@ export default function Withdrawal() {
                         type="text" 
                         placeholder={resolvingName ? "Querying secure gateway..." : "Full name as on bank record"}
                         required
-                        disabled={!isWindowOpen || resolvingName}
+                        disabled={resolvingName}
                         className={`w-full bg-slate-50 border-none rounded-xl py-3 pl-11 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
                           resolvingName ? 'opacity-70 cursor-wait select-none' : ''
                         }`}

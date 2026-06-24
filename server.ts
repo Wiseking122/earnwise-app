@@ -737,7 +737,8 @@ async function startServer() {
               message: `${selectedTopic.quote} 👉 Tip: ${selectedTopic.tip}`,
               type: 'reward',
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              readBy: []
+              readBy: [],
+              read: false
             })
           );
 
@@ -990,6 +991,82 @@ async function startServer() {
     } catch (err: any) {
       console.error("[ADMIN] Manual coaching trigger failed:", err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/send-payout-email", async (req, res) => {
+    const { email, name, amount, netPayout, fee, withdrawalId, bankName, accountName, accountNumber } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        await transporter.sendMail({
+          from: `"Earnwise Payouts" <${process.env.EMAIL_USER}>`,
+          to: email,
+          replyTo: 'earnwise29@gmail.com',
+          subject: `💸 Payout Approved & Processed - ₦${Number(netPayout).toLocaleString()}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
+              <div style="text-align: center; margin-bottom: 25px;">
+                <h1 style="color: #10b981; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Payout Approved</h1>
+                <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Transaction Successful • Reference: #${withdrawalId ? withdrawalId.slice(0, 8) : ''}</p>
+              </div>
+              
+              <div style="background-color: #ecfdf5; border-left: 5px solid #10b981; padding: 20px; border-radius: 12px; margin: 25px 0; text-align: center;">
+                <h3 style="margin-top: 0; color: #065f46; font-size: 14px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 5px;">Net Credit Amount</h3>
+                <h2 style="color: #047857; font-size: 32px; font-weight: 900; margin: 0;">₦${Number(netPayout).toLocaleString()}</h2>
+              </div>
+
+              <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
+                <h4 style="margin-top: 0; color: #1e293b; font-size: 13px; text-transform: uppercase; font-weight: 800; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">Transaction Details</h4>
+                <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                  <tr style="height: 30px;">
+                    <td style="color: #64748b; font-weight: 500;">Beneficiary</td>
+                    <td style="color: #1e293b; font-weight: 700; text-align: right;">${name || 'Earner'}</td>
+                  </tr>
+                  <tr style="height: 30px;">
+                    <td style="color: #64748b; font-weight: 500;">Bank Name</td>
+                    <td style="color: #1e293b; font-weight: 700; text-align: right;">${bankName || 'N/A'}</td>
+                  </tr>
+                  <tr style="height: 30px;">
+                    <td style="color: #64748b; font-weight: 500;">Account Number</td>
+                    <td style="color: #1e293b; font-weight: 700; text-align: right;">${accountNumber || 'N/A'}</td>
+                  </tr>
+                  <tr style="height: 30px;">
+                    <td style="color: #64748b; font-weight: 500;">Gross Amount</td>
+                    <td style="color: #1e293b; font-weight: 700; text-align: right;">₦${Number(amount).toLocaleString()}</td>
+                  </tr>
+                  <tr style="height: 30px;">
+                    <td style="color: #64748b; font-weight: 500;">Processing Fee (5%)</td>
+                    <td style="color: #e11d48; font-weight: 700; text-align: right;">-₦${Number(fee).toLocaleString()}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <p style="color: #475569; font-size: 14px; margin-bottom: 15px;">Your digital earner proof receipt is ready. Share it on your status to earn referrals!</p>
+                <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}/earnings" style="background-color: #10b981; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); text-transform: uppercase;">Download Proof Receipt</a>
+              </div>
+
+              <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                <p style="color: #94a3b8; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Earnwise Elite Financial Protocol</p>
+                <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">If you did not initiate this transaction, please contact support immediately.</p>
+              </div>
+            </div>
+          `
+        });
+        console.log(`[PAYOUT-EMAIL] Successfully sent payout approved email via SMTP to ${email}`);
+        return res.json({ status: "success", message: "Email sent successfully" });
+      } else {
+        console.warn(`[PAYOUT-EMAIL] EMAIL_USER/EMAIL_PASS not configured. Email simulated for ${email}.`);
+        return res.json({ status: "success", message: "Email simulation complete (credentials missing)" });
+      }
+    } catch (err: any) {
+      console.error("[PAYOUT-EMAIL] Failed to send payout approval email:", err);
+      return res.status(500).json({ error: err.message });
     }
   });
 
@@ -1301,7 +1378,6 @@ Respond STRICTLY in JSON:
       }
       res.json(data);
     } catch (error: any) {
-      console.warn("AI Insights Error details (sending beautiful fallback data):", error.message || error);
       const fallbackInsights = {
         prediction: `₦${Number(balance || 0) + 2500} estimate based on task completion and referral multipliers.`,
         insights: [
@@ -2191,7 +2267,7 @@ Provide your response strictly in the JSON format requested.`;
       });
       res.json(response.data);
     } catch (error: any) {
-      console.error("Fetch banks error, using offline bank list fallback:", error.response?.data || error.message);
+      console.warn("Using offline bank list fallback due to API issue.");
       res.json(fallbackBanks);
     }
   });
@@ -2226,14 +2302,13 @@ Provide your response strictly in the JSON format requested.`;
     } catch (error: any) {
       const paystackData = error.response?.data;
       if (error.response?.status === 422) {
-        console.warn(`[PAYMENT] Account resolution validation mismatch (accountNumber: ${accountNumber}, bankCode: ${bankCode}):`, paystackData?.message || "Verification mismatch");
+        console.warn(`[PAYMENT] Account resolution validation mismatch (accountNumber: ${accountNumber}, bankCode: ${bankCode})`);
         return res.status(422).json({
           status: "failed",
           type: "validation_error",
           error: paystackData?.message || "Could not resolve account name. Please check selection."
         });
       }
-      console.error("Resolve account error:", paystackData || error.message);
       // Give simulated fallback instead of failing completely if Paystack is rate-limited/failing
       console.warn("[PAYMENT] Resolve failed, serving simulated resolve fallback.");
       res.json({
@@ -2589,7 +2664,8 @@ Provide your response strictly in the JSON format requested.`;
             message: `${selectedTopic.quote} 👉 Today's tip: ${selectedTopic.tip}`,
             type: 'reward',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            readBy: []
+            readBy: [],
+            read: false
           });
           console.log(`[AUTH] In-app notification created for ${userId}`);
           storedServerSide = true;
@@ -2703,7 +2779,8 @@ Provide your response strictly in the JSON format requested.`;
       if (!userData || userData.balance < amount) {
         return res.status(400).json({ error: "Insufficient balance" });
       }
-      if (!userData.plan || userData.plan === 'free') {
+      const isAdmin = userData.role === 'admin';
+      if (!isAdmin && (!userData.plan || userData.plan === 'free')) {
         return res.status(400).json({ error: "Upgrade your plan to start withdrawing." });
       }
 

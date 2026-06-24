@@ -156,6 +156,8 @@ export default function AdminPayments() {
 
   const handleAction = async (request: WithdrawalRequest, action: 'approved' | 'rejected' | 'completed') => {
     try {
+      const wasDeducted = (request as any).deductedAtRequest || false;
+
       if (action === 'approved') {
         await runTransaction(db, async (transaction) => {
           const withRef = doc(db, 'withdrawals', request.id);
@@ -171,18 +173,22 @@ export default function AdminPayments() {
           const uWalletBalance = uData[walletField] || 0;
           const currentWithdrawable = uData.withdrawableBalance || 0;
 
-          if (uWalletBalance < request.amount) {
-            throw new Error(`Insufficient user ${isReferral ? 'Referral' : 'Task'} balance for approval.`);
-          }
-          if (currentWithdrawable < request.amount) {
-            throw new Error("Insufficient user overall withdrawable balance for approval.");
+          if (!wasDeducted) {
+            // Legacy requests require balance check and deduction on approval
+            if (uWalletBalance < request.amount) {
+              throw new Error(`Insufficient user ${isReferral ? 'Referral' : 'Task'} balance for approval.`);
+            }
+            if (currentWithdrawable < request.amount) {
+              throw new Error("Insufficient user overall withdrawable balance for approval.");
+            }
+            transaction.update(userRef, { 
+              [walletField]: uWalletBalance - request.amount,
+              withdrawableBalance: currentWithdrawable - request.amount,
+              balance: (uData.balance || 0) - request.amount
+            });
           }
 
           transaction.update(withRef, { status: 'approved', processedAt: serverTimestamp() });
-          transaction.update(userRef, { 
-            [walletField]: uWalletBalance - request.amount,
-            withdrawableBalance: currentWithdrawable - request.amount
-          });
 
           // Transaction log
           const transRef = doc(collection(db, 'transactions'));
@@ -212,8 +218,26 @@ export default function AdminPayments() {
             actionUrl: `/earnings?receipt=${transRef.id}`
           });
 
-          // USER INTENT GUARDIAN: Placeholder comment for EmailJS confirmation message to user upon approval
+          // USER INTENT GUARDIAN: Email confirmation message to user upon approval via backend + EmailJS
           try {
+            // Trigger server-side Nodemailer email (extremely robust and works without client-side setup)
+            fetch('/api/admin/send-payout-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: uData.email,
+                name: uData.displayName || `${uData.firstName || ''} ${uData.lastName || ''}`.trim() || "Earner",
+                amount: request.amount,
+                netPayout: request.amount * 0.95,
+                fee: request.amount * 0.05,
+                withdrawalId: request.id,
+                bankName: request.bankDetails?.bankName,
+                accountName: request.bankDetails?.accountName,
+                accountNumber: request.bankDetails?.accountNumber
+              })
+            }).catch(fetchErr => console.warn("Backend payout email fetch error:", fetchErr));
+
+            // Legacy EmailJS delivery fallback
             const emailPublicKey = (import.meta as any).env.VITE_EMAILJS_PUBLIC_KEY || 'dummy_key';
             const emailServiceId = (import.meta as any).env.VITE_EMAILJS_SERVICE_ID || 'default_service';
             const emailTemplateId = (import.meta as any).env.VITE_EMAILJS_TEMPLATE_ID || 'template_payout_receipt';
@@ -232,6 +256,39 @@ export default function AdminPayments() {
           } catch(emailErr) {
             console.warn("Could not dispatch email:", emailErr);
           }
+        });
+      } else if (action === 'rejected') {
+        await runTransaction(db, async (transaction) => {
+          const withRef = doc(db, 'withdrawals', request.id);
+          const userRef = doc(db, 'users', request.userId);
+          
+          const userSnap = await transaction.get(userRef);
+          if (!userSnap.exists()) throw new Error("User not found");
+          
+          const uData = userSnap.data();
+          
+          if (wasDeducted) {
+            // Refund the pre-deducted balance
+            const isReferral = request.withdrawalType === 'referral';
+            const walletField = isReferral ? 'referralBalance' : 'taskBalance';
+            
+            transaction.update(userRef, {
+              [walletField]: (uData[walletField] || 0) + request.amount,
+              withdrawableBalance: (uData.withdrawableBalance || 0) + request.amount,
+              balance: (uData.balance || 0) + request.amount
+            });
+          }
+
+          transaction.update(withRef, { status: 'rejected', processedAt: serverTimestamp() });
+
+          // Send rejection notification
+          transaction.set(doc(collection(db, 'notifications')), {
+            userId: request.userId,
+            title: '❌ Payout Rejected',
+            message: `Your withdrawal request of ₦${request.amount.toLocaleString()} was rejected and the funds have been returned to your balance.`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
         });
       } else {
         await updateDoc(doc(db, 'withdrawals', request.id), { 
@@ -318,21 +375,21 @@ export default function AdminPayments() {
                 onClick={() => saveControls({ taskOverrideOpen: !controls.taskOverrideOpen })}
                 className={`flex-1 min-w-[120px] px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
                   controls.taskOverrideOpen 
-                    ? 'bg-blue-600 text-white shadow-md animate-pulse' 
-                    : 'bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20'
+                    ? 'bg-emerald-600 text-white shadow-md animate-pulse' 
+                    : 'bg-slate-700 text-slate-300 border border-slate-600 hover:bg-slate-600'
                 }`}
               >
-                {controls.taskOverrideOpen ? '🔓 Task Override' : '🔒 Force Open Task Withdrawals'}
+                {controls.taskOverrideOpen ? '🔓 Task Withdrawals OPEN' : '🔒 Tasks Closed (Click to Open)'}
               </button>
               <button
                 onClick={() => saveControls({ referralOverrideOpen: !controls.referralOverrideOpen })}
                 className={`flex-1 min-w-[120px] px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
                   controls.referralOverrideOpen 
-                    ? 'bg-blue-600 text-white shadow-md animate-pulse' 
-                    : 'bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20'
+                    ? 'bg-emerald-600 text-white shadow-md animate-pulse' 
+                    : 'bg-slate-700 text-slate-300 border border-slate-600 hover:bg-slate-600'
                 }`}
               >
-                {controls.referralOverrideOpen ? '🔓 Referral Override' : '🔒 Force Open Referral Withdrawals'}
+                {controls.referralOverrideOpen ? '🔓 Referral Withdrawals OPEN' : '🔒 Referrals Closed (Click to Open)'}
               </button>
               
               {/* Kill Switch Toggle */}
@@ -341,10 +398,10 @@ export default function AdminPayments() {
                 className={`flex-1 min-w-[120px] px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
                   controls.payoutsForceClosed 
                     ? 'bg-rose-600 text-white animate-pulse shadow-md' 
-                    : 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30'
+                    : 'bg-slate-700 text-slate-300 border border-slate-600 hover:bg-slate-600'
                 }`}
               >
-                {controls.payoutsForceClosed ? '🔴 Shield Activated' : '🟢 Gateway Open'}
+                {controls.payoutsForceClosed ? '🔴 Shield Active (Click to Disable)' : '🟢 Gateway Open (Click to Shield)'}
               </button>
             </div>
           </div>
