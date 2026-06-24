@@ -1,0 +1,93 @@
+18:import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
+35:  firebaseApp = admin.apps.find(app => app?.name === 'earnwise-app') || admin.initializeApp({
+36:    credential: credential || admin.credential.applicationDefault(),
+38:  }, 'earnwise-app');
+40:  console.error("[FIREBASE] Admin App init error, trying default app:", err);
+41:  firebaseApp = admin.apps.length > 0 ? admin.apps[0] : admin.initializeApp({
+42:    credential: admin.credential.applicationDefault(),
+167:  'app_download': 150,
+176:  const app = express();
+177:  app.set('trust proxy', 1);
+178:  app.use(express.json({ limit: '10mb' }));
+390:        const baseUrl = process.env.APP_URL || currentAppUrl || "https://ais-dev-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app";
+441:        ctx.reply("👥 *Refer & Earn Lifetime Commissions*\n\nInvite your friends and earn:\n1. 10% Upgrade Commission when they upgrade\n2. 10% Lifetime Royalty on their earnings\n\nGet your unique link in the app!", {
+473:        ctx.reply("🔑 *Forgot Password?*\n\nTo reset your password:\n1. Open the app login page\n2. Click 'Forgot Password?'\n3. Enter your email to receive a reset link.", {
+482:            type: 'web_app',
+484:            web_app: { url: getWebAppUrl() }
+492:      // Register the commands with Telegram so they appear when typing / in chat
+500:        { command: 'status', description: 'Check app active status' },
+512:          ctx.reply(`🇳🇬 *Welcome to the Earnwise community, ${userName}!* 🎉\n\nYou've just entered Nigeria's #1 digital wealth community. Let's get you set up to start earning real cash daily! 🚀\n\n📖 *YOUR COMPLETE GUIDE TO EARNWISE:*\n\n1️⃣ *Launch the Web App*\nClick the *"💰 Open Earnwise App"* button below (or run /start) and sign in to access your customized dashboard directly inside Telegram.\n\n2️⃣ *Activate Your Plan (Multiply Profits)*\nTo unlock high-paying tasks, head over to the *Upgrade* page. Choose a Tier that fits your goal to multiply your rewards up to 500%:\n• *Elite Tier* (1.25x Earning Multiplier)\n• *Lite Tier* (1.5x Earning Multiplier)\n• *Bronze Tier* (2.0x Earning Multiplier)\n• *Silver Tier* (3.0x Earning Multiplier)\n• *Golden Tier* (5.0x Earning Multiplier) 💎\n\n3️⃣ *Complete Micro-Tasks*\nVisit the **Tasks** page. Like, subscribe, share, or download apps, and upload an honest screenshot. Submissions are verified instantly by our smart audit engine.\n\n4️⃣ *Withdraw Instantly*\nAccumulate up to ₦1,000 and select your local Nigerian bank. Withdrawals are processed 24/7 automatically via paystack!\n\n5️⃣ *Refers and Bonuses*\nTap *Referrals* to share your unique link. You'll receive a commission instantly for every friend who signs up and registers!\n\n👇 Click the buttons below to launch the App and join our community!`, {
+531:          // Auto-approve the subscriber immediately into the channel/group
+532:          await ctx.approveChatJoinRequest(userId);
+533:          console.log(`[BOT] Auto-approved join request for ${userName} (${userId})`);
+536:          await bot.telegram.sendMessage(userId, `🇳🇬 *Welcome to the Earnwise community, ${userName}!* 🎉\n\nYou've just entered Nigeria's #1 digital wealth community. Let's get you set up to start earning real cash daily! 🚀\n\n📖 *YOUR COMPLETE GUIDE TO EARNWISE:*\n\n1️⃣ *Launch the Web App*\nClick the *"💰 Open Earnwise"* button below (or run /start) and sign in to access your customized dashboard directly inside Telegram.\n\n2️⃣ *Activate Your Plan (Multiply Profits)*\nTo unlock high-paying tasks, head over to the *Upgrade* page. Choose a Tier that fits your goal to multiply your rewards up to 500%:\n• *Elite Tier* (1.25x Earning Multiplier)\n• *Lite Tier* (1.5x Earning Multiplier)\n• *Bronze Tier* (2.0x Earning Multiplier)\n• *Silver Tier* (3.0x Earning Multiplier)\n• *Golden Tier* (5.0x Earning Multiplier) 💎\n\n3️⃣ *Complete Micro-Tasks*\nVisit the **Tasks** page. Like, subscribe, share, or download apps, and upload an honest screenshot. Submissions are verified instantly by our smart audit engine.\n\n4️⃣ *Withdraw Instantly*\nAccumulate up to ₦1,000 and select your local Nigerian bank. Withdrawals are processed 24/7 automatically via paystack!\n\n5️⃣ *Refers and Bonuses*\nTap *Referrals* to share your unique link. You'll receive a commission instantly for every friend who signs up and registers!\n\n👇 Click the buttons below to launch the App and join our community!`, {
+549:          await bot.telegram.sendMessage(announceChatId, `🇳🇬 *Let's welcome ${userName} to Earnwise!* 🎉\n\nYour request has been approved. Launch your app and activate your earnings below:`, {
+565:          await bot.telegram.sendMessage(fallbackChatId, `🇳🇬 *Welcome to the Earnwise community, ${userName}!* 🎉\n\nI tried to send you the official Setup Guide in private, but please use the links below to start earning:\n\n📖 *YOUR QUICK START GUIDE:*\n• 1️⃣ Click *"💰 Open Earnwise App"* to register/login.\n• 2️⃣ Go to *Upgrade* inside the app to activate your multiplication tier panels (1.25x - 5.0x).\n• 3️⃣ Click *Tasks* to complete easy social earning tasks.\n• 4️⃣ Withdraw directly to your local Nigerian bank!\n\n👇 Use the active links below to start:`, {
+620:  app.use((req, res, next) => {
+674:          tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 10% cash bonus on all their task approval reserves!"
+702:          tip: "Log in around 8 AM and 6 PM when new corporate advertising audits and social follow tasks are assigned. Read task instructions carefully, perform the follow, like, or subscription, and upload the exact screenshot. Our system approves honest submissions instantly!"
+732:          // 1. In-app Notification
+785:  app.get("/api/health", (req, res) => {
+793:  app.post("/api/rewards/verify", async (req, res) => {
+840:  app.get("/api/webhooks/cpx", async (req, res) => {
+930:  app.get("/api/cpx/signed-url", async (req, res) => {
+932:    const appId = process.env.CPX_APP_ID || '33341';
+939:    let signedUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user_id}&username=${encodeURIComponent(String(username || ''))}&email=${encodeURIComponent(String(email || ''))}&subid_1=&subid_2=`;
+950:  app.get("/api/admin/coaching-status", async (req, res) => {
+959:  app.post("/api/admin/broadcast", async (req, res) => {
+984:  app.post("/api/admin/trigger-coaching", async (req, res) => {
+1000:  app.post("/api/v1/tasks/breakdown", async (req, res) => {
+1128:  app.post("/api/ai/assistant", async (req, res) => {
+1217:  app.post("/api/v1/ai/smart-insights", async (req, res) => {
+1321:  app.post("/api/v1/tasks/verify-proof", async (req, res) => {
+1330:      let verificationResult = { approved: true, reason: "Proof submitted successfully and approved under standard verification protocol." };
+1355:                  responseMimeType: "application/json",
+1359:                      approved: { type: Type.BOOLEAN },
+1362:                    required: ["approved", "reason"]
+1380:          console.warn("Wise AI Verification failed due to API model error (approving proof automatically):", error.message || error);
+1384:      // Process the reward securely server-side if approved
+1385:      if (verificationResult.approved && isDbAdminCapable) {
+1393:          if (completionDoc.exists && completionDoc.data()?.status === 'approved') {
+1394:             throw new Error("Task already approved and credited.");
+1400:             status: 'approved',
+1425:        approved: verificationResult.approved,
+1440:  app.post("/api/v1/affiliate/matches", async (req, res) => {
+1447:      { key: 'app', offer: 'PiggyVest - Save & Earn 15%', link: 'https://piggyvest.com' },
+1464:  app.post("/api/v1/telemetry/announce", async (req, res) => {
+1488:  app.get("/api/v1/tasks/available", async (req, res) => {
+1544:  app.post("/api/v1/admin/tasks/create", async (req, res) => {
+1594:  app.post("/api/support/message", async (req, res) => {
+1611:  app.post("/api/v1/advertiser/tasks/submit", async (req, res) => {
+1664:  app.post("/api/v1/payments/webhook/paystack", async (req, res) => {
+1669:  app.put("/api/v1/admin/tasks/:id/:action", async (req, res) => {
+1675:    if (action === 'approve') await dbAdmin.collection('tasks').doc(id).update({ admin_status: 'active' });
+1685:  app.post("/api/user/complete-task", velocityGate, taskLimiter, async (req, res) => {
+1821:  app.post("/api/admin/clear-escrow", async (req, res) => {
+1831:  app.post("/api/paystack/initialize-deposit", async (req, res) => {
+1877:  app.post("/api/paystack/webhook", express.json(), async (req, res) => {
+1943:          // Award referral bonus if applicable
+1995:  app.post("/api/paystack/verify-deposit", async (req, res) => {
+2162:  app.get("/api/paystack/banks", async (req, res) => {
+2200:  app.get("/api/paystack/resolve", async (req, res) => {
+2251:  app.post("/api/paystack/verify-upgrade", async (req, res) => {
+2420:  app.post("/api/auth/send-welcome-email", async (req, res) => {
+2435:            text: `Welcome to Earnwise! You're now part of Nigeria's #1 digital wealth platform, powered by Wise AI. Complete high-paying tasks, withdraw real cash, and earn lifetime commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}`,
+2454:                  <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">Go to Your Dashboard</a>
+2501:              console.log(`[AUTH] In-door notification appended for ${email} (${uid})`);
+2505:          console.error("[AUTH] Welcome notification appending failed:", dbErr.message);
+2521:  app.post("/api/auth/send-daily-encouragement", async (req, res) => {
+2531:        tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 10% cash bonus on all their task approval reserves!"
+2559:        tip: "Log in around 8 AM and 6 PM when new corporate advertising audits and social follow tasks are assigned. Read task instructions carefully, perform the follow, like, or subscription, and upload the exact screenshot. Our system approves honest submissions instantly!"
+2583:      // 1. Send notification in-app if userId is provided
+2594:          console.log(`[AUTH] In-app notification created for ${userId}`);
+2597:          console.warn("[AUTH] Server Admin SDK failed writing in-app notification document:", dbErr.message || dbErr);
+2629:                  <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); text-transform: uppercase;">Access Dashboard</a>
+2662:  app.post("/api/paystack/withdraw", async (req, res) => {
+2782:  app.post("/api/v1/academy/purchase", async (req, res) => {
+2874:  app.get("/api/v1/academy/ai-status", (req, res) => {
+2883:  app.post("/api/v1/academy/ask-tutor", async (req, res) => {
+3002:      appType: "spa",
+3004:    app.use(vite.middlewares);
+3007:    app.use(express.static(distPath, { index: false }));
+3008:    app.get("*", (req, res, next) => {
+3095:  const server = http.createServer(app);

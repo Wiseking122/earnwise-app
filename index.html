@@ -144,6 +144,13 @@
     
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.message === 'Failed to fetch') {
+          console.warn('Suppressed Failed to fetch unhandled rejection');
+          e.preventDefault();
+        }
+      });
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           const sw_version_flag = 'sw_force_clean_v6';

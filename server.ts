@@ -1040,7 +1040,7 @@ async function startServer() {
         httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
       });
 
-      const models = ["gemini-3.5-flash"];
+      const models = ["gemini-2.5-flash"];
       let lastErr;
       let finalData = { subtasks: [] };
 
@@ -1175,7 +1175,7 @@ IMPORTANT INSTRUCTIONS:
 
 User Prompt: ${promptMessage}`;
         
-        const models = ["gemini-3.5-flash"];
+        const models = ["gemini-2.5-flash"];
         let lastError;
         
         const tools = [];
@@ -1262,7 +1262,7 @@ Respond STRICTLY in JSON:
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const interaction = await requestAiClient.interactions.create({
-            model: "gemini-3.5-flash",
+            model: "gemini-2.5-flash",
             input: prompt,
             response_format: {
               type: Type.OBJECT,
@@ -1349,7 +1349,7 @@ Provide your response strictly in the JSON format requested.`;
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               response = await requestAiClient.models.generateContent({
-                model: "gemini-3.5-flash",
+                model: "gemini-2.5-flash",
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 config: {
                   responseMimeType: "application/json",
@@ -2933,7 +2933,7 @@ Provide your response strictly in the JSON format requested.`;
       res.setHeader('Transfer-Encoding', 'chunked');
 
       try {
-        const tutorModels = ["gemini-3.5-flash"];
+        const tutorModels = ["gemini-2.5-flash"];
         let lastTutorErr;
         let streamSuccess = false;
 
@@ -2973,7 +2973,7 @@ Provide your response strictly in the JSON format requested.`;
         console.error("[ACADEMY] AI Generation failed:", aiErr);
         try {
           const fbStream = await requestAiClient.interactions.create({
-             model: "gemini-3.5-flash",
+             model: "gemini-2.5-flash",
              input: `System: Fallback answer.\nCourse: ${courseTitle}\nQuestion: ${question}`,
              stream: true
           });
@@ -3131,7 +3131,7 @@ Provide your response strictly in the JSON format requested.`;
         
         const tools = [];
 
-        const models = ["gemini-3.5-flash"];
+        const models = ["gemini-2.5-flash"];
         let lastWsErr;
         let wsStreamSuccess = false;
 
