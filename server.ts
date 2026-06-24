@@ -231,9 +231,9 @@ async function startServer() {
         if (!referrers.empty) {
           const referrerDoc = referrers.docs[0];
           
-          // Calculate 10% of plan cost
+          // Calculate 20% of plan cost
           const planCost = PLAN_COSTS[planId] || 0;
-          const bonusAmount = Math.floor(planCost * 0.1);
+          const bonusAmount = Math.floor(planCost * 0.2);
           
           if (bonusAmount <= 0) return; // No bonus for free or zero cost plans
 
@@ -255,14 +255,14 @@ async function startServer() {
             transaction.set(notifRef, {
               userId: referrerDoc.id,
               title: '🎁 Referral Upgrade Commission!',
-              message: `Your friend upgraded to ${planId}! You have received a 10% commission of ₦${bonusAmount}.`,
+              message: `Your friend upgraded to ${planId}! You have received a 20% commission of ₦${bonusAmount}.`,
               type: 'reward',
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               readBy: []
             });
           });
           
-          console.log(`[REFERRAL] Awarded ₦${bonusAmount} (10% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
+          console.log(`[REFERRAL] Awarded ₦${bonusAmount} (20% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
         }
       }
     } catch (err) {
@@ -438,7 +438,7 @@ async function startServer() {
       });
 
       bot.command('refer', (ctx) => {
-        ctx.reply("👥 *Refer & Earn Lifetime Commissions*\n\nInvite your friends and earn:\n1. 10% Upgrade Commission when they upgrade\n2. 10% Lifetime Royalty on their earnings\n\nGet your unique link in the app!", {
+        ctx.reply("👥 *Refer & Earn 20% Commission*\n\nInvite your friends and earn:\n1. 20% Upgrade Commission when they activate any plan\n\nGet your unique link in the app!", {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
@@ -1184,7 +1184,7 @@ async function startServer() {
       return `To complete a task on Earnwise and credit your balance:\n1. Choose an active task from your Task list.\n2. Click 'Start Task' to open the social media target link (follow, like, or comment as requested).\n3. Take a screenshot or grab your profile handle to serve as completion proof.\n4. Upload or enter this proof in the Task Detail page and click 'Submit Proof'.\nOur automated 'Wise AI' engine will review your submission and automatically credit your wallet upon instant verification. Keep your streak alive to gain daily multipliers!`;
     }
     if (p.includes('refer') || p.includes('recruit') || p.includes('invite') || p.includes('commission') || p.includes('affiliate')) {
-      return `Earnwise offers a highly lucrative, unlimited 10% lifetime referral commission structure. Share your unique referral link from your Profile tab with friends and digital earners. Every time your direct referrals complete high-paying tasks, purchase plans, or activate tiers, you instantly receive a 10% commission credited directly to your withdrawable wallet balance!`;
+      return `Earnwise offers a highly lucrative, unlimited 20% referral commission structure. Share your unique referral link from your Profile tab with friends and digital earners. Every time your direct referrals purchase plans or activate tiers, you instantly receive a 20% commission credited directly to your withdrawable wallet balance!`;
     }
     if (p.includes('vault') || p.includes('stake') || p.includes('growth')) {
       return `Our premium 'Vault' feature allows you to stake or lock a portion of your digital balance for fixed-term growth bonuses of up to 40% per annum. Select a fixed term, deposit the minimum requirement, and watch your capital compound passively with guaranteed safety. Interest and capital are automatically returned to your withdrawable wallet at the conclusion of the term.`;
@@ -1195,7 +1195,7 @@ async function startServer() {
     if (p.includes('who is the owner') || p.includes('ceo') || p.includes('founder') || p.includes('sterling')) {
       return `The official founder, owner, and CEO of EarnWise is Johnathan Sterling. Under his core guidance, EarnWise has grown to become Nigeria's #1 digital task-based rewards platform of choice.`;
     }
-    return `Welcome! I am Wise AI, your digital earning coach at Earnwise. You can earn daily cash rewards in Nigerian Naira by completing simple social media tasks, interacting with high-yielding sponsored ads, completing courses in the Academy, entering the daily Lucky Spin, and leveraging our 10% lifetime team referral commissions. Tell me, how can I help you maximize your income streams today?`;
+    return `Welcome! I am Wise AI, your digital earning coach at Earnwise. You can earn daily cash rewards in Nigerian Naira by completing simple social media tasks, interacting with high-yielding sponsored ads, completing courses in the Academy, entering the daily Lucky Spin, and leveraging our 20% team referral commissions. Tell me, how can I help you maximize your income streams today?`;
   };
 
   /**
@@ -1795,30 +1795,30 @@ Provide your response strictly in the JSON format requested.`;
         });
 
         // --- REFERRAL ENGINE: 10% Royalty + ₦1,000 Bonus ---
-        if (userData.referredBy) {
-           const referrers = await dbAdmin.collection('users').where('referralCode', '==', userData.referredBy).limit(1).get();
-           if (!referrers.empty) {
-             const referrerDoc = referrers.docs[0];
-             const royalty = finalPayout * 0.10;
-             
-             transaction.update(referrerDoc.ref, {
-               referralBalance: admin.firestore.FieldValue.increment(royalty),
-               withdrawableBalance: admin.firestore.FieldValue.increment(royalty),
-               referralEarnings: admin.firestore.FieldValue.increment(royalty)
-             });
-
-             // SEND NOTIFICATION
-             const notifRef = dbAdmin.collection('notifications').doc();
-             transaction.set(notifRef, {
-               userId: referrerDoc.id,
-               title: '👥 Referral Royalty!',
-               message: `You earned ₦${royalty.toFixed(2)} royalty from your friend's task completion.`,
-               type: 'reward',
-               createdAt: admin.firestore.FieldValue.serverTimestamp(),
-               readBy: []
-             });
-           }
-        }
+        // if (userData.referredBy) {
+        //    const referrers = await dbAdmin.collection('users').where('referralCode', '==', userData.referredBy).limit(1).get();
+        //    if (!referrers.empty) {
+        //      const referrerDoc = referrers.docs[0];
+        //      const royalty = finalPayout * 0.10;
+        //      
+        //      transaction.update(referrerDoc.ref, {
+        //        referralBalance: admin.firestore.FieldValue.increment(royalty),
+        //        withdrawableBalance: admin.firestore.FieldValue.increment(royalty),
+        //        referralEarnings: admin.firestore.FieldValue.increment(royalty)
+        //      });
+        //
+        //      // SEND NOTIFICATION
+        //      const notifRef = dbAdmin.collection('notifications').doc();
+        //      transaction.set(notifRef, {
+        //        userId: referrerDoc.id,
+        //        title: '👥 Referral Royalty!',
+        //        message: `You earned ₦${royalty.toFixed(2)} royalty from your friend's task completion.`,
+        //        type: 'reward',
+        //        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        //        readBy: []
+        //      });
+        //    }
+        // }
 
         // Deduct from task pool
         transaction.update(taskRef, {
@@ -2507,7 +2507,7 @@ Provide your response strictly in the JSON format requested.`;
             to: email,
             replyTo: 'earnwise29@gmail.com',
             subject: `Welcome to Earnwise, ${name || ''}!`,
-            text: `Welcome to Earnwise! You're now part of Nigeria's #1 digital wealth platform, powered by Wise AI. Complete high-paying tasks, withdraw real cash, and earn lifetime commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}`,
+            text: `Welcome to Earnwise! You're now part of Nigeria's #1 digital wealth platform, powered by Wise AI. Complete high-paying tasks, withdraw real cash, and earn referral commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}`,
             html: `
               <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
                 <div style="text-align: center; margin-bottom: 20px;">
@@ -2567,17 +2567,82 @@ Provide your response strictly in the JSON format requested.`;
               await dbAdmin.collection('notifications').add({
                 userId: uid,
                 title: "Welcome to Earnwise!",
-                message: `Welcome aboard, ${name || 'Earner'}! We're thrilled to have you. Complete high-paying tasks, withdraw real cash in Naira, and earn lifetime commissions!`,
+                message: `Welcome aboard, ${name || 'Earner'}! We're thrilled to have you. Complete high-paying tasks, withdraw real cash in Naira, and earn referral commissions!`,
                 type: 'success',
                 read: false,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 readBy: []
               });
               console.log(`[AUTH] In-door notification appended for ${email} (${uid})`);
+
+              // Automatically trigger their first daily coaching topic (Chapter 1) so coaching is completely automatic
+              const firstCoachingTopic = {
+                subject: "💸 Secrets to 10X Your Daily Earnings on Earnwise",
+                headline: "The Compound Earning Framework",
+                quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
+                tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 10% cash bonus on all their task approval reserves!"
+              };
+
+              // Send in-app notification for Chapter 1
+              await dbAdmin.collection('notifications').add({
+                userId: uid,
+                title: `🌅 Wise AI Daily: ${firstCoachingTopic.headline}`,
+                message: `${firstCoachingTopic.quote} 👉 Tip: ${firstCoachingTopic.tip}`,
+                type: 'reward',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                readBy: [],
+                read: false
+              });
+
+              // If SMTP configured, dispatch email coaching immediately
+              if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                await transporter.sendMail({
+                  from: `"Earnwise Coaching" <${process.env.EMAIL_USER}>`,
+                  to: email,
+                  replyTo: 'earnwise29@gmail.com',
+                  subject: firstCoachingTopic.subject,
+                  html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
+                      <div style="text-align: center; margin-bottom: 25px;">
+                        <h1 style="color: #2563eb; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Daily Coach</h1>
+                        <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Automated Success Coach • Active Multipliers</p>
+                      </div>
+                      
+                      <p style="font-size: 15px; color: #475569; line-height: 1.6;">Hello ${name || 'Earner'},</p>
+                      <p style="font-size: 15px; color: #475569; line-height: 1.6;">We've automatically dispatched your first masterclass lesson to kickstart your journey:</p>
+
+                      <div style="background-color: #eff6ff; border-left: 5px solid #2563eb; padding: 20px; border-radius: 12px; margin: 25px 0;">
+                        <h3 style="margin-top: 0; color: #1e3a8a; font-size: 16px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">${firstCoachingTopic.headline}</h3>
+                        <p style="color: #1e40af; font-size: 15px; font-style: italic; margin-bottom: 0;">"${firstCoachingTopic.quote}"</p>
+                      </div>
+
+                      <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
+                        <h4 style="margin-top: 0; color: #1e293b; font-size: 14px; text-transform: uppercase; font-weight: 800;">Strategic Action Tip:</h4>
+                        <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 0;">${firstCoachingTopic.tip}</p>
+                      </div>
+
+                      <div style="text-align: center; margin: 30px 0;">
+                        <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); text-transform: uppercase;">Access Dashboard</a>
+                      </div>
+
+                      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                        <p style="color: #94a3b8; font-size: 11px; margin-bottom: 5px; text-transform: uppercase;">Active Streak Protection Alert</p>
+                        <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">You are receiving this because you registered on Earnwise. Daily email coaching is active.</p>
+                      </div>
+                    </div>
+                  `
+                }).catch(e => console.error("[AUTH] Automatic first coaching email dispatch failed:", e.message));
+              }
+
+              // Update coaching step to 1 so the next scheduled drops follow sequentially
+              await userSnap.docs[0].ref.update({
+                coachingStep: 1,
+                lastCoachingAt: admin.firestore.FieldValue.serverTimestamp()
+              }).catch(e => console.error("[AUTH] Failed updating coaching step metadata:", e.message));
             }
           }
         } catch (dbErr: any) {
-          console.error("[AUTH] Welcome notification appending failed:", dbErr.message);
+          console.error("[AUTH] Welcome notification/coaching automatic dispatch failed:", dbErr.message);
         }
       }
 

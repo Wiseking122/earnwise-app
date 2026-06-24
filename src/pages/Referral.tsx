@@ -232,18 +232,8 @@ export default function Referral() {
                 <Gift size={24} />
               </div>
               <div>
-                <h4 className="font-black text-green-900 text-sm">10% Upgrade Commission</h4>
-                <p className="text-xs text-green-700 font-medium">Earn 10% instantly when your friend successfully upgrades their plan.</p>
-              </div>
-            </div>
-
-            <div className="bg-purple-50 p-6 rounded-[2rem] border border-purple-100 flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-lg shadow-purple-200">
-                <Target size={24} />
-              </div>
-              <div>
-                <h4 className="font-black text-purple-900 text-sm">10% Lifetime Royalty</h4>
-                <p className="text-xs text-purple-700 font-medium">Receive 10% of every Naira your referrals earn, forever.</p>
+                <h4 className="font-black text-green-900 text-sm">20% Upgrade Commission</h4>
+                <p className="text-xs text-green-700 font-medium">Earn 20% instantly when your friend successfully activates a plan.</p>
               </div>
             </div>
           </div>

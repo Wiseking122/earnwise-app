@@ -143,7 +143,7 @@ export default function Home() {
     setShowInsightsModal(true);
     setAiInsightsError(null);
     try {
-      const apiUrl = (import.meta as any).env.VITE_API_URL || '';
+      const apiUrl = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${apiUrl}/api/v1/ai/smart-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -27,8 +27,8 @@ export default function EarningsOutline() {
       icon: Users,
       title: "2. Build Your Team",
       color: "bg-purple-500",
-      description: "Invite your friends using your unique referral code. You earn a 10% lifetime commission on every withdrawal your referrals make.",
-      features: ["Passive Income", "10% Commission", "Lifetime Earnings"]
+      description: "Invite your friends using your unique referral code. You earn a 20% commission on every friend who activates a plan.",
+      features: ["Passive Income", "20% Commission"]
     },
     {
       icon: Zap,

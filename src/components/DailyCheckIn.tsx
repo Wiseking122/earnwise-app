@@ -22,13 +22,13 @@ import Confetti from './Confetti';
 
 // Daily Rewards configuration mapping to 7-day cycle
 const DAILY_REWARDS = [
-  { day: 1, amount: 50, xp: 20, description: "Day 1 Bonus" },
-  { day: 2, amount: 60, xp: 25, description: "Day 2 Boost" },
-  { day: 3, amount: 75, xp: 30, description: "Day 3 Boost" },
-  { day: 4, amount: 95, xp: 40, description: "Day 4 Multiplier" },
-  { day: 5, amount: 120, xp: 50, description: "Day 5 Mega Bonus" },
-  { day: 6, amount: 155, xp: 60, description: "Day 6 Ultra Reward" },
-  { day: 7, amount: 250, xp: 120, description: "Day 7 Legendary Chest", isChest: true }
+  { day: 1, amount: 15, xp: 20, description: "Day 1 Bonus" },
+  { day: 2, amount: 18, xp: 25, description: "Day 2 Boost" },
+  { day: 3, amount: 22, xp: 30, description: "Day 3 Boost" },
+  { day: 4, amount: 28, xp: 40, description: "Day 4 Multiplier" },
+  { day: 5, amount: 36, xp: 50, description: "Day 5 Mega Bonus" },
+  { day: 6, amount: 46, xp: 60, description: "Day 6 Ultra Reward" },
+  { day: 7, amount: 75, xp: 120, description: "Day 7 Legendary Chest", isChest: true }
 ];
 
 export const DailyCheckIn: React.FC = () => {
@@ -283,17 +283,17 @@ export const DailyCheckIn: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5">
                     <span className="text-slate-400 font-medium">Standard Daily Base</span>
-                    <span className="text-white font-black">₦50.00 / 20 XP</span>
+                    <span className="text-white font-black">₦15.00 / 20 XP</span>
                   </div>
                   <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5">
                     <span className="text-slate-400 font-medium">Peak High Yield (Day 6)</span>
-                    <span className="text-amber-400 font-black">₦155.00 / 60 XP</span>
+                    <span className="text-amber-400 font-black">₦46.00 / 60 XP</span>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-amber-400/20">
                     <span className="text-amber-400 font-extrabold">Day 7 Grand Reward</span>
-                    <span className="text-yellow-300 font-black">₦250.00 + 120 XP 👑</span>
+                    <span className="text-yellow-300 font-black">₦75.00 + 120 XP 👑</span>
                   </div>
                   <p className="text-[10px] text-slate-500 font-medium italic pl-1 leading-normal">
                     * The absolute cycle restarts automatically immediately upon Day 7 claim execution. Or breaks instantly if you miss any daily check-in sequence slot.

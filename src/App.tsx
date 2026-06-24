@@ -37,6 +37,7 @@ import AdminPayments from './pages/admin/Payments';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
 import InstallAppModal from './components/InstallAppModal';
+import { TelegramJoinPopup } from './components/TelegramJoinPopup';
 
 function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: { children: React.ReactNode, adminOnly?: boolean, bypassPlanCheck?: boolean }) {
   const { user, profile, loading } = useAuth();
@@ -140,6 +141,7 @@ function AppContent() {
       <AppRoutes />
       <FloatingAIAssistant />
       <InstallAppModal />
+      <TelegramJoinPopup />
     </>
   );
 }

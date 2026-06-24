@@ -403,31 +403,31 @@ export default function Withdrawal() {
   return (
     <Layout title="Wallet Protocol" showBack>
       {success && <Confetti />}
-      <div className="p-5 pb-24 space-y-8 max-w-2xl mx-auto relative">
+      <div className="p-3.5 sm:p-5 pb-24 space-y-4 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
 
         {/* Tab Switcher */}
-        <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200">
+        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button 
             onClick={() => setActiveTab('withdraw')}
-            className={`flex-1 py-4 px-6 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 px-3 rounded-lg font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
               activeTab === 'withdraw' 
                 ? 'bg-slate-950 text-white shadow-xl' 
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            <ArrowUpRight size={16} />
+            <ArrowUpRight size={14} />
             Withdraw
           </button>
           <button 
             onClick={() => setActiveTab('deposit')}
-            className={`flex-1 py-4 px-6 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 px-3 rounded-lg font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
               activeTab === 'deposit' 
                 ? 'bg-slate-950 text-white shadow-xl' 
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            <ArrowDownLeft size={16} />
+            <ArrowDownLeft size={14} />
             Deposit
           </button>
         </div>
@@ -435,17 +435,17 @@ export default function Withdrawal() {
         {activeTab === 'withdraw' ? (
           <>
             {/* Real-time Status Alert Banner */}
-            <div className={`p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border transition-all flex items-center gap-3 sm:gap-4 ${
+            <div className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${
               isWindowOpen 
                 ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
                 : 'bg-rose-50 border-rose-100 text-rose-800'
             }`}>
-              <span className={`w-3 h-3 rounded-full flex-shrink-0 ${isWindowOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isWindowOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
               <div className="flex-1 text-left min-w-0">
-                <p className="text-xs font-black uppercase tracking-wider truncate">
+                <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider truncate">
                   {isWindowOpen ? "Settlement Window Open" : "Payout Gateway Closed"}
                 </p>
-                <p className="text-[10px] font-bold uppercase opacity-85 mt-0.5 leading-relaxed">
+                <p className="text-[9px] font-bold uppercase opacity-85 mt-0.5 leading-normal">
                   {isWindowOpen ? (
                     timeRemainingStr || "Processing windows are strictly scheduled by Administration."
                   ) : (
@@ -460,22 +460,22 @@ export default function Withdrawal() {
             </div>
 
             {/* Available Balance Header */}
-            <div className="bg-slate-950 rounded-2xl sm:rounded-[3rem] p-5 sm:p-10 text-white relative overflow-hidden shadow-2xl group border border-white/5">
+            <div className="bg-slate-950 rounded-xl p-4 sm:p-6 text-white relative overflow-hidden shadow-xl group border border-white/5">
               <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-600/20" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
               
-              <div className="relative z-10 space-y-4 sm:space-y-6">
+              <div className="relative z-10 space-y-3 sm:space-y-4">
                 <div className="flex justify-between items-start gap-3">
                   <div className="space-y-1 min-w-0 flex-1 text-left">
-                    <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] truncate">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] truncate">
                       {withdrawalType === 'task' ? 'Task Wallet Balance' : 'Referral Wallet Balance'}
                     </p>
-                    <h3 className="text-3xl sm:text-5xl font-display font-black tracking-tighter italic truncate">
+                    <h3 className="text-2xl sm:text-4xl font-display font-black tracking-tighter italic truncate">
                       ₦<AnimatedNumber value={withdrawalType === 'task' ? (profile?.taskBalance || 0) : (profile?.referralBalance || 0)} fractionDigits={2} />
                     </h3>
                   </div>
-                  <div className="w-11 h-11 sm:w-14 sm:h-14 bg-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform shrink-0">
-                    <Wallet size={20} className="text-blue-500 sm:w-7 sm:h-7" />
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white/5 rounded-lg sm:rounded-xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform shrink-0">
+                    <Wallet size={16} className="text-blue-500 sm:w-6 sm:h-6" />
                   </div>
                 </div>
 
@@ -502,15 +502,15 @@ export default function Withdrawal() {
               <button
                 type="button"
                 onClick={() => setWithdrawalType('task')}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
                   withdrawalType === 'task' 
-                    ? 'bg-blue-600 border-blue-500 text-white shadow-xl scale-[1.02]' 
+                    ? 'bg-blue-600 border-blue-500 text-white shadow-lg scale-[1.01]' 
                     : 'bg-white border-slate-100 text-slate-900 hover:border-blue-200'
                 }`}
               >
                 <div className="flex items-center justify-between relative z-10">
-                  <Zap size={16} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-600'} />
-                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${withdrawalType === 'task' ? 'bg-white/20' : 'bg-blue-50'}`}>
+                  <Zap size={14} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-600'} />
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${withdrawalType === 'task' ? 'bg-white/20' : 'bg-blue-50'}`}>
                     <span className={`w-1 h-1 rounded-full ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
                     <span className={`text-[7px] font-black uppercase tracking-widest ${withdrawalType === 'task' ? 'text-white' : 'text-blue-600'}`}>
                       Task
@@ -518,8 +518,8 @@ export default function Withdrawal() {
                   </div>
                 </div>
                 <div className="relative z-10 text-left">
-                  <span className="text-xs font-black uppercase tracking-tighter block">Task Payout</span>
-                  <span className={`text-[8px] font-bold uppercase opacity-80 mt-0.5 block ${withdrawalType === 'task' ? 'text-blue-100' : 'text-slate-400'}`}>Schedule Enabled</span>
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-tighter block">Task Payout</span>
+                  <span className={`text-[8px] font-bold uppercase opacity-85 mt-0.5 block ${withdrawalType === 'task' ? 'text-blue-100' : 'text-slate-400'}`}>Schedule Enabled</span>
                 </div>
                 {withdrawalType === 'task' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
               </button>
@@ -527,15 +527,15 @@ export default function Withdrawal() {
               <button
                 type="button"
                 onClick={() => setWithdrawalType('referral')}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
                   withdrawalType === 'referral' 
-                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl scale-[1.02]' 
+                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg scale-[1.01]' 
                     : 'bg-white border-slate-100 text-slate-900 hover:border-emerald-200'
                 }`}
               >
                 <div className="flex items-center justify-between relative z-10">
-                  <User size={16} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-600'} />
-                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${withdrawalType === 'referral' ? 'bg-white/20' : 'bg-emerald-50'}`}>
+                  <User size={14} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-600'} />
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${withdrawalType === 'referral' ? 'bg-white/20' : 'bg-emerald-50'}`}>
                     <span className={`w-1 h-1 rounded-full ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
                     <span className={`text-[7px] font-black uppercase tracking-widest ${withdrawalType === 'referral' ? 'text-white' : 'text-emerald-600'}`}>
                       Referral
@@ -543,37 +543,37 @@ export default function Withdrawal() {
                   </div>
                 </div>
                 <div className="relative z-10 text-left">
-                  <span className="text-xs font-black uppercase tracking-tighter block">Referral Payout</span>
-                  <span className={`text-[8px] font-bold uppercase opacity-80 mt-0.5 block ${withdrawalType === 'referral' ? 'text-emerald-100' : 'text-slate-400'}`}>Schedule Enabled</span>
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-tighter block">Referral Payout</span>
+                  <span className={`text-[8px] font-bold uppercase opacity-85 mt-0.5 block ${withdrawalType === 'referral' ? 'text-emerald-100' : 'text-slate-400'}`}>Schedule Enabled</span>
                 </div>
                 {withdrawalType === 'referral' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2 text-left">
+              <div className="space-y-1 text-left">
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Transfer Quantum</h3>
                 <div className="relative group">
-                  <span className="absolute left-5 top-1/2 -translate-y-1/2 font-display font-black text-xl text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-lg text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
                   <input 
                     type="number" 
                     placeholder="0.00"
                     required
                     min="1000"
                     step="0.01"
-                    className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-white border border-slate-100 rounded-xl py-2.5 pl-10 pr-4 text-xl sm:text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </div>
                 {parseFloat(amount) >= 1000 && (
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider px-4">
-                    A 5% processing fee applies. You will receive: ₦{(parseFloat(amount) * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })} (Fee: ₦{(parseFloat(amount) * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                  <p className="text-[9px] font-black text-blue-600 uppercase tracking-wider px-4">
+                    A 5% processing fee applies. You receive: ₦{(parseFloat(amount) * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 )}
               </div>
 
-              <div className="space-y-4 text-left">
+              <div className="space-y-3 text-left">
                 <div className="flex items-center justify-between px-4">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Ledger Information</h3>
                   <button
@@ -585,9 +585,9 @@ export default function Withdrawal() {
                     {isSavingBank ? 'Saving...' : 'Save Details'}
                   </button>
                 </div>
-                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
-                  <div className="space-y-1.5 relative">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Target Bank</label>
+                <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-100 shadow-sm space-y-3">
+                  <div className="space-y-1 relative">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Target Bank</label>
                     <div className="relative">
                       {/* Trigger Button */}
                       <button
@@ -596,13 +596,13 @@ export default function Withdrawal() {
                           setIsOpenBankDropdown(!isOpenBankDropdown);
                           setBankSearch('');
                         }}
-                        className="w-full text-left bg-slate-50 border border-transparent rounded-xl py-3 pl-11 pr-8 text-xs font-black uppercase tracking-tight hover:bg-slate-100/80 active:scale-[0.99] transition-all flex items-center justify-between relative disabled:opacity-50"
+                        className="w-full text-left bg-slate-50 border border-transparent rounded-lg py-2.5 pl-10 pr-8 text-xs font-black uppercase tracking-tight hover:bg-slate-100/80 active:scale-[0.99] transition-all flex items-center justify-between relative disabled:opacity-50"
                       >
-                        <Building2 className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isOpenBankDropdown ? 'text-blue-600' : 'text-slate-400'}`} size={16} />
+                        <Building2 className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${isOpenBankDropdown ? 'text-blue-600' : 'text-slate-400'}`} size={14} />
                         <span className={bankCode ? 'text-slate-900 font-black' : 'text-slate-500 font-bold normal-case'}>
                           {bankName || 'Select Protocol Bank'}
                         </span>
-                        <ChevronDown className={`text-slate-400 transition-transform duration-200 ${isOpenBankDropdown ? 'rotate-180 text-blue-600' : ''}`} size={16} />
+                        <ChevronDown className={`text-slate-400 transition-transform duration-200 ${isOpenBankDropdown ? 'rotate-180 text-blue-600' : ''}`} size={14} />
                       </button>
 
                       <AnimatePresence>
@@ -613,7 +613,7 @@ export default function Withdrawal() {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.2 }}
-                            className="absolute left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden z-[500] max-h-80 flex flex-col"
+                            className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-xl shadow-xl overflow-hidden z-[500] max-h-80 flex flex-col"
                           >
                             {/* Backdrop overlay inside the motion div for better coordination */}
                             <div 
@@ -625,20 +625,20 @@ export default function Withdrawal() {
                             />
                             
                             {/* Search Bar Input */}
-                            <div className="p-3 border-b border-slate-100 relative flex items-center bg-slate-50/50 z-10">
-                              <Search className="absolute left-6 text-slate-400" size={14} />
+                            <div className="p-2 border-b border-slate-100 relative flex items-center bg-slate-50/50 z-10">
+                              <Search className="absolute left-5 text-slate-400" size={12} />
                               <input
                                 type="text"
                                 autoFocus
                                 placeholder="Search bank name..."
-                                className="w-full bg-white border border-slate-100 rounded-xl py-2 pl-9 pr-4 text-xs font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+                                className="w-full bg-white border border-slate-100 rounded-lg py-1.5 pl-8 pr-4 text-xs font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
                                 value={bankSearch}
                                 onChange={(e) => setBankSearch(e.target.value)}
                               />
                             </div>
 
                             {/* Banks list */}
-                            <div className="overflow-y-auto max-h-56 no-scrollbar p-2 space-y-1 z-10">
+                            <div className="overflow-y-auto max-h-56 no-scrollbar p-1.5 space-y-1 z-10">
                               {filteredBanks.length > 0 ? (
                                 filteredBanks.map((bank, index) => {
                                   const isSelected = bank.code === bankCode;
@@ -652,7 +652,7 @@ export default function Withdrawal() {
                                         setIsOpenBankDropdown(false);
                                         setBankSearch('');
                                       }}
-                                      className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
+                                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
                                         isSelected 
                                           ? 'bg-blue-50/80 text-blue-700 font-extrabold' 
                                           : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
@@ -660,14 +660,14 @@ export default function Withdrawal() {
                                     >
                                       <span className="truncate">{bank.name}</span>
                                       {isSelected && (
-                                        <CheckCircle2 size={14} className="text-blue-600 flex-shrink-0" />
+                                        <CheckCircle2 size={12} className="text-blue-600 flex-shrink-0" />
                                       )}
                                     </button>
                                   );
                                 })
                               ) : (
-                                <div className="text-center py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                                  No protocol bank found
+                                <div className="text-center py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                                  No bank found
                                 </div>
                               )}
                             </div>
@@ -676,30 +676,30 @@ export default function Withdrawal() {
                       </AnimatePresence>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Account Coordinate</label>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Account Coordinate</label>
                     <div className="relative group">
-                      <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={16} />
+                      <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={14} />
                       <input 
                         type="text" 
                         placeholder="Enter 10-digit account number"
                         required
-                        className="w-full bg-slate-50 border border-slate-250 rounded-xl py-3 pl-11 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5 flex flex-col">
+                  <div className="space-y-1 flex flex-col">
                     <div className="flex justify-between items-center ml-4 mr-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verified Identity</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Verified Identity</label>
                       {resolvingName && (
-                        <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                        <span className="text-[8px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse">
                           <Loader2 size={10} className="animate-spin" /> Resolving Name
                         </span>
                       )}
                       {!resolvingName && resolveFeedback && (
-                        <span className={`text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
+                        <span className={`text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
                           resolveFeedback.includes('Verified') ? 'text-emerald-600' : 'text-amber-600'
                         }`}>
                           {resolveFeedback.includes('Verified') ? <CheckCircle2 size={10} /> : <AlertCircle size={10} />} {resolveFeedback}
@@ -707,13 +707,13 @@ export default function Withdrawal() {
                       )}
                     </div>
                     <div className="relative group">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={16} />
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={14} />
                       <input 
                         type="text" 
                         placeholder={resolvingName ? "Querying secure gateway..." : "Full name as on bank record"}
                         required
                         disabled={resolvingName}
-                        className={`w-full bg-slate-50 border-none rounded-xl py-3 pl-11 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`w-full bg-slate-50 border-none rounded-lg py-2.5 pl-10 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
                           resolvingName ? 'opacity-70 cursor-wait select-none' : ''
                         }`}
                         value={accountName}
@@ -728,29 +728,29 @@ export default function Withdrawal() {
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700 shadow-md"
+                  className="bg-rose-50 border border-rose-100 p-3 rounded-lg flex items-center gap-2.5 text-rose-700 shadow-sm"
                 >
-                  <AlertCircle size={20} />
-                  <p className="text-xs font-black uppercase tracking-tight">{error || "Automated withdrawal failed. Check bank details."}</p>
+                  <AlertCircle size={16} />
+                  <p className="text-xs font-black uppercase tracking-tight">{error || "Automated withdrawal failed."}</p>
                 </motion.div>
               )}
 
               <button 
                 type="submit"
                 disabled={loading || success || !isWindowOpen}
-                className={`w-full py-4 rounded-2xl font-display font-black text-xs uppercase tracking-[0.2em] italic shadow-2xl transition-all flex items-center justify-center gap-3 group/btn ${
+                className={`w-full py-2.5 sm:py-3 rounded-lg font-display font-black text-[11px] sm:text-xs uppercase tracking-[0.2em] italic shadow-lg transition-all flex items-center justify-center gap-2.5 group/btn ${
                   success 
                     ? 'bg-emerald-500 text-white shadow-emerald-900/20' 
                     : !isWindowOpen
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] shadow-emerald-900/10'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]'
                 }`}
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : success ? (
                   <>
-                    <CheckCircle2 size={16} /> Protocol Finalized
+                    <CheckCircle2 size={14} /> Protocol Finalized
                   </>
                 ) : !isWindowOpen ? (
                   <>
@@ -759,60 +759,60 @@ export default function Withdrawal() {
                 ) : (
                   <>
                     <span>🟢 Active: Withdraw Now</span>
-                    <ArrowUpRight size={16} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform opacity-50" />
+                    <ArrowUpRight size={14} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform opacity-50" />
                   </>
                 )}
               </button>
             </form>
 
-            <div className="bg-blue-50 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex gap-3 sm:gap-4 border border-blue-100 italic relative overflow-hidden group">
+            <div className="bg-blue-50 rounded-xl p-3 flex gap-3 border border-blue-100 italic relative overflow-hidden group">
               <div className="absolute inset-0 bg-linear-to-r from-blue-600/5 to-transparent" />
-              <Zap className="text-blue-600 flex-shrink-0 animate-pulse relative z-10" size={20} />
+              <Zap className="text-blue-600 flex-shrink-0 animate-pulse relative z-10" size={16} />
               <div className="relative z-10 text-left">
-                <h4 className="text-[11px] font-black text-blue-900 uppercase tracking-widest">Automated Node Settlement</h4>
-                <p className="text-[10px] text-blue-800 leading-relaxed font-bold uppercase tracking-tighter mt-1">Withdrawals are processed via real-time Paystack synchronization. Settlement is usually completed within 280ms of network confirmation.</p>
+                <h4 className="text-[10px] font-black text-blue-900 uppercase tracking-widest">Automated Node Settlement</h4>
+                <p className="text-[9px] text-blue-800 leading-normal font-bold uppercase tracking-tighter mt-1">Withdrawals are processed via real-time Paystack synchronization. Settlement is usually completed within 280ms of network confirmation.</p>
               </div>
             </div>
 
             {/* Withdrawal History */}
-            <section className="space-y-4 sm:space-y-6">
+            <section className="space-y-3">
               <div className="flex items-center justify-between px-2">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                  <History size={14} />
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                  <History size={12} />
                   Historical Protocol Data
                 </h3>
               </div>
               
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2.5">
                 {loadingHistory ? (
-                  [1,2].map(i => <div key={`skeleton-withdraw-${i}`} className="h-20 bg-slate-50 rounded-xl sm:rounded-[2rem] animate-pulse" />)
+                  [1,2].map(i => <div key={`skeleton-withdraw-${i}`} className="h-16 bg-slate-50 rounded-xl animate-pulse" />)
                 ) : withdrawals.length > 0 ? (
                   withdrawals.map((w, index) => (
-                    <div key={w.id || index} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-100 transition-colors group gap-3">
-                      <div className="flex items-center gap-3 sm:gap-5 min-w-0">
-                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center border transition-colors shrink-0 ${
+                    <div key={w.id || index} className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-100 transition-colors group gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center border transition-colors shrink-0 ${
                           w.status === 'completed' || w.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white' : 
                           w.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-100 group-hover:bg-rose-600 group-hover:text-white' : 
                           'bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-600 group-hover:text-white'
                         }`}>
-                          {w.status === 'completed' || w.status === 'approved' ? <CheckCircle2 size={20} className="sm:w-6 sm:h-6" /> : 
-                           w.status === 'rejected' ? <X size={20} className="sm:w-6 sm:h-6" /> : <Clock size={20} className="sm:w-6 sm:h-6" />}
+                          {w.status === 'completed' || w.status === 'approved' ? <CheckCircle2 size={16} /> : 
+                           w.status === 'rejected' ? <X size={16} /> : <Clock size={16} />}
                         </div>
                         <div className="min-w-0 text-left">
-                          <h4 className="font-display font-black text-slate-900 text-base sm:text-xl italic tracking-tighter">₦{w.amount.toLocaleString()}</h4>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">
+                          <h4 className="font-display font-black text-slate-900 text-sm sm:text-base italic tracking-tighter">₦{w.amount.toLocaleString()}</h4>
+                          <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">
                             {w.requestedAt?.toDate?.()?.toLocaleDateString() || 'Recently'} • {w.status}
                           </p>
                           <WithdrawalTimeline status={w.status || 'submitted'} />
                         </div>
                       </div>
                       <div className="hidden md:block shrink-0">
-                        <ChevronDown className="-rotate-90 text-slate-200" />
+                        <ChevronDown className="-rotate-90 text-slate-200" size={14} />
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="bg-slate-50 rounded-[2.5rem] p-12 text-center border-2 border-dashed border-slate-200">
+                  <div className="bg-slate-50 rounded-xl p-8 text-center border-2 border-dashed border-slate-200">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">No active ledger history detected</p>
                   </div>
                 )}

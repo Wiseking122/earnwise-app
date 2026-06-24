@@ -99,45 +99,45 @@ export default function Upgrade() {
     return (
       <motion.div 
         key={plan.id}
-        whileHover={{ y: -5 }}
-        className={`relative bg-white border-2 rounded-[3.5rem] p-10 transition-all duration-500 overflow-hidden group ${
+        whileHover={{ y: -3 }}
+        className={`relative bg-white border-2 rounded-2xl p-5 sm:p-6 transition-all duration-300 overflow-hidden group ${
           profile?.plan === plan.id 
-            ? 'border-indigo-600 shadow-2xl ring-8 ring-indigo-50' 
-            : 'border-slate-100 hover:border-indigo-200 hover:shadow-xl shadow-sm'
+            ? 'border-indigo-600 shadow-md ring-4 ring-indigo-50' 
+            : 'border-slate-100 hover:border-indigo-200 hover:shadow-md shadow-xs'
         }`}
       >
         {profile?.plan === plan.id && (
-          <div className="absolute top-8 right-8 px-5 py-2 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg relative z-10">
+          <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600 text-white rounded-full text-[8px] font-black uppercase tracking-[0.15em] shadow-md relative z-10">
             Active Tier
           </div>
         )}
 
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)' }} />
+        <div className="absolute top-0 right-0 w-24 h-24 rounded-full -mr-12 -mt-12 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%)' }} />
 
-        <div className="space-y-8 relative z-10">
-          <div className="flex items-center gap-6">
-            <div className={`w-16 h-16 ${plan.color} rounded-[1.5rem] flex items-center justify-center text-white shadow-2xl relative`}>
-              <Zap size={32} className="relative z-10" />
+        <div className="space-y-5 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 ${plan.color} rounded-xl flex items-center justify-center text-white shadow-md relative flex-shrink-0`}>
+              <Zap size={22} className="relative z-10" />
               <div className="absolute inset-0 bg-white/10 rounded-full animate-pulse" />
             </div>
             <div>
-              <h4 className="text-3xl font-black text-slate-900 tracking-tight">{plan.name}</h4>
+              <h4 className="text-xl font-black text-slate-900 tracking-tight">{plan.name}</h4>
               <div className="flex items-baseline gap-1">
-                <span className="text-indigo-600 font-black text-2xl tracking-tighter">₦{plan.cost.toLocaleString()}</span>
-                <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">/ Lifetime</span>
+                <span className="text-indigo-600 font-black text-lg tracking-tighter">₦{plan.cost.toLocaleString()}</span>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">/ Lifetime</span>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4 py-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Included Benefits</p>
-            <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2.5 py-1">
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Included Benefits</p>
+            <div className="grid grid-cols-1 gap-2.5">
               {plan.perks.map((perk, i) => (
-                <div key={`perk-${plan.id}-${i}`} className="flex items-start gap-3 group/perk">
-                  <div className="mt-1 w-5 h-5 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0 group-hover/perk:bg-emerald-500 transition-colors">
-                    <CheckCircle2 size={12} className="text-emerald-500 group-hover/perk:text-white transition-colors" />
+                <div key={`perk-${plan.id}-${i}`} className="flex items-start gap-2 group/perk">
+                  <div className="mt-0.5 w-4 h-4 bg-emerald-50 rounded-md flex items-center justify-center flex-shrink-0 group-hover/perk:bg-emerald-500 transition-colors">
+                    <CheckCircle2 size={10} className="text-emerald-500 group-hover/perk:text-white transition-colors" />
                   </div>
-                  <span className="text-[13px] font-semibold text-slate-600 group-hover/perk:text-slate-900 transition-colors leading-tight">{perk}</span>
+                  <span className="text-xs font-semibold text-slate-600 group-hover/perk:text-slate-900 transition-colors leading-tight">{perk}</span>
                 </div>
               ))}
             </div>
@@ -146,10 +146,10 @@ export default function Upgrade() {
           <button
             onClick={() => handleUpgradeWithBalance(plan)}
             disabled={!!loading || profile?.plan === plan.id}
-            className={`w-full py-5 rounded-[1.5rem] font-black text-base flex items-center justify-center gap-3 transition-all relative overflow-hidden group/sub ${
+            className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all relative overflow-hidden group/sub ${
               profile?.plan === plan.id
                 ? 'bg-slate-50 text-slate-400 cursor-default border border-slate-100 shadow-inner'
-                : 'bg-slate-900 text-white hover:bg-black active:scale-[0.98] shadow-2xl'
+                : 'bg-slate-900 text-white hover:bg-black active:scale-[0.98] shadow-md'
             }`}
           >
             {loading === plan.id ? (
@@ -175,49 +175,49 @@ export default function Upgrade() {
 
   return (
     <Layout title="Membership">
-      <div className="p-5 pb-24 space-y-10 max-w-2xl mx-auto relative">
+      <div className="p-3.5 sm:p-5 pb-24 space-y-6 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
         
         {/* Header */}
-        <div className="text-center pt-8 space-y-4">
+        <div className="text-center pt-4 space-y-2">
           <motion.div 
-            initial={{ y: 20, opacity: 0 }}
+            initial={{ y: 15, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="flex flex-col items-center"
           >
-            <div className="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl border border-white/10 mb-6">
-              <Sparkles size={14} className="text-amber-400" />
+            <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 text-white rounded-full text-[9px] font-black uppercase tracking-wider shadow-md border border-white/10 mb-3">
+              <Sparkles size={12} className="text-amber-400" />
               Elite Tiers
             </div>
-            <h1 className="text-5xl font-display font-black text-slate-900 tracking-tighter leading-none italic uppercase">
+            <h1 className="text-3xl sm:text-4xl font-display font-black text-slate-900 tracking-tighter leading-none italic uppercase">
               Financial <br /> <span className="text-blue-600">Freedom</span>
             </h1>
-            <p className="text-slate-500 font-bold text-sm uppercase tracking-widest mt-4">Multiply your results with high-yield tiers</p>
+            <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-2">Multiply your results with high-yield tiers</p>
           </motion.div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200">
+        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button 
             onClick={() => setActiveTab('plans')}
-            className={`flex-1 py-4 px-6 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 sm:py-3 px-3 sm:px-4 rounded-lg font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
               activeTab === 'plans' 
-                ? 'bg-slate-950 text-white shadow-xl' 
+                ? 'bg-slate-950 text-white shadow-md' 
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            <Crown size={16} />
+            <Crown size={14} />
             Subscription Plans
           </button>
           <button 
             onClick={() => setActiveTab('deposit')}
-            className={`flex-1 py-4 px-6 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 sm:py-3 px-3 sm:px-4 rounded-lg font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
               activeTab === 'deposit' 
-                ? 'bg-slate-950 text-white shadow-xl' 
+                ? 'bg-slate-950 text-white shadow-md' 
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            <Wallet size={16} />
+            <Wallet size={14} />
             Deposit Funds
           </button>
         </div>
@@ -231,10 +231,10 @@ export default function Upgrade() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex items-center gap-4 text-emerald-700 shadow-xl"
+                  className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-xl flex items-center gap-3 text-emerald-700 shadow-md"
                 >
-                  <CheckCircle2 size={24} />
-                  <p className="text-sm font-black uppercase tracking-tight">{success}</p>
+                  <CheckCircle2 size={18} className="flex-shrink-0" />
+                  <p className="text-xs font-black uppercase tracking-tight">{success}</p>
                 </motion.div>
               )}
               {error && (
@@ -242,10 +242,10 @@ export default function Upgrade() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] flex items-center gap-4 text-rose-700 shadow-xl"
+                  className="bg-rose-50 border border-rose-100 p-3.5 rounded-xl flex items-center gap-3 text-rose-700 shadow-md"
                 >
-                  <AlertCircle size={24} />
-                  <p className="text-sm font-black uppercase tracking-tight">{error}</p>
+                  <AlertCircle size={18} className="flex-shrink-0" />
+                  <p className="text-xs font-black uppercase tracking-tight">{error}</p>
                 </motion.div>
               )}
             </AnimatePresence>
