@@ -1,25 +1,21 @@
 {
-  "name": "Earnwise",
   "short_name": "Earnwise",
-  "description": "Unlock your earning potential with Earnwise. The most trusted task-based platform in Nigeria.",
-  "start_url": "/?utm_source=pwa",
-  "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#020617",
-  "orientation": "portrait",
-  "prefer_related_applications": false,
+  "name": "Earnwise Platform",
   "icons": [
     {
-      "src": "/icon-any.png",
-      "sizes": "192x192",
+      "src": "/logo.png",
       "type": "image/png",
-      "purpose": "any"
+      "sizes": "192x192"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
+      "src": "/logo.png",
       "type": "image/png",
-      "purpose": "any"
+      "sizes": "512x512"
     }
-  ]
+  ],
+  "start_url": "/",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "display": "standalone",
+  "orientation": "portrait"
 }
