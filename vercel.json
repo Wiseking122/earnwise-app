@@ -4,3 +4,4 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
+fix: persistent routing path override
