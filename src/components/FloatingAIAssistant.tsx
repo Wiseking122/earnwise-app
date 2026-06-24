@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { getApiUrl, WS_BASE_URL } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Sparkles } from 'lucide-react';
 
@@ -14,9 +15,7 @@ export default function FloatingAIAssistant() {
 
   useEffect(() => {
     // Initialize WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const socket = new WebSocket(`${protocol}//${host}`);
+    const socket = new WebSocket(WS_BASE_URL);
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);

@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { updateDoc, doc, collection, query, where, limit, onSnapshot, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import AnimatedNumber from '../components/AnimatedNumber';
@@ -26,6 +25,7 @@ import {
   Loader2,
   Search
 } from 'lucide-react';
+import { getApiUrl } from '../lib/config';
 import DepositTab from '../components/DepositTab';
 import WithdrawalTimeline from '../components/WithdrawalTimeline';
 
@@ -185,13 +185,12 @@ export default function Withdrawal() {
         setResolvingName(true);
         setResolveFeedback('');
         try {
-          const apiUrl = (import.meta as any).env.VITE_API_URL || '';
-          const response = await axios.get(`${apiUrl}/api/paystack/resolve`, {
-            params: { accountNumber: cleanNum, bankCode }
-          });
+          const res = await fetch(getApiUrl(`/api/paystack/resolve?accountNumber=${cleanNum}&bankCode=${bankCode}`));
+          const data = await res.json();
+          
           if (!isCurrent) return;
-          if (response.data && response.data.data && response.data.data.account_name) {
-            setAccountName(response.data.data.account_name);
+          if (data && data.data && data.data.account_name) {
+            setAccountName(data.data.account_name);
             setResolveFeedback('Verified Account Owner');
           } else {
             setAccountName('');
@@ -199,14 +198,9 @@ export default function Withdrawal() {
           }
         } catch (err: any) {
           if (!isCurrent) return;
-          const backendErr = err.response?.data?.error;
-          console.warn("Account name resolution resulted in mismatch:", backendErr || err.message);
+          console.warn("Account name resolution resulted in mismatch:", err.message);
           setAccountName('');
-          if (backendErr && (backendErr.includes('resolve') || backendErr.includes('validation') || backendErr.includes('check'))) {
-            setResolveFeedback('Verification mismatch: Check number/bank');
-          } else {
-            setResolveFeedback(backendErr || 'Verification failed');
-          }
+          setResolveFeedback('Verification failed');
         } finally {
           if (isCurrent) {
             setResolvingName(false);
@@ -245,10 +239,10 @@ export default function Withdrawal() {
   useEffect(() => {
     async function fetchBanks() {
       try {
-        const apiUrl = (import.meta as any).env.VITE_API_URL || '';
-        const response = await axios.get(`${apiUrl}/api/paystack/banks`);
-        if (response.data.status) {
-          setBanks(response.data.data);
+        const res = await fetch(getApiUrl('/api/paystack/banks'));
+        const data = await res.json();
+        if (data.status) {
+          setBanks(data.data);
         }
       } catch (err) {
         console.error("Failed to fetch banks", err);

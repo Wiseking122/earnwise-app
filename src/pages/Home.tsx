@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
+import { getApiUrl } from '../lib/config';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, limit, getDocs, doc, updateDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -143,8 +144,7 @@ export default function Home() {
     setShowInsightsModal(true);
     setAiInsightsError(null);
     try {
-      // Forcing absolute production URL as requested to bypass Vercel/Render connection issues
-      const res = await fetch('https://earnwise-o30u.onrender.com/api/ai/insights', {
+      const res = await fetch(getApiUrl('/api/ai/insights'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json' 

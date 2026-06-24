@@ -5,6 +5,7 @@ import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs
 import { db } from '../lib/firebase';
 import { Task, TaskCompletion, PlanType } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../lib/config';
 import { PLANS } from '../constants/plans';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -166,7 +167,7 @@ export default function TaskDetail() {
     setSubmitting(true);
     try {
       // Call the backend endpoint for secure completion
-      const resp = await fetch('/api/user/complete-task', {
+      const resp = await fetch(getApiUrl('/api/user/complete-task'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +260,7 @@ export default function TaskDetail() {
     setError('');
     setWiseAiMessage('');
     try {
-      const response = await fetch('/api/v1/tasks/verify-proof', {
+      const response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

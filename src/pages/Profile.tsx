@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../lib/config';
 import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -106,7 +107,7 @@ export default function Profile() {
     setTriggeringEncouragement(true);
     setTriggerSuccess(false);
     try {
-      const response = await fetch('/api/auth/send-daily-encouragement', {
+      const response = await fetch(getApiUrl('/api/auth/send-daily-encouragement'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

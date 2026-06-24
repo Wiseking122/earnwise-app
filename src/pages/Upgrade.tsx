@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { PLANS, PlanDetails } from '../constants/plans';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { getApiUrl } from '../lib/config';
 import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
@@ -45,7 +46,7 @@ export default function Upgrade() {
     setError(null);
     try {
       // In a real app, I'd move this to a secure server endpoint too, but I'll use verify-upgrade as a generic 'activate' call since it already handles the DB update
-      const response = await axios.post('/api/paystack/verify-upgrade', {
+      const response = await axios.post(getApiUrl('/api/paystack/verify-upgrade'), {
         reference: `WALLET_${Date.now()}`,
         userId: profile.uid,
         planId: plan.id,

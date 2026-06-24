@@ -14,6 +14,7 @@ import {
   runTransaction
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
+import { getApiUrl } from '../../lib/config';
 import { WithdrawalRequest, Transaction } from '../../types';
 import { 
   Clock, 
@@ -221,7 +222,7 @@ export default function AdminPayments() {
           // USER INTENT GUARDIAN: Email confirmation message to user upon approval via backend + EmailJS
           try {
             // Trigger server-side Nodemailer email (extremely robust and works without client-side setup)
-            fetch('/api/admin/send-payout-email', {
+            fetch(getApiUrl('/api/admin/send-payout-email'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

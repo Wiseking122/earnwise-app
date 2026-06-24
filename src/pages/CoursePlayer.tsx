@@ -28,6 +28,7 @@ import { collection, query, where, getDocs, doc, setDoc, updateDoc, increment } 
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
+import { getApiUrl } from '../lib/config';
 import { COURSES } from '../data/courses';
 import { getEnrichedStep } from '../data/courseEnrichment';
 import axios from 'axios';
@@ -118,7 +119,7 @@ export default function CoursePlayer() {
     setPurchaseError(null);
     setPurchaseLoading(true);
     try {
-      const res = await axios.post('/api/v1/academy/purchase', {
+      const res = await axios.post(getApiUrl('/api/v1/academy/purchase'), {
         userId: user.uid,
         courseId: course.id,
         courseTitle: course.title
@@ -228,7 +229,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     try {
       setMessages(prev => [...prev, { role: 'ai', content: '' }]);
       
-      const res = await fetch('/api/v1/academy/ask-tutor', {
+      const res = await fetch(getApiUrl('/api/v1/academy/ask-tutor'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -293,7 +294,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     setAiLoading(true);
     setExpandedStep("");
     try {
-      const res = await fetch('/api/v1/academy/ask-tutor', {
+      const res = await fetch(getApiUrl('/api/v1/academy/ask-tutor'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getApiUrl } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Clock, Coins, Tv, CheckCircle, X, Sparkles, Loader2 } from 'lucide-react';
 
@@ -73,7 +74,7 @@ export default function VideoAdsSection() {
     console.log(`[REWARD] Crediting user ${userId} for task ${taskId}`);
     try {
       // Placeholder fetch request to secure backend endpoint
-      const response = await fetch('/api/rewards/verify', {
+      const response = await fetch(getApiUrl('/api/rewards/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, taskId, type: 'video_ad' }),

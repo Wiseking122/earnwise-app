@@ -4,6 +4,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../lib/firebase';
 import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { getApiUrl } from '../lib/config';
 import { 
   Wallet, 
   ChevronRight, 
@@ -39,7 +40,7 @@ export default function DepositTab() {
     setLoading(true);
     try {
       const urlAmount = searchParams.get('amount');
-      const response = await axios.post('/api/paystack/verify-deposit', {
+      const response = await axios.post(getApiUrl('/api/paystack/verify-deposit'), {
         reference: ref,
         userId: user?.uid,
         amount: urlAmount || amount

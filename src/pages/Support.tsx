@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, MessageSquare, HelpCircle, Mail, Send, CheckCircle2, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getApiUrl } from '../lib/config';
 import { useAuth } from '../context/AuthContext';
 
 export default function Support() {
@@ -16,7 +17,7 @@ export default function Support() {
     e.preventDefault();
     setLoading(true);
     try {
-      await fetch('/api/support/message', {
+      await fetch(getApiUrl('/api/support/message'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

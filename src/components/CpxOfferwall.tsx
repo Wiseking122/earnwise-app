@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '../lib/config';
 import { ShieldCheck, Info } from 'lucide-react';
 
 interface CpxOfferwallProps {
@@ -23,7 +24,7 @@ export const CpxOfferwall: React.FC<CpxOfferwallProps> = ({ userId, userName, us
           email: userEmail || ''
         });
         
-        const response = await fetch(`/api/cpx/signed-url?${queryParams.toString()}`);
+        const response = await fetch(getApiUrl(`/api/cpx/signed-url?${queryParams.toString()}`));
         if (!response.ok) {
           throw new Error('Failed to fetch signed URL');
         }

@@ -12,6 +12,7 @@ import { setDoc, doc, getDoc, serverTimestamp, query, collection, where, limit, 
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogIn, UserPlus, Mail, Lock, Sparkles, AlertCircle, CheckCircle2, KeyRound, ArrowLeft, Users, Eye, EyeOff } from 'lucide-react';
 import { Logo } from '../components/Logo';
@@ -167,7 +168,7 @@ export default function Welcome() {
           safeStorage.removeItem('referralCode');
 
           // Send Welcome Email for new user
-          await axios.post('/api/auth/send-welcome-email', { 
+          await axios.post(getApiUrl('/api/auth/send-welcome-email'), { 
             email: user.email, 
             name: userData.displayName
           }).catch(err => console.error("Failed to send welcome email", err));

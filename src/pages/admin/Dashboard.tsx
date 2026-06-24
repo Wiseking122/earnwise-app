@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { collection, query, getDocs, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
+import { getApiUrl } from '../../lib/config';
 import { Link } from 'react-router-dom';
 import { 
   Users, 
@@ -107,7 +108,7 @@ export default function AdminDashboard() {
     if (!window.confirm("Move all eligible pending funds (7+ days old) to withdrawable balances?")) return;
     setClearing(true);
     try {
-      const resp = await fetch('/api/admin/clear-escrow', { method: 'POST' });
+      const resp = await fetch(getApiUrl('/api/admin/clear-escrow'), { method: 'POST' });
       const data = await resp.json();
       alert(`Success: ${data.clearedCount || 0} transactions cleared.`);
     } catch (err) {
@@ -353,7 +354,7 @@ export default function AdminDashboard() {
                   if (triggeringCoaching) return;
                   setTriggeringCoaching(true);
                   try {
-                    const r = await fetch('/api/admin/trigger-coaching', { method: 'POST' });
+                    const r = await fetch(getApiUrl('/api/admin/trigger-coaching'), { method: 'POST' });
                     const res = await r.json();
                     alert(res.message || "Standard coaching trigger completed");
                   } catch (err: any) {
@@ -374,7 +375,7 @@ export default function AdminDashboard() {
                   if (!window.confirm("Bypass 2-hour interval? Every opted-in user will instantly receive their next scheduled coaching phase.")) return;
                   setTriggeringCoaching(true);
                   try {
-                    const r = await fetch('/api/admin/trigger-coaching?force=true', { method: 'POST' });
+                    const r = await fetch(getApiUrl('/api/admin/trigger-coaching?force=true'), { method: 'POST' });
                     const res = await r.json();
                     alert(res.message || "Force dispatch executed successfully");
                   } catch (err: any) {

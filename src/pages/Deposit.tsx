@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../lib/config';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -40,7 +41,7 @@ export default function Deposit() {
     setVerifyStatus('verifying');
     setLoading(true);
     try {
-      const response = await axios.post('/api/paystack/verify-deposit', {
+      const response = await axios.post(getApiUrl('/api/paystack/verify-deposit'), {
         reference: ref,
         userId: user?.uid,
         amount: amountOverride || amount
