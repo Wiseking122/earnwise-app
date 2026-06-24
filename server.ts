@@ -179,11 +179,19 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
 
   app.use(cors({
-    origin: [
-      'http://localhost:5173',
-      'https://earnwise1.vercel.app',
-      'https://ais-dev-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      // or any localhost, vercel.app, render.com, run.app domain
+      if (!origin || 
+          origin.includes('localhost') || 
+          origin.includes('vercel.app') || 
+          origin.includes('onrender.com') || 
+          origin.includes('run.app')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Fallback to allow all origins so users never hit CORS issues
+      }
+    },
     credentials: true
   }));
 
@@ -1301,7 +1309,7 @@ User Prompt: ${promptMessage}`;
    * POST /api/v1/ai/smart-insights
    * Generates a personalized earning plan based on user profile
    */
-  app.post("/api/v1/ai/smart-insights", async (req, res) => {
+  app.post(["/api/v1/ai/smart-insights", "/api/ai/insights"], async (req, res) => {
     const { userId, balance, level, streak, plan } = req.body;
     
     try {
