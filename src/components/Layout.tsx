@@ -294,13 +294,13 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       )}
       
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pb-28 scroll-smooth no-scrollbar">
+      <main className="flex-1 overflow-y-auto pb-20 sm:pb-28 scroll-smooth no-scrollbar">
         {children}
       </main>
 
       {/* Premium Floating Navigation */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-[1000] px-2 shadow-[0_20px_50px_-10px_rgba(37,99,235,0.2)] rounded-full">
-        <nav className="bg-[#050B1A]/80 backdrop-blur-3xl border border-blue-500/20 shadow-2xl rounded-full h-16 flex items-center justify-around px-2 relative overflow-hidden">
+      <div className="fixed bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 w-[96%] max-w-md sm:max-w-lg z-[1000] px-1 sm:px-2 shadow-[0_15px_40px_-10px_rgba(37,99,235,0.2)] rounded-full">
+        <nav className="bg-[#050B1A]/85 backdrop-blur-3xl border border-blue-500/20 shadow-2xl rounded-full h-12 sm:h-16 flex items-center justify-around px-1 sm:px-2 relative overflow-hidden">
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
             
             {navItems.map((item) => {
@@ -316,19 +316,19 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
                 >
                   <motion.div 
                     whileTap={{ scale: 0.85 }}
-                    className={`p-1.5 rounded-full transition-all duration-300 relative flex flex-col items-center justify-center ${isActive ? '' : (item.locked ? 'opacity-40' : '')}`}
+                    className={`p-1 rounded-full transition-all duration-300 relative flex flex-col items-center justify-center ${isActive ? '' : (item.locked ? 'opacity-40' : '')}`}
                   >
                       {isActive && (
-                        <motion.div layoutId="nav-pill" className="absolute inset-0 bg-blue-500/10 rounded-full -z-10 shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
+                        <motion.div layoutId="nav-pill" className="absolute inset-0 bg-blue-500/10 rounded-full -z-10 shadow-[0_0_12px_rgba(59,130,246,0.3)]" />
                       )}
-                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
+                      <Icon size={15} strokeWidth={isActive ? 2.5 : 2} className={`sm:w-5 sm:h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
                       {item.locked && (
                         <div className="absolute top-0 right-0 bg-slate-900 border border-slate-700 text-slate-400 rounded-full p-[1px] shadow-sm">
-                          <Lock size={8} />
+                           <Lock size={6} />
                         </div>
                       )}
                   </motion.div>
-                  <span className={`text-[9px] font-bold mt-1 tracking-wider transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-0 h-0 mt-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto group-hover:mt-1'}`}>
+                  <span className={`text-[7.5px] sm:text-[9px] font-black mt-0.5 sm:mt-1 tracking-wider transition-all duration-300 ${isActive ? 'opacity-100 block' : 'hidden sm:block sm:opacity-0 sm:h-0 sm:mt-0 sm:overflow-hidden group-hover:sm:opacity-100 group-hover:sm:h-auto group-hover:sm:mt-1'}`}>
                       {item.label}
                   </span>
                 </Link>

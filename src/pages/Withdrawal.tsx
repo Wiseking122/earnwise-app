@@ -435,23 +435,23 @@ export default function Withdrawal() {
         {activeTab === 'withdraw' ? (
           <>
             {/* Real-time Status Alert Banner */}
-            <div className={`p-6 rounded-[2rem] border transition-all flex items-center gap-4 ${
+            <div className={`p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border transition-all flex items-center gap-3 sm:gap-4 ${
               isWindowOpen 
                 ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
                 : 'bg-rose-50 border-rose-100 text-rose-800'
             }`}>
               <span className={`w-3 h-3 rounded-full flex-shrink-0 ${isWindowOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-              <div className="flex-1 text-left">
-                <p className="text-xs font-black uppercase tracking-wider">
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-black uppercase tracking-wider truncate">
                   {isWindowOpen ? "Settlement Window Open" : "Payout Gateway Closed"}
                 </p>
                 <p className="text-[10px] font-bold uppercase opacity-85 mt-0.5 leading-relaxed">
                   {isWindowOpen ? (
                     timeRemainingStr || "Processing windows are strictly scheduled by Administration."
                   ) : (
-                    `🔒 Payout portal is currently closed. Next scheduled window: ${
+                    `🔒 Closed. Next: ${
                       payoutSettings?.payoutStartDate 
-                        ? new Date(payoutSettings.payoutStartDate).toLocaleString() 
+                        ? new Date(payoutSettings.payoutStartDate).toLocaleDateString() 
                         : 'Unscheduled'
                     }`
                   )}
@@ -460,33 +460,33 @@ export default function Withdrawal() {
             </div>
 
             {/* Available Balance Header */}
-            <div className="bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group border border-white/5">
+            <div className="bg-slate-950 rounded-2xl sm:rounded-[3rem] p-5 sm:p-10 text-white relative overflow-hidden shadow-2xl group border border-white/5">
               <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-600/20" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
               
-              <div className="relative z-10 space-y-6">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
+              <div className="relative z-10 space-y-4 sm:space-y-6">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="space-y-1 min-w-0 flex-1 text-left">
+                    <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] truncate">
                       {withdrawalType === 'task' ? 'Task Wallet Balance' : 'Referral Wallet Balance'}
                     </p>
-                    <h3 className="text-5xl font-display font-black tracking-tighter italic">
+                    <h3 className="text-3xl sm:text-5xl font-display font-black tracking-tighter italic truncate">
                       ₦<AnimatedNumber value={withdrawalType === 'task' ? (profile?.taskBalance || 0) : (profile?.referralBalance || 0)} fractionDigits={2} />
                     </h3>
                   </div>
-                  <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform">
-                    <Wallet size={28} className="text-blue-500" />
+                  <div className="w-11 h-11 sm:w-14 sm:h-14 bg-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform shrink-0">
+                    <Wallet size={20} className="text-blue-500 sm:w-7 sm:h-7" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
                   <div>
                     <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-left">Task Balance</p>
-                    <p className="text-sm font-black text-slate-200 text-left">₦{(profile?.taskBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    <p className="text-xs sm:text-sm font-black text-slate-200 text-left">₦{(profile?.taskBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div>
                     <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-left">Referral Balance</p>
-                    <p className="text-sm font-black text-slate-200 text-left">₦{(profile?.referralBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    <p className="text-xs sm:text-sm font-black text-slate-200 text-left">₦{(profile?.referralBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
 
@@ -765,48 +765,48 @@ export default function Withdrawal() {
               </button>
             </form>
 
-            <div className="bg-blue-50 rounded-[2rem] p-6 flex gap-4 border border-blue-100 italic relative overflow-hidden group">
+            <div className="bg-blue-50 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex gap-3 sm:gap-4 border border-blue-100 italic relative overflow-hidden group">
               <div className="absolute inset-0 bg-linear-to-r from-blue-600/5 to-transparent" />
-              <Zap className="text-blue-600 flex-shrink-0 animate-pulse relative z-10" size={24} />
-              <div className="relative z-10">
+              <Zap className="text-blue-600 flex-shrink-0 animate-pulse relative z-10" size={20} />
+              <div className="relative z-10 text-left">
                 <h4 className="text-[11px] font-black text-blue-900 uppercase tracking-widest">Automated Node Settlement</h4>
                 <p className="text-[10px] text-blue-800 leading-relaxed font-bold uppercase tracking-tighter mt-1">Withdrawals are processed via real-time Paystack synchronization. Settlement is usually completed within 280ms of network confirmation.</p>
               </div>
             </div>
 
             {/* Withdrawal History */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between px-4">
+            <section className="space-y-4 sm:space-y-6">
+              <div className="flex items-center justify-between px-2">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                  <History size={16} />
+                  <History size={14} />
                   Historical Protocol Data
                 </h3>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {loadingHistory ? (
-                  [1,2].map(i => <div key={`skeleton-withdraw-${i}`} className="h-24 bg-slate-50 rounded-[2rem] animate-pulse" />)
+                  [1,2].map(i => <div key={`skeleton-withdraw-${i}`} className="h-20 bg-slate-50 rounded-xl sm:rounded-[2rem] animate-pulse" />)
                 ) : withdrawals.length > 0 ? (
                   withdrawals.map((w, index) => (
-                    <div key={w.id || index} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-100 transition-colors group">
-                      <div className="flex items-center gap-5">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-colors ${
+                    <div key={w.id || index} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-100 transition-colors group gap-3">
+                      <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center border transition-colors shrink-0 ${
                           w.status === 'completed' || w.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white' : 
                           w.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-100 group-hover:bg-rose-600 group-hover:text-white' : 
                           'bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-600 group-hover:text-white'
                         }`}>
-                          {w.status === 'completed' || w.status === 'approved' ? <CheckCircle2 size={24} /> : 
-                           w.status === 'rejected' ? <X size={24} /> : <Clock size={24} />}
+                          {w.status === 'completed' || w.status === 'approved' ? <CheckCircle2 size={20} className="sm:w-6 sm:h-6" /> : 
+                           w.status === 'rejected' ? <X size={20} className="sm:w-6 sm:h-6" /> : <Clock size={20} className="sm:w-6 sm:h-6" />}
                         </div>
-                        <div>
-                          <h4 className="font-display font-black text-slate-900 text-xl italic tracking-tighter">₦{w.amount.toLocaleString()}</h4>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                        <div className="min-w-0 text-left">
+                          <h4 className="font-display font-black text-slate-900 text-base sm:text-xl italic tracking-tighter">₦{w.amount.toLocaleString()}</h4>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">
                             {w.requestedAt?.toDate?.()?.toLocaleDateString() || 'Recently'} • {w.status}
                           </p>
                           <WithdrawalTimeline status={w.status || 'submitted'} />
                         </div>
                       </div>
-                      <div className="hidden md:block">
+                      <div className="hidden md:block shrink-0">
                         <ChevronDown className="-rotate-90 text-slate-200" />
                       </div>
                     </div>

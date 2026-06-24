@@ -99,37 +99,37 @@ export default function Referral() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white border border-slate-100 p-5 rounded-[2rem] shadow-sm flex flex-col items-center text-center">
+          <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex flex-col items-center text-center">
             <Users size={20} className="text-blue-500 mb-2" />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Referred</span>
-            <span className="text-2xl font-display font-black text-slate-900 mt-1">{profile?.totalReferrals || 0}</span>
+            <span className="text-xl sm:text-2xl font-display font-black text-slate-900 mt-1">{profile?.totalReferrals || 0}</span>
           </div>
-          <div className="bg-white border border-slate-100 p-5 rounded-[2rem] shadow-sm flex flex-col items-center text-center">
+          <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex flex-col items-center text-center">
             <Zap size={20} className="text-amber-500 mb-2" />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Bonus Earned</span>
-            <span className="text-2xl font-display font-black text-slate-900 mt-1">₦{(profile?.referralEarnings || 0).toLocaleString()}</span>
+            <span className="text-xl sm:text-2xl font-display font-black text-slate-900 mt-1">₦{(profile?.referralEarnings || 0).toLocaleString()}</span>
           </div>
         </div>
 
         {/* Hero Banner Part 2 */}
-        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-200">
+        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-200">
           <div className="relative z-10 flex flex-col items-center">
-            <h3 className="text-xl font-black mb-2 flex items-center gap-2">
-              <Gift size={24} className="text-yellow-400" />
+            <h3 className="text-lg sm:text-xl font-black mb-2 flex items-center gap-2">
+              <Gift size={20} className="text-yellow-400 sm:w-6 sm:h-6" />
               Invite & Earn
             </h3>
-            <p className="text-blue-100 text-[10px] uppercase font-black tracking-widest mb-6">Commission for Lifetime</p>
+            <p className="text-blue-100 text-[9px] sm:text-[10px] uppercase font-black tracking-widest mb-4 sm:mb-6">Commission for Lifetime</p>
             
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 w-full border border-white/20 mb-6 text-center">
-              <p className="text-[10px] font-black text-blue-200 uppercase tracking-widest mb-2">Referral Code</p>
-              <p className="text-4xl font-mono font-black tracking-[0.2em]">{profile?.referralCode}</p>
+            <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 w-full border border-white/20 mb-4 sm:mb-6 text-center">
+              <p className="text-[9px] sm:text-[10px] font-black text-blue-200 uppercase tracking-widest mb-1.5">Referral Code</p>
+              <p className="text-2xl sm:text-4xl font-mono font-black tracking-[0.2em]">{profile?.referralCode}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 w-full">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full">
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={copyToClipboard}
-                className="bg-white text-blue-600 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-colors shadow-lg relative overflow-hidden cursor-pointer"
+                className="bg-white text-blue-600 py-2.5 sm:py-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors shadow-lg relative overflow-hidden cursor-pointer"
               >
                 <AnimatePresence mode="wait">
                   {copiedCode ? (
@@ -139,9 +139,9 @@ export default function Referral() {
                       animate={{ scale: 1, rotate: 0 }}
                       exit={{ scale: 0, rotate: 45 }}
                       transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                      className="flex items-center gap-2 text-green-600 justify-center"
+                      className="flex items-center gap-1.5 text-green-600 justify-center"
                     >
-                      <CheckCircle2 size={16} /> Verified!
+                      <CheckCircle2 size={14} /> Verified!
                     </motion.div>
                   ) : (
                     <motion.div
@@ -149,18 +149,18 @@ export default function Referral() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       exit={{ scale: 0 }}
-                      className="flex items-center gap-2 justify-center"
+                      className="flex items-center gap-1.5 justify-center"
                     >
-                      <Copy size={16} /> Copy Code
+                      <Copy size={14} /> Copy Code
                     </motion.div>
                   )}
                 </AnimatePresence>
               </motion.button>
               <button 
                 onClick={handleShare}
-                className="bg-blue-500 text-white py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg border border-blue-400/30"
+                className="bg-blue-500 text-white py-2.5 sm:py-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-lg border border-blue-400/30"
               >
-                <Share2 size={16} /> Share Now
+                <Share2 size={14} /> Share Now
               </button>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function Referral() {
         </div>
 
         {/* Social Quick Share */}
-        <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm">
+        <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-sm">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 text-center">Direct Share Options</p>
           <div className="flex justify-between items-center px-4">
             {socialPlatforms.map((platform) => (

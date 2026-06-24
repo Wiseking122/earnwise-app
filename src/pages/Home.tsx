@@ -181,25 +181,25 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="p-5 pb-24 space-y-8 max-w-2xl mx-auto relative">
+      <div className="p-3 sm:p-5 pb-24 space-y-5 sm:space-y-8 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
         
         <PayoutTicker />
 
         {/* Header Section */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <motion.div 
               whileHover={{ scale: 1.05, rotate: 5 }}
-              className="w-14 h-14 bg-linear-to-br from-blue-500 to-indigo-600 rounded-2xl p-[2px] shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+              className="w-11 h-11 sm:w-14 sm:h-14 bg-linear-to-br from-blue-500 to-indigo-600 rounded-xl sm:rounded-2xl p-[2px] shadow-[0_0_12px_rgba(59,130,246,0.4)]"
             >
-                <div className="w-full h-full bg-slate-900 rounded-[0.9rem] flex items-center justify-center font-black text-blue-400 text-2xl border border-blue-500/30">
+                <div className="w-full h-full bg-slate-900 rounded-[0.6rem] sm:rounded-[0.9rem] flex items-center justify-center font-black text-blue-400 text-lg sm:text-2xl border border-blue-500/30">
                   {profile?.displayName?.[0] || 'U'}
                 </div>
             </motion.div>
             <div>
-              <p className="text-[10px] text-blue-400 font-black uppercase tracking-[0.2em] mb-0.5">Account Overview</p>
-              <h1 className="font-display font-black text-white text-2xl leading-none drop-shadow-md">
+              <p className="text-[8px] sm:text-[10px] text-blue-400 font-black uppercase tracking-[0.2em] mb-0.5">Account Overview</p>
+              <h1 className="font-display font-black text-white text-xl sm:text-2xl leading-none drop-shadow-md">
                 Hi, {profile?.displayName?.split(' ')[0] || 'Earner'}
               </h1>
             </div>
@@ -208,17 +208,17 @@ export default function Home() {
           <div className="flex gap-2">
             <motion.div 
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 bg-slate-900/60 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
+              className="flex items-center gap-1.5 sm:gap-2 bg-slate-900/60 backdrop-blur-xl px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border border-white/10 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
             >
               <div className="relative">
-                  <Flame size={18} className="text-orange-500 fill-orange-500" />
+                  <Flame size={15} className="text-orange-500 fill-orange-500 sm:w-[18px] sm:h-[18px]" />
                   <motion.div 
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ repeat: Infinity, duration: 2 }}
                     className="absolute inset-0 bg-orange-500 blur-md opacity-40"
                   />
               </div>
-              <span className="font-black text-white text-sm tracking-tight">{profile?.streak || 0} Streak</span>
+              <span className="font-black text-white text-xs sm:text-sm tracking-tight">{profile?.streak || 0} Streak</span>
             </motion.div>
           </div>
         </div>
@@ -231,11 +231,11 @@ export default function Home() {
             hidden: { opacity: 0 },
             visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
           }}
-          className="grid grid-cols-6 gap-4"
+          className="grid grid-cols-6 gap-3 sm:gap-4"
         >
           {/* Main Balance Card */}
           {/* Main Balance Card (Virtual Card Design) */}
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 bg-slate-900/80 backdrop-blur-3xl border border-blue-500/30 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 text-white relative overflow-hidden group shadow-[0_15px_50px_rgba(37,99,235,0.2)]">
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 bg-slate-900/80 backdrop-blur-3xl border border-blue-500/30 rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-6 text-white relative overflow-hidden group shadow-[0_15px_50px_rgba(37,99,235,0.2)]">
             {/* Holographic metallic effect */}
             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-400/5 to-white/10 opacity-50 z-0 pointer-events-none" />
             
@@ -243,53 +243,53 @@ export default function Home() {
             <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full -ml-20 -mb-20 pointer-events-none blur-2xl" style={{ background: 'radial-gradient(circle, rgba(147, 51, 234, 0.3) 0%, transparent 70%)' }} />
             
             {/* Virtual Card Chip & Logo */}
-            <div className="relative z-10 flex justify-between items-center mb-6">
-              <div className="w-12 h-9 rounded-md border border-amber-500/30 bg-gradient-to-br from-amber-200/20 to-yellow-500/10 flex flex-col justify-center gap-1.5 px-2.5 overflow-hidden shadow-inner relative">
+            <div className="relative z-10 flex justify-between items-center mb-4 sm:mb-6">
+              <div className="w-10 h-7 rounded border border-amber-500/30 bg-gradient-to-br from-amber-200/20 to-yellow-500/10 flex flex-col justify-center gap-1 px-2 overflow-hidden shadow-inner relative">
                  <div className="w-full h-px bg-amber-500/20"></div>
                  <div className="w-full h-px bg-amber-500/20"></div>
                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/30 to-transparent w-[200%] -translate-x-[50%] group-hover:translate-x-[0%] transition-transform duration-1000" />
               </div>
-              <div className="flex gap-1.5 opacity-80">
-                 <div className="w-6 h-6 rounded-full bg-red-500/80 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
-                 <div className="w-6 h-6 rounded-full bg-amber-500/80 -ml-3 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
+              <div className="flex gap-1 opacity-80">
+                 <div className="w-5 h-5 rounded-full bg-red-500/80 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
+                 <div className="w-5 h-5 rounded-full bg-amber-500/80 -ml-2.5 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
               </div>
             </div>
 
-            <div className="relative z-10 flex flex-col h-full justify-start gap-4 sm:gap-6">
+            <div className="relative z-10 flex flex-col h-full justify-start gap-3 sm:gap-6">
               <div className="flex justify-between items-start gap-2">
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-blue-200 text-[10px] font-black uppercase tracking-[0.2em] truncate drop-shadow-md">Available Balance</p>
-                    <div className="w-1.5 h-1.5 bg-emerald-400 opacity-80 rounded-full animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-1 sm:mb-2">
+                    <p className="text-blue-200 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] truncate drop-shadow-md">Available Balance</p>
+                    <div className="w-1 h-1 bg-emerald-400 opacity-80 rounded-full animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   </div>
-                  <h2 className="text-4xl sm:text-5xl md:text-6xl font-display font-black tracking-tight text-white mb-1 break-all select-all drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+                  <h2 className="text-2xl sm:text-4xl md:text-5xl font-display font-black tracking-tight text-white mb-0.5 break-all select-all drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
                     ₦<AnimatedNumber value={profile?.balance || 0} fractionDigits={2} />
                   </h2>
-                  <p className="text-blue-400/80 text-[10px] font-bold uppercase tracking-widest truncate">Virtual Card Active</p>
+                  <p className="text-blue-400/80 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest truncate">Virtual Card Active</p>
                 </div>
-                <div className="flex gap-2 sm:gap-3 shrink-0">
-                  <Link to="/deposit" className="w-12 h-12 sm:w-14 sm:h-14 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all active:scale-95 group/icon relative overflow-hidden">
+                <div className="flex gap-1.5 sm:gap-3 shrink-0">
+                  <Link to="/deposit" className="w-9 h-9 sm:w-12 sm:h-12 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all active:scale-95 group/icon relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/20 to-transparent opacity-0 group-hover/icon:opacity-100 transition-opacity" />
-                    <Zap size={22} className="text-blue-400 group-hover/icon:scale-110 transition-transform drop-shadow" />
+                    <Zap size={16} className="text-blue-400 sm:w-5 sm:h-5 group-hover/icon:scale-110 transition-transform drop-shadow" />
                   </Link>
-                  <Link to="/withdrawal" className="w-12 h-12 sm:w-14 sm:h-14 bg-linear-to-tr from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.4)]">
-                    <Wallet size={22} className="text-white drop-shadow" />
+                  <Link to="/withdrawal" className="w-9 h-9 sm:w-12 sm:h-12 bg-linear-to-tr from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 rounded-lg sm:rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                    <Wallet size={16} className="text-white sm:w-5 sm:h-5 drop-shadow" />
                   </Link>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-2 mb-2">
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 mt-1 mb-1">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
                   <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
-                  <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1 truncate">Task Earnings</p>
-                  <h3 className="text-xl font-display font-black text-white truncate drop-shadow-md">
+                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Task Earnings</p>
+                  <h3 className="text-sm sm:text-lg font-display font-black text-white truncate drop-shadow-md">
                     ₦<AnimatedNumber value={profile?.taskEarnings || 0} />
                   </h3>
                 </div>
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
                   <div className="absolute -inset-2 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
-                  <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1 truncate">Referral Rewards</p>
-                  <h3 className="text-xl font-display font-black text-white truncate drop-shadow-md">
+                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Referral Rewards</p>
+                  <h3 className="text-sm sm:text-lg font-display font-black text-white truncate drop-shadow-md">
                     ₦<AnimatedNumber value={profile?.referralEarnings || 0} />
                   </h3>
                 </div>
@@ -298,22 +298,22 @@ export default function Home() {
           </motion.div>
 
           {/* AI Smart Assistant Card */}
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 bg-indigo-900/40 backdrop-blur-3xl border border-indigo-500/30 rounded-[2rem] p-5 shadow-[0_8px_32px_rgba(79,70,229,0.2)] relative overflow-hidden group">
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 bg-indigo-900/40 backdrop-blur-3xl border border-indigo-500/30 rounded-2xl p-4 shadow-md relative overflow-hidden group">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
             <div className="absolute -inset-10 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent translate-x-[-100%] animate-[shimmer_3s_infinite] pointer-events-none" />
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex gap-4 items-center">
-                 <div className="w-12 h-12 bg-indigo-500/20 border border-indigo-400/50 rounded-full flex items-center justify-center text-indigo-300 shadow-[0_0_20px_rgba(99,102,241,0.5)]">
-                    <Bot size={24} className="animate-pulse" />
+              <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
+                 <div className="w-10 h-10 bg-indigo-500/20 border border-indigo-400/50 rounded-full flex items-center justify-center text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.4)] shrink-0">
+                    <Bot size={20} className="animate-pulse" />
                  </div>
-                 <div>
-                    <h4 className="font-display font-black text-white text-lg drop-shadow-md flex items-center gap-2">Wise AI Assistant <span className="px-2 py-0.5 bg-indigo-500 text-white text-[8px] rounded-full uppercase tracking-widest">Beta</span></h4>
-                    <p className="text-indigo-300 text-[10px] font-bold uppercase tracking-widest mt-0.5 line-clamp-1">Based on your activity, we predict you can earn ₦1,500 today.</p>
+                 <div className="min-w-0">
+                    <h4 className="font-display font-black text-white text-sm sm:text-base drop-shadow-md flex items-center gap-1.5">Wise AI Assistant <span className="px-1.5 py-0.5 bg-indigo-500 text-white text-[7px] rounded-full uppercase tracking-widest font-black">Beta</span></h4>
+                    <p className="text-indigo-300 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest mt-0.5 line-clamp-1">Based on your activity, we predict you can earn ₦1,500 today.</p>
                  </div>
               </div>
               <button 
                 onClick={viewAiPlan}
-                className="bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-400/30 transition-colors"
+                className="bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 px-3 py-1.5 rounded-lg text-[8.5px] sm:text-[10px] font-black uppercase tracking-widest border border-indigo-400/30 transition-colors shrink-0"
                 >
                 View Plan
               </button>
@@ -321,33 +321,33 @@ export default function Home() {
           </motion.div>
 
           {/* XP Progress Card */}
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 md:col-span-3 bg-slate-900/60 backdrop-blur-3xl rounded-[2rem] p-6 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] space-y-4 hover:shadow-2xl hover:bg-slate-900/80 transition-all group">
-            <div className="flex justify-between items-center">
-              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Level Progression</h4>
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 md:col-span-3 bg-slate-900/60 backdrop-blur-3xl rounded-2xl p-4 border border-white/10 shadow-sm space-y-3.5 hover:shadow-lg hover:bg-slate-900/80 transition-all group">
+            <div className="flex justify-between items-center gap-1">
+              <h4 className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest">Level Progression</h4>
               <button
                 onClick={() => { setLevelUpNumber(profile?.level || 1); setShowLevelUpModal(true); }}
-                className="text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:shadow-[0_0_20px_rgba(245,158,11,0.6)] transition-all cursor-pointer flex items-center gap-1 active:scale-95 border border-amber-400/50 outline-none select-none"
+                className="text-[8.5px] sm:text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2.5 py-1 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.3)] hover:shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all cursor-pointer flex items-center gap-1 active:scale-95 border border-amber-400/50 outline-none select-none"
                 title="Review level milestones and celebrate"
               >
-                <Sparkles size={10} className="animate-pulse" /> Celebrate Level {profile?.level || 1}
+                <Sparkles size={9} className="animate-pulse" /> Celebrate Tier {profile?.level || 1}
               </button>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p className="text-xs text-slate-500 font-bold uppercase">Now</p>
-                <p className="text-3xl font-display font-black text-white leading-none drop-shadow">{profile?.level || 1}</p>
+            <div className="flex items-center gap-3">
+              <div className="text-center shrink-0">
+                <p className="text-[9px] text-slate-500 font-bold uppercase">Now</p>
+                <p className="text-xl sm:text-2xl font-display font-black text-white leading-none drop-shadow">{profile?.level || 1}</p>
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-slate-800/80 rounded-full overflow-hidden border border-white/5 shadow-inner">
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <div className="h-2.5 bg-slate-800/80 rounded-full overflow-hidden border border-white/5 shadow-inner">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
-                    className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full relative shadow-[0_0_10px_rgba(99,102,241,0.6)]"
+                    className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full relative shadow-[0_0_8px_rgba(99,102,241,0.5)]"
                   >
                     <div className="absolute top-0 right-0 bottom-0 w-4 bg-white/30 animate-pulse rounded-full" />
                   </motion.div>
                 </div>
-                <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                <div className="flex justify-between text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">
                   <span className="text-blue-400">{currentXp.toLocaleString()} XP</span>
                   <span className="text-purple-400">{nextLevelXp.toLocaleString()} XP</span>
                 </div>
@@ -356,25 +356,25 @@ export default function Home() {
           </motion.div>
 
           {/* Quick Actions Card */}
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 md:col-span-3 grid grid-cols-2 gap-3">
-            <Link to="/lucky-spin" className="bg-emerald-900/20 backdrop-blur-3xl border border-emerald-500/20 rounded-3xl p-5 flex flex-col justify-between shadow-[0_8px_32px_rgba(16,185,129,0.1)] hover:shadow-[0_8px_40px_rgba(16,185,129,0.2)] hover:bg-emerald-900/30 hover:border-emerald-500/40 transition-all active:scale-95 group overflow-hidden relative">
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 md:col-span-3 grid grid-cols-2 gap-2.5">
+            <Link to="/lucky-spin" className="bg-emerald-900/20 backdrop-blur-3xl border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between shadow-sm hover:bg-emerald-900/30 hover:border-emerald-500/40 transition-all active:scale-95 group overflow-hidden relative">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-4 border border-emerald-500/30">
-                <Dices className="text-emerald-400 group-hover:scale-110 transition-transform relative z-10" size={24} />
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-3 border border-emerald-500/30">
+                <Dices className="text-emerald-400 group-hover:scale-110 transition-transform relative z-10" size={20} />
               </div>
-              <div className="relative z-10 pt-2">
-                <h5 className="text-sm font-black text-white leading-tight drop-shadow-md">Lucky Spin</h5>
-                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">Win ₦500</p>
+              <div className="relative z-10 pt-1">
+                <h5 className="text-xs font-black text-white leading-tight drop-shadow-md">Lucky Spin</h5>
+                <p className="text-[8.5px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">Win ₦500</p>
               </div>
             </Link>
-            <Link to="/vault" className="bg-purple-900/20 backdrop-blur-3xl border border-purple-500/20 rounded-3xl p-5 flex flex-col justify-between shadow-[0_8px_32px_rgba(168,85,247,0.1)] hover:shadow-[0_8px_40px_rgba(168,85,247,0.2)] hover:bg-purple-900/30 hover:border-purple-500/40 transition-all active:scale-95 group overflow-hidden relative">
+            <Link to="/vault" className="bg-purple-900/20 backdrop-blur-3xl border border-purple-500/20 rounded-2xl p-4 flex flex-col justify-between shadow-sm hover:bg-purple-900/30 hover:border-purple-500/40 transition-all active:scale-95 group overflow-hidden relative">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-4 border border-purple-500/30">
-                <Lock className="text-purple-400 group-hover:scale-110 transition-transform relative z-10" size={24} />
+              <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center mb-3 border border-purple-500/30">
+                <Lock className="text-purple-400 group-hover:scale-110 transition-transform relative z-10" size={20} />
               </div>
-              <div className="relative z-10 pt-2">
-                <h5 className="text-sm font-black text-white leading-tight drop-shadow-md">Stake Vault</h5>
-                <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest mt-0.5">5% Bonus</p>
+              <div className="relative z-10 pt-1">
+                <h5 className="text-xs font-black text-white leading-tight drop-shadow-md">Stake Vault</h5>
+                <p className="text-[8.5px] text-purple-400 font-bold uppercase tracking-widest mt-0.5">5% Bonus</p>
               </div>
             </Link>
           </motion.div>
@@ -382,32 +382,32 @@ export default function Home() {
           {/* Plan Status Banner */}
           <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6">
             {profile?.plan !== 'free' ? (
-              <div className="bg-linear-to-r from-amber-400 to-orange-500 p-6 rounded-[2rem] text-white flex items-center justify-between shadow-xl shadow-orange-500/20 border border-orange-400/20">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center border border-white/20">
-                    <Crown size={24} className="fill-white" />
+              <div className="bg-linear-to-r from-amber-400 to-orange-500 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between shadow-md border border-orange-400/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center border border-white/20">
+                    <Crown size={20} className="fill-white" />
                   </div>
                   <div>
-                    <h4 className="font-display font-black text-lg leading-tight uppercase tracking-tighter">{profile?.plan} Plan Active</h4>
-                    <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Multiplier: {multiplier}x Reward Boost</p>
+                    <h4 className="font-display font-black text-sm sm:text-base leading-tight uppercase tracking-tighter">{profile?.plan} Plan Active</h4>
+                    <p className="text-white/80 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest">Multiplier: {multiplier}x Reward Boost</p>
                   </div>
                 </div>
-                <Link to="/upgrade" className="bg-white text-orange-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-transform hover:bg-orange-50">
+                <Link to="/upgrade" className="bg-white text-orange-600 px-4 py-2 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
                   Upgrade
                 </Link>
               </div>
             ) : (
-              <Link to="/upgrade" className="bg-blue-600 p-6 rounded-[2rem] text-white flex items-center justify-between shadow-lg shadow-blue-100 border border-blue-500 group">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                    <Zap size={24} className="fill-white animate-pulse" />
+              <Link to="/upgrade" className="bg-blue-600 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between shadow-md border border-blue-500 group">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                    <Zap size={20} className="fill-white animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="font-display font-black text-lg leading-tight">Activate High-Yield Plan</h4>
-                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Boost your earnings by 5.0x</p>
+                    <h4 className="font-display font-black text-sm sm:text-base leading-tight">Activate High-Yield Plan</h4>
+                    <p className="text-white/70 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest">Boost your earnings by 5.0x</p>
                   </div>
                 </div>
-                <ArrowRight className="group-hover:translate-x-2 transition-transform" />
+                <ArrowRight className="group-hover:translate-x-1.5 transition-transform" size={16} />
               </Link>
             )}
           </motion.div>
@@ -420,103 +420,103 @@ export default function Home() {
         <DailyGoal />
 
         {/* Quick Links Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link to="/lucky-spin" className="dark-glass-card p-6 rounded-[2rem] text-white group relative overflow-hidden active:scale-[0.98] transition-all">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <Link to="/lucky-spin" className="dark-glass-card p-4 rounded-2xl text-white group relative overflow-hidden active:scale-[0.98] transition-all">
             <div className="absolute inset-0 bg-linear-to-br from-emerald-500/20 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                  <Play size={20} className="fill-white" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                  <Play size={18} className="fill-white" />
                 </div>
                 <div>
-                  <h4 className="font-display font-black text-lg">Daily Spin</h4>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Rewards Reset in 4h</p>
+                  <h4 className="font-display font-black text-base">Daily Spin</h4>
+                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Rewards Reset in 4h</p>
                 </div>
               </div>
-              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform" />
+              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform" size={16} />
             </div>
           </Link>
 
-          <Link to="/outline" className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-6 rounded-[2rem] group relative overflow-hidden active:scale-[0.98] transition-all shadow-[0_8px_32px_rgba(0,0,0,0.2)] hover:shadow-[0_8px_40px_rgba(37,99,235,0.15)] hover:border-blue-500/30">
+          <Link to="/outline" className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-4 rounded-2xl group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm hover:shadow-md hover:border-blue-500/30">
             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.3)] border border-blue-500/30 text-blue-400 rounded-2xl flex items-center justify-center">
-                  <TrendingUp size={20} />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-500/30 text-blue-400 rounded-xl flex items-center justify-center">
+                  <TrendingUp size={18} />
                 </div>
                 <div>
-                  <h4 className="font-display font-black text-lg text-white drop-shadow-sm">Earning Guide</h4>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Master EarnWise</p>
+                  <h4 className="font-display font-black text-base text-white drop-shadow-sm">Earning Guide</h4>
+                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Master EarnWise</p>
                 </div>
               </div>
-              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform group-hover:text-blue-400" />
+              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform group-hover:text-blue-400" size={16} />
             </div>
           </Link>
         </div>
 
         {/* Featured Opportunities Section */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-              <h3 className="text-xl font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Premium Jobs</h3>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Premium Jobs</h3>
             </div>
-            <Link to="/tasks" className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-400 transition-colors">
+            <Link to="/tasks" className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-400 transition-colors">
               View All Tasks
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3.5">
              {/* Surveys & Ads Center Preview */}
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-2 gap-3">
                <Link 
                 to="/tasks?category=survey"
-                className="bg-orange-500/10 border border-orange-500/30 p-6 rounded-[2rem] text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
+                className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-2xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg group-hover:rotate-12 transition-transform">
-                   <Search size={22} />
+                 <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white mb-3 shadow-md group-hover:rotate-12 transition-transform">
+                   <Search size={18} />
                  </div>
-                 <h4 className="font-display font-black text-white text-lg uppercase italic tracking-tighter">Paid Surveys</h4>
-                 <p className="text-orange-400 text-[9px] font-bold uppercase tracking-widest mt-1">High-Yield Global</p>
+                 <h4 className="font-display font-black text-white text-sm sm:text-base uppercase italic tracking-tighter">Paid Surveys</h4>
+                 <p className="text-orange-400 text-[8.5px] font-bold uppercase tracking-widest mt-1">High-Yield Global</p>
                </Link>
                
                <Link 
                 to="/tasks?category=ad"
-                className="bg-emerald-500/10 border border-emerald-500/30 p-6 rounded-[2rem] text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
+                className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg group-hover:rotate-12 transition-transform">
-                   <Play size={22} className="fill-white" />
+                 <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-3 shadow-md group-hover:rotate-12 transition-transform">
+                   <Play size={18} className="fill-white" />
                  </div>
-                 <h4 className="font-display font-black text-white text-lg uppercase italic tracking-tighter">Ads Center</h4>
-                 <p className="text-emerald-400 text-[9px] font-bold uppercase tracking-widest mt-1">Montage Network</p>
+                 <h4 className="font-display font-black text-white text-sm sm:text-base uppercase italic tracking-tighter">Ads Center</h4>
+                 <p className="text-emerald-400 text-[8.5px] font-bold uppercase tracking-widest mt-1">Montage Network</p>
                </Link>
              </div>
 
             {loading ? (
-              [1, 2].map(i => <div key={`skeleton-home-${i}`} className="h-32 bg-slate-800/50 rounded-[2.5rem] animate-pulse border border-white/5" />)
+              [1, 2].map(i => <div key={`skeleton-home-${i}`} className="h-28 bg-slate-800/50 rounded-2xl animate-pulse border border-white/5" />)
             ) : (
               featuredTasks.map((task, index) => (
                 <Link 
                   key={task.id || index} 
                   to={`/tasks/${task.id}`}
-                  className="group bg-slate-900/60 backdrop-blur-3xl border border-white/10 p-6 rounded-[2.5rem] shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_40px_rgba(37,99,235,0.15)] hover:border-blue-500/30 hover:bg-slate-900/80 transition-all active:scale-[0.98] relative overflow-hidden"
+                  className="group bg-slate-900/60 backdrop-blur-3xl border border-white/10 p-4 rounded-2xl shadow-sm hover:border-blue-500/30 hover:bg-slate-900/80 transition-all active:scale-[0.98] relative overflow-hidden"
                 >
                   <div className="flex justify-between items-center relative z-10">
-                    <div className="flex gap-4 items-center">
-                      <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-slate-300 border border-white/10 group-hover:bg-blue-500/20 group-hover:border-blue-500/40 group-hover:text-blue-400 transition-all duration-300 shadow-inner">
-                        <Target size={24} className="group-hover:scale-110 transition-transform" />
+                    <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
+                      <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-slate-300 border border-white/10 group-hover:bg-blue-500/20 group-hover:border-blue-500/40 group-hover:text-blue-400 transition-all duration-300 shadow-inner shrink-0">
+                        <Target size={18} className="group-hover:scale-110 transition-transform" />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-300 transition-colors">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-300 transition-colors">
                             {task.type.replace('_', ' ')}
                             </span>
                         </div>
-                        <h4 className="font-display font-black text-white text-lg leading-tight group-hover:text-blue-400 transition-colors uppercase italic drop-shadow-sm">{task.title}</h4>
+                        <h4 className="font-display font-black text-white text-base leading-tight group-hover:text-blue-400 transition-colors uppercase italic drop-shadow-sm truncate">{task.title}</h4>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-slate-900 font-display font-black text-2xl tracking-tighter">₦{(task.reward * multiplier).toFixed(0)}</p>
+                    <div className="text-right shrink-0">
+                      <p className="text-slate-900 font-display font-black text-lg sm:text-2xl tracking-tighter">₦{(task.reward * multiplier).toFixed(0)}</p>
                       <div className="flex items-center justify-end gap-1">
                         <Zap size={10} className="text-blue-600 fill-blue-600" />
                         <span className="text-[9px] text-blue-600 font-black uppercase tracking-tighter">Boosted</span>
@@ -531,7 +531,7 @@ export default function Home() {
 
 
         {/* Global Activity Feed */}
-        <section className="bg-slate-950 rounded-[3rem] p-8 sm:p-10 text-white space-y-8 overflow-hidden relative shadow-2xl">
+        <section className="bg-slate-950 rounded-2xl sm:rounded-[3rem] p-4 sm:p-10 text-white space-y-6 sm:space-y-8 overflow-hidden relative shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.1),transparent)]" />
             
             <div className="flex items-center justify-between relative z-10">

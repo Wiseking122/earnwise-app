@@ -104,77 +104,77 @@ export default function TaskList() {
 
   return (
     <Layout title="Premium Jobs">
-      <div className="p-5 pb-24 space-y-8 max-w-2xl mx-auto relative">
+      <div className="p-3 sm:p-5 pb-24 space-y-5 sm:space-y-8 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
         
         {/* Search & Statistics Header */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={20} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
             <input 
               type="text" 
               placeholder="Search premium opportunities..."
-              className="w-full bg-white border border-slate-100 rounded-[2rem] py-4 pl-14 pr-6 text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium shadow-sm outline-none"
+              className="w-full bg-white border border-slate-100 rounded-2xl py-3 pl-11 pr-5 text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium shadow-sm outline-none"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
-              <h3 className="font-display font-black text-slate-900 uppercase tracking-tighter text-xl">Job Categories</h3>
-              <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest">{filteredTasks.length} Live</span>
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-display font-black text-slate-900 uppercase tracking-tighter text-lg">Job Categories</h3>
+              <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">{filteredTasks.length} Live</span>
             </div>
           </div>
         </div>
 
         {/* Main Category Grid */}
-        <div className="grid grid-cols-2 gap-4 pb-2">
+        <div className="grid grid-cols-2 gap-3 pb-1">
             {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
               <button
                 key={cat.id}
                 onClick={() => {
                   setActiveCategory(cat.id);
                 }}
-                className={`p-4 sm:p-5 rounded-3xl sm:rounded-[2rem] border transition-all flex flex-col items-start gap-4 relative overflow-hidden group ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col items-start gap-3 relative overflow-hidden group ${
                   activeCategory === cat.id
-                    ? 'bg-slate-950 border-slate-900 shadow-2xl scale-[1.02]' 
-                    : 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-lg shadow-sm'
+                    ? 'bg-slate-950 border-slate-900 shadow-lg scale-[1.01]' 
+                    : 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-md shadow-sm'
                 }`}
               >
-                 <div className={`absolute top-4 right-4 bg-blue-600 text-white text-[8px] font-black min-w-[1.5rem] h-6 px-1.5 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.4)] animate-pulse z-10`}>
-                   {cat.id === 'ad' ? taskCounts.ad : taskCounts[cat.id as keyof typeof taskCounts] || 0}
+                 <div className={`absolute top-3 right-3 bg-blue-600 text-white text-[7.5px] font-black min-w-[1.25rem] h-5 px-1 rounded-full flex items-center justify-center shadow-md animate-pulse z-10`}>
+                    {cat.id === 'ad' ? taskCounts.ad : taskCounts[cat.id as keyof typeof taskCounts] || 0}
                  </div>
                  
-                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500 relative z-10 ${
-                  activeCategory === cat.id ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-900 border border-slate-100'
-                }`}>
-                   <cat.icon size={22} className={activeCategory === cat.id ? 'fill-white' : ''} />
-                </div>
-                
-                <div className="relative z-10">
-                  <h4 className={`text-sm font-display font-black uppercase tracking-tight italic ${
-                    activeCategory === cat.id ? 'text-white' : 'text-slate-900'
-                  }`}>
-                    {cat.label}
-                  </h4>
-                  <p className={`text-[9px] font-bold uppercase tracking-widest leading-none mt-1 ${
-                    activeCategory === cat.id ? 'text-slate-500' : 'text-slate-400'
-                  }`}>{cat.subtext || 'Explore Global'}</p>
-                </div>
+                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 duration-500 relative z-10 ${
+                   activeCategory === cat.id ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-900 border border-slate-100'
+                 }`}>
+                    <cat.icon size={18} className={activeCategory === cat.id ? 'fill-white' : ''} />
+                 </div>
+                 
+                 <div className="relative z-10">
+                   <h4 className={`text-xs font-display font-black uppercase tracking-tight italic ${
+                     activeCategory === cat.id ? 'text-white' : 'text-slate-900'
+                   }`}>
+                     {cat.label}
+                   </h4>
+                   <p className={`text-[8px] font-bold uppercase tracking-widest leading-none mt-1 ${
+                     activeCategory === cat.id ? 'text-slate-500' : 'text-slate-400'
+                   }`}>{cat.subtext || 'Explore Global'}</p>
+                 </div>
 
-                {activeCategory === cat.id && (
-                  <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
-                )}
-             </button>
+                 {activeCategory === cat.id && (
+                   <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
+                 )}
+              </button>
             ))}
         </div>
 
         {/* Filter Toggle */}
-        <div className="flex gap-3 px-1">
+        <div className="flex gap-2 px-1">
             <button
                onClick={() => setActiveCategory('all')}
-               className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm ${
+               className={`px-4 py-2 rounded-xl text-[8.5px] sm:text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm ${
                  activeCategory === 'all' 
                    ? 'bg-slate-950 text-white border-slate-900' 
                    : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'
@@ -185,17 +185,17 @@ export default function TaskList() {
         </div>
 
         {/* Task List */}
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
           {activeCategory === 'video' && <VideoAdsSection />}
           {activeCategory === 'survey' && user && (
-            <div className="space-y-6">
+            <div className="space-y-4">
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
             </div>
           )}
           
           {loading ? (
-            [1, 2, 3].map(i => <div key={`skeleton-${i}`} className="h-32 bg-white rounded-[2.5rem] animate-pulse border border-slate-100 shadow-sm" />)
+            [1, 2, 3].map(i => <div key={`skeleton-${i}`} className="h-28 bg-white rounded-2xl animate-pulse border border-slate-100 shadow-sm" />)
           ) : filteredTasks.length > 0 ? (
             <motion.div 
               initial="hidden"
@@ -204,49 +204,49 @@ export default function TaskList() {
                 hidden: { opacity: 0 },
                 visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
               }}
-              className="space-y-4"
+              className="space-y-3.5"
             >
               {filteredTasks.map((task, index) => (
                 <motion.div key={task.id || index} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
                   <Link 
                     to={`/tasks/${task.id}`}
-                    className="block group bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
+                    className="block group bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
                     
                     <div className="flex justify-between items-center relative z-10">
-                      <div className="flex gap-4 items-center">
-                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500">
-                          <Zap size={24} className="group-hover:fill-white" />
+                      <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
+                        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shrink-0">
+                          <Zap size={18} className="group-hover:fill-white" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{task.type.replace('_', ' ')} Network</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{task.type.replace('_', ' ')} Network</span>
                             {task.isRepeatable && (
-                              <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">
+                              <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full border border-amber-100 shrink-0">
                                 <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
-                                <span className="text-[8px] font-black uppercase tracking-tighter">Unlimited</span>
+                                <span className="text-[7.5px] font-black uppercase tracking-tighter">Unlimited</span>
                               </div>
                             )}
                           </div>
-                          <h4 className="font-display font-black text-slate-900 text-lg leading-tight uppercase italic group-hover:text-blue-600 transition-colors">
+                          <h4 className="font-display font-black text-slate-900 text-sm sm:text-base leading-tight uppercase italic group-hover:text-blue-600 transition-colors truncate">
                             {task.title}
                           </h4>
                         </div>
                       </div>
                       
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <div className="flex flex-col items-end">
-                          <p className="text-2xl font-display font-black text-slate-900 tracking-tighter">
+                          <p className="text-base sm:text-2xl font-display font-black text-slate-900 tracking-tighter">
                             ₦{((task.userPayout || 0) * multiplier).toFixed(0)}
                           </p>
                           {multiplier > 1 ? (
-                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 mt-1">
-                               <TrendingUp size={10} />
-                               <span className="text-[9px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
+                            <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md border border-blue-100 mt-0.5">
+                               <TrendingUp size={8} />
+                               <span className="text-[7.5px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
                             </div>
                           ) : (
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Verified Rate</span>
+                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 italic">Verified Rate</span>
                           )}
                         </div>
                       </div>
