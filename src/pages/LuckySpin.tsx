@@ -175,6 +175,8 @@ export default function LuckySpin() {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
           balance: increment(finalReward),
+          withdrawableBalance: increment(finalReward),
+          taskBalance: increment(finalReward),
           taskEarnings: increment(finalReward),
           xp: increment(25)
         });

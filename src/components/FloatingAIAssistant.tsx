@@ -12,65 +12,100 @@ export default function FloatingAIAssistant() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const isActiveRef = useRef(true);
+  const reconnectTimeoutRef = useRef<any>(null);
 
   const connect = () => {
-    const socket = new WebSocket(WS_BASE_URL);
+    if (!isActiveRef.current) return;
     
-    socket.onopen = () => console.log('WS Connection Open');
-    
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'chunk') {
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === 'ai' && !last.image) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, content: last.content + data.content };
-            return updated;
-          } else {
-            return [...prev, { role: 'ai', content: data.content }];
-          }
-        });
-      } else if (data.type === 'image') {
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === 'ai') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, image: data.url };
-            return updated;
-          } else {
-            return [...prev, { role: 'ai', content: '', image: data.url }];
-          }
-        });
-      } else if (data.type === 'status') {
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === 'ai' && last.content.includes(data.message)) return prev;
-          return [...prev, { role: 'ai', content: `✨ ${data.message}` }];
-        });
-      } else if (data.type === 'done') {
-        setLoading(false);
-      } else if (data.type === 'error') {
-        setMessages(prev => [...prev, { role: 'ai', content: "I'm having a little trouble with the connection right now. Please try again in a moment, or refresh the page if the issue persists." }]);
-        setLoading(false);
+    // Clear any pending reconnects
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    try {
+      const socket = new WebSocket(WS_BASE_URL);
+      
+      socket.onopen = () => {
+        if (isActiveRef.current) {
+          console.log('WS Connection Open');
+        }
+      };
+      
+      socket.onmessage = (event) => {
+        if (!isActiveRef.current) return;
+        const data = JSON.parse(event.data);
+        if (data.type === 'chunk') {
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === 'ai' && !last.image) {
+              const updated = [...prev];
+              updated[updated.length - 1] = { ...last, content: last.content + data.content };
+              return updated;
+            } else {
+              return [...prev, { role: 'ai', content: data.content }];
+            }
+          });
+        } else if (data.type === 'image') {
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === 'ai') {
+              const updated = [...prev];
+              updated[updated.length - 1] = { ...last, image: data.url };
+              return updated;
+            } else {
+              return [...prev, { role: 'ai', content: '', image: data.url }];
+            }
+          });
+        } else if (data.type === 'status') {
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === 'ai' && last.content.includes(data.message)) return prev;
+            return [...prev, { role: 'ai', content: `✨ ${data.message}` }];
+          });
+        } else if (data.type === 'done') {
+          setLoading(false);
+        } else if (data.type === 'error') {
+          setMessages(prev => [...prev, { role: 'ai', content: "I'm having a little trouble with the connection right now. Please try again in a moment, or refresh the page if the issue persists." }]);
+          setLoading(false);
+        }
+      };
+
+      socket.onerror = (err) => {
+        if (isActiveRef.current) {
+          console.warn('WS Connection Status Info:', err);
+        }
+      };
+
+      socket.onclose = () => {
+        if (isActiveRef.current) {
+          console.log('WS Shared Connection Closed. Reconnecting in 5s...');
+          reconnectTimeoutRef.current = setTimeout(connect, 5000);
+        }
+      };
+      
+      wsRef.current = socket;
+    } catch (e) {
+      console.warn('WS Init Info:', e);
+      if (isActiveRef.current) {
+        reconnectTimeoutRef.current = setTimeout(connect, 5000);
       }
-    };
-
-    socket.onerror = (err) => {
-      console.error('WS Connection Error:', err);
-    };
-
-    socket.onclose = () => {
-      console.log('WS Shared Connection Closed. Reconnecting in 3s...');
-      setTimeout(connect, 3000);
-    };
-    
-    wsRef.current = socket;
+    }
   };
 
   useEffect(() => {
+    isActiveRef.current = true;
     connect();
-    return () => wsRef.current?.close();
+    return () => {
+      isActiveRef.current = false;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
   }, []);
 
   useEffect(() => {

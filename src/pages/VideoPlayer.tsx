@@ -97,6 +97,9 @@ export default function VideoPlayer() {
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         balance: increment(rewardVal),
+        withdrawableBalance: increment(rewardVal),
+        taskBalance: increment(rewardVal),
+        taskEarnings: increment(rewardVal),
         totalEarnings: increment(rewardVal),
         completedAds: arrayUnion({
           id: adId,

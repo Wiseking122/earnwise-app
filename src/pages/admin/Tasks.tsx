@@ -252,6 +252,8 @@ export default function AdminTasks() {
             transaction.update(userRef, { 
               balance: (uData.balance || 0) + completion.rewardEarned,
               withdrawableBalance: (uData.withdrawableBalance || 0) + completion.rewardEarned,
+              taskBalance: (uData.taskBalance || 0) + completion.rewardEarned,
+              taskEarnings: (uData.taskEarnings || 0) + completion.rewardEarned,
               updatedAt: serverTimestamp()
             });
 
@@ -272,7 +274,8 @@ export default function AdminTasks() {
                 const referralBonus = 2.00;
                 const rData = referrerSnap.data();
                 transaction.update(referrerRef, { 
-                  pendingBalance: (rData.pendingBalance || 0) + referralBonus 
+                  pendingBalance: (rData.pendingBalance || 0) + referralBonus,
+                  referralEarnings: (rData.referralEarnings || 0) + referralBonus
                 });
                 transaction.update(userRef, { hasReceivedReferralBonus: true });
 

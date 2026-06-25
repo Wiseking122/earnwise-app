@@ -85,6 +85,7 @@ export const DailyCheckIn: React.FC = () => {
       await updateDoc(userRef, {
         balance: increment(rewardAmount),
         withdrawableBalance: increment(rewardAmount),
+        taskBalance: increment(rewardAmount),
         taskEarnings: increment(rewardAmount), // classified under task earnings
         xp: increment(xpAmount),
         lastCheckIn: serverTimestamp(),

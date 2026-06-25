@@ -292,16 +292,16 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-2 sm:gap-4 mt-1 mb-1">
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
                   <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
-                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Task Earnings</p>
+                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Task Wallet</p>
                   <h3 className="text-sm sm:text-lg font-display font-black text-white truncate drop-shadow-md">
-                    ₦<AnimatedNumber value={profile?.taskEarnings || 0} />
+                    ₦<AnimatedNumber value={profile?.taskBalance || 0} />
                   </h3>
                 </div>
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
                   <div className="absolute -inset-2 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
-                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Referral Rewards</p>
+                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Referral Wallet</p>
                   <h3 className="text-sm sm:text-lg font-display font-black text-white truncate drop-shadow-md">
-                    ₦<AnimatedNumber value={profile?.referralEarnings || 0} />
+                    ₦<AnimatedNumber value={profile?.referralBalance || 0} />
                   </h3>
                 </div>
               </div>

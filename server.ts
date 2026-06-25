@@ -1495,6 +1495,8 @@ Provide your response strictly in the JSON format requested.`;
           transaction.update(userRef, {
              balance: admin.firestore.FieldValue.increment(rewardAmount),
              withdrawableBalance: admin.firestore.FieldValue.increment(rewardAmount),
+             taskBalance: admin.firestore.FieldValue.increment(rewardAmount),
+             taskEarnings: admin.firestore.FieldValue.increment(rewardAmount),
              updatedAt: admin.firestore.FieldValue.serverTimestamp()
           });
 
@@ -1879,9 +1881,12 @@ Provide your response strictly in the JSON format requested.`;
         const userRef = dbAdmin.collection('users').doc(entry.userId);
         
         // Move funds between variables
+        const isReferral = entry.type === 'referral';
+        const walletField = isReferral ? 'referralBalance' : 'taskBalance';
+
         batch.update(userRef, {
           pendingBalance: admin.firestore.FieldValue.increment(-entry.amount),
-          taskBalance: admin.firestore.FieldValue.increment(entry.amount),
+          [walletField]: admin.firestore.FieldValue.increment(entry.amount),
           withdrawableBalance: admin.firestore.FieldValue.increment(entry.amount)
         });
         
@@ -2885,13 +2890,15 @@ Provide your response strictly in the JSON format requested.`;
       });
 
       if (transferResponse.data.status) {
+        const walletField = withdrawalType === 'referral' ? 'referralBalance' : 'taskBalance';
         await userRef.update({
           balance: admin.firestore.FieldValue.increment(-amount),
           withdrawableBalance: admin.firestore.FieldValue.increment(-amount),
+          [walletField]: admin.firestore.FieldValue.increment(-amount),
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        await dbAdmin.collection('withdrawals').add({
+        const withdrawalDocRef = await dbAdmin.collection('withdrawals').add({
           userId,
           amount,
           status: 'completed',
@@ -2919,6 +2926,73 @@ Provide your response strictly in the JSON format requested.`;
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           readBy: []
         });
+
+        // Trigger Automated Withdrawal Email to User
+        if (userData.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+          try {
+            const netPayout = amount * 0.95;
+            const fee = amount * 0.05;
+            const name = userData.displayName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || "Earner";
+            await transporter.sendMail({
+              from: `"Earnwise Payouts" <${process.env.EMAIL_USER}>`,
+              to: userData.email,
+              replyTo: 'earnwise29@gmail.com',
+              subject: `💸 Payout Approved & Processed - ₦${Number(netPayout).toLocaleString()}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
+                  <div style="text-align: center; margin-bottom: 25px;">
+                    <h1 style="color: #10b981; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Payout Approved</h1>
+                    <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Transaction Successful • Reference: #${withdrawalDocRef.id ? withdrawalDocRef.id.slice(0, 8) : ''}</p>
+                  </div>
+                  
+                  <div style="background-color: #ecfdf5; border-left: 5px solid #10b981; padding: 20px; border-radius: 12px; margin: 25px 0; text-align: center;">
+                    <h3 style="margin-top: 0; color: #065f46; font-size: 14px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 5px;">Net Credit Amount</h3>
+                    <h2 style="color: #047857; font-size: 32px; font-weight: 900; margin: 0;">₦${Number(netPayout).toLocaleString()}</h2>
+                  </div>
+
+                  <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
+                    <h4 style="margin-top: 0; color: #1e293b; font-size: 13px; text-transform: uppercase; font-weight: 800; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">Transaction Details</h4>
+                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                      <tr style="height: 30px;">
+                        <td style="color: #64748b; font-weight: 500;">Beneficiary</td>
+                        <td style="color: #1e293b; font-weight: 700; text-align: right;">${name}</td>
+                      </tr>
+                      <tr style="height: 30px;">
+                        <td style="color: #64748b; font-weight: 500;">Bank Name</td>
+                        <td style="color: #1e293b; font-weight: 700; text-align: right;">${bankDetails.bankName || 'N/A'}</td>
+                      </tr>
+                      <tr style="height: 30px;">
+                        <td style="color: #64748b; font-weight: 500;">Account Number</td>
+                        <td style="color: #1e293b; font-weight: 700; text-align: right;">${bankDetails.accountNumber || 'N/A'}</td>
+                      </tr>
+                      <tr style="height: 30px;">
+                        <td style="color: #64748b; font-weight: 500;">Gross Amount</td>
+                        <td style="color: #1e293b; font-weight: 700; text-align: right;">₦${Number(amount).toLocaleString()}</td>
+                      </tr>
+                      <tr style="height: 30px;">
+                        <td style="color: #64748b; font-weight: 500;">Processing Fee (5%)</td>
+                        <td style="color: #e11d48; font-weight: 700; text-align: right;">-₦${Number(fee).toLocaleString()}</td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <div style="text-align: center; margin: 30px 0;">
+                    <p style="color: #475569; font-size: 14px; margin-bottom: 15px;">Your digital earner proof receipt is ready. Share it on your status to earn referrals!</p>
+                    <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}/earnings" style="background-color: #10b981; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); text-transform: uppercase;">Download Proof Receipt</a>
+                  </div>
+
+                  <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                    <p style="color: #94a3b8; font-size: 10px; margin-bottom: 5px; text-transform: uppercase;">Earnwise Elite Financial Protocol</p>
+                    <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">If you did not initiate this transaction, please contact support immediately.</p>
+                  </div>
+                </div>
+              `
+            });
+            console.log(`[PAYOUT-EMAIL] Successfully sent payout approved email automatically for automated withdrawal to ${userData.email}`);
+          } catch (emailErr) {
+            console.error("[PAYOUT-EMAIL] Failed to send automated withdrawal email:", emailErr);
+          }
+        }
 
         res.json({ status: "success", message: "Withdrawal processed" });
       } else {

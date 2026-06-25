@@ -93,6 +93,9 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
        const userRef = doc(db, 'users', user.uid);
        await updateDoc(userRef, {
          balance: increment(amount),
+         withdrawableBalance: increment(amount),
+         taskBalance: increment(amount),
+         taskEarnings: increment(amount),
          totalEarnings: increment(amount),
          completedAds: arrayUnion({
            id: adId,

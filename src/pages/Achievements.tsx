@@ -28,6 +28,8 @@ export default function Achievements() {
     try {
       await updateDoc(doc(db, 'users', profile.uid), {
         balance: increment(ach.rewardCash),
+        withdrawableBalance: increment(ach.rewardCash),
+        taskBalance: increment(ach.rewardCash),
         xp: increment(ach.rewardXp),
         achievements: arrayUnion(ach.id),
         bonusEarnings: increment(ach.rewardCash)
