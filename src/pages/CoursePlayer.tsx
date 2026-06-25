@@ -218,6 +218,27 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     URL.revokeObjectURL(url);
   };
 
+  const fetchWithRetry = async (url: string, options: any, retries = 3, delay = 1000): Promise<Response> => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        if (retries > 0) throw new Error('Retry');
+        return response;
+      }
+      return response;
+    } catch (err) {
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchWithRetry(url, options, retries - 1, delay * 2);
+      }
+      throw err;
+    }
+  };
+
   const askTutor = async () => {
     if (!question.trim() || aiLoading || !user || !course) return;
     
@@ -229,7 +250,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     try {
       setMessages(prev => [...prev, { role: 'ai', content: '' }]);
       
-      const res = await fetch(getApiUrl('/api/v1/academy/ask-tutor'), {
+      const res = await fetchWithRetry(getApiUrl('/api/v1/academy/ask-tutor'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -277,10 +298,10 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
         });
       }
     } catch (err: any) {
-      const serverErr = err.message || "Protocol failure. AI Node offline.";
+      // Provide a helpful fallback response instead of showing technical errors
       setMessages(prev => {
          const newMessages = [...prev];
-         newMessages[newMessages.length - 1].content = serverErr;
+         newMessages[newMessages.length - 1].content = "I'm here to guide you through this course. I'm experiencing a temporary connectivity issue, but please feel free to ask your question again, or I can help you with general course insights.";
          return newMessages;
       });
     } finally {

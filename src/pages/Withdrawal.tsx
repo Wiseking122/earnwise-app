@@ -237,15 +237,34 @@ export default function Withdrawal() {
   }, [profile]);
 
   useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+
     async function fetchBanks() {
       try {
-        const res = await fetch(getApiUrl('/api/paystack/banks'));
-        const data = await res.json();
-        if (data.status) {
-          setBanks(data.data);
+        const banksUrl = getApiUrl('/api/paystack/banks');
+        console.log(`[PAYMENT] Attempting to fetch banks from: ${banksUrl}`);
+        const res = await fetch(banksUrl);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
         }
-      } catch (err) {
-        console.error("Failed to fetch banks", err);
+        
+        const data = await res.json();
+        if (data.status && data.data) {
+          setBanks(data.data);
+          console.log(`[PAYMENT] Successfully loaded ${data.data.length} banks.`);
+        } else {
+          throw new Error(data.message || 'Malformed bank data received');
+        }
+      } catch (err: any) {
+        console.error(`[PAYMENT] Bank fetch attempt ${retryCount + 1} failed:`, err.message);
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(fetchBanks, 1500 * retryCount); // Exponential backoff
+        } else {
+          console.error("[PAYMENT] Max retries reached for bank fetching.");
+        }
       }
     }
     fetchBanks();

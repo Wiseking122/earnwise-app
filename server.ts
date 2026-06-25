@@ -1130,12 +1130,8 @@ async function startServer() {
         return res.json({ subtasks: mockSubtasks });
       }
 
-      const requestAiClient = new GoogleGenAI({
-        apiKey: activeApiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
-
-      const models = ["gemini-2.5-flash"];
+      const requestAiClient = ai;
+      const models = ["gemini-flash-latest"];
       let lastErr;
       let finalData = { subtasks: [] };
 
@@ -1226,30 +1222,27 @@ async function startServer() {
     const promptMessage = payload?.prompt || "";
 
     if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
-      return res.json({ result: getFallbackAssistantResponse(promptMessage) });
-    }
-
-    const requestAiClient = new GoogleGenAI({
-      apiKey: activeApiKey,
-      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-    });
-
-    const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
-      try {
-        return await fn();
-      } catch (err: any) {
-        if (retries > 0 && (err.status === 503 || err.status === 429)) {
-          console.log(`[AI-Assistant] Retrying due to error: ${err.status}, attempts left: ${retries}`);
-          await new Promise(resolve => setTimeout(resolve, delay + Math.random() * 1000));
-          return withRetry(fn, retries - 1, delay * 2);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Transfer-Encoding', 'chunked');
+      const fallbackText = getFallbackAssistantResponse(promptMessage);
+      let index = 0;
+      const chunkSize = 5;
+      const interval = setInterval(() => {
+        if (index < fallbackText.length) {
+          res.write(fallbackText.substring(index, index + chunkSize));
+          index += chunkSize;
+        } else {
+          clearInterval(interval);
+          res.end();
         }
-        throw err;
-      }
-    };
+      }, 15);
+      return;
+    }
 
     try {
       if (action === 'generate-text') {
-        const promptText = `You are an expert marketing and earning assistant for EarnWise, a leading task-based earning and advertising platform in Nigeria.
+        const history = payload?.history || [];
+        const systemInstruction = `You are an expert marketing and earning assistant for EarnWise, a leading task-based earning and advertising platform in Nigeria.
 Your goal is to help users succeed on EarnWise. Answer all their questions about EarnWise features including:
 - Task List & Detail: How to perform social tasks (follow, like, comment) and submit proof for automated verification.
 - Earnings & Withdrawals: How to track revenue, the 7-day escrow period for funds, and automated withdrawals via Paystack.
@@ -1260,48 +1253,55 @@ Your goal is to help users succeed on EarnWise. Answer all their questions about
 - Vault: Staking funds for fixed-term growth bonuses.
 - Support: How to reach out for assistance.
 
-
 IMPORTANT INSTRUCTIONS:
 - ONLY explain what the user asks about. Do NOT volunteer facts about the owner, CEO, or sponsors unless the user explicitly asks for them.
 - If explicitly asked about the owner, CEO, or founder of EarnWise, state clearly that the owner, founder, and CEO is Johnathan Sterling. Maintain total anonymity for any other identities.
 - If asked how to earn, accurately explain earning through tasks, ads, courses, upgrades, buying plans, referral, and lucky spin. Do NOT mention the owner in a general guide.
 - If asked about Wise AI, state that Wise AI is proudly owned by EarnWise.
-- Be highly professional, encouraging, and informative. Keep responses natural and conversational.
+- Be highly professional, encouraging, and informative. Keep responses natural and conversational.`;
 
-User Prompt: ${promptMessage}`;
-        
-        const models = ["gemini-2.5-flash"];
-        let lastError;
-        
-        const tools = [];
-        
-        for (const modelName of models) {
-            try {
-                let interaction = await withRetry(() => requestAiClient.interactions.create({
-                  model: modelName,
-                  input: promptText,
-                  tools: tools
-                }));
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
 
-                // Check for function calls
-                const lastStep = (interaction.steps && interaction.steps.length > 0) ? interaction.steps.at(-1) as any : null;
-                if (lastStep?.type === 'function_call') {
-                  // Function calling is disabled.
-                }
+        try {
+          const contents = [
+            ...history.map((h: any) => ({
+              role: h.role === 'user' ? 'user' : 'model',
+              parts: [{ text: h.content || "" }]
+            })),
+            { role: 'user', parts: [{ text: promptMessage }] }
+          ];
 
-                return res.json({ result: interaction.output_text });
-            } catch (err: any) {
-                lastError = err;
-                console.log(`[AI-Assistant] Model ${modelName} failed: ${err.message}`);
+          const responseStream = await ai.models.generateContentStream({
+            model: "gemini-2.5-flash",
+            contents: contents,
+            config: {
+              systemInstruction: systemInstruction,
+              temperature: 0.5,
+              topP: 0.8,
+              maxOutputTokens: 800,
             }
+          });
+
+          for await (const chunk of responseStream) {
+            if (chunk.text) {
+              res.write(chunk.text);
+            }
+          }
+          res.end();
+        } catch (err: any) {
+          console.error("[AI-Assistant] Gemini stream error:", err);
+          res.write("\n\n⚠️ I'm having trouble connecting to the AI service right now. Please try again in a moment.");
+          res.end();
         }
-        return res.json({ result: getFallbackAssistantResponse(promptMessage) });
       } else {
         res.status(400).json({ error: "Unknown action" });
       }
     } catch (err: any) {
-      console.warn("[AI-Assistant] Error (sending optimized fallback guidance):", err);
-      res.json({ result: getFallbackAssistantResponse(promptMessage) });
+      console.error("[AI-Assistant] Real error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message || "Unknown AI error" });
+      }
     }
   });
 
@@ -1326,10 +1326,7 @@ User Prompt: ${promptMessage}`;
          });
       }
 
-      const requestAiClient = new GoogleGenAI({
-        apiKey: activeApiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
+      const requestAiClient = ai;
 
       const prompt = `You are a financial AI assistant for the Earnwise App. Analyze the user's profile and provide 3 actionable insights to maximize their earnings today.
 User Profile:
@@ -1357,7 +1354,7 @@ Respond STRICTLY in JSON:
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const interaction = await requestAiClient.interactions.create({
-            model: "gemini-2.5-flash",
+            model: "gemini-flash-latest",
             input: prompt,
             response_format: {
               type: Type.OBJECT,
@@ -1425,10 +1422,7 @@ Respond STRICTLY in JSON:
 
       if (activeApiKey && activeApiKey !== "your_gemini_api_key_here") {
         try {
-          const requestAiClient = new GoogleGenAI({
-            apiKey: activeApiKey,
-            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-          });
+          const requestAiClient = ai;
 
           const prompt = `You are "Wise AI", the automated task verification assistant for Earnwise.
 A user has submitted proof for completing a task.
@@ -1443,7 +1437,7 @@ Provide your response strictly in the JSON format requested.`;
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               response = await requestAiClient.models.generateContent({
-                model: "gemini-2.5-flash",
+                model: "gemini-flash-latest",
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 config: {
                   responseMimeType: "application/json",
@@ -3084,69 +3078,42 @@ Provide your response strictly in the JSON format requested.`;
         return res.end();
       }
 
-      const requestAiClient = new GoogleGenAI({
-        apiKey: activeApiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
+      const requestAiClient = ai;
 
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Transfer-Encoding', 'chunked');
 
       try {
-        const tutorModels = ["gemini-2.5-flash"];
-        let lastTutorErr;
-        let streamSuccess = false;
-
-        for (const modelName of tutorModels) {
-          for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-              const stream = await requestAiClient.interactions.create({
-                model: modelName,
-                input: `You are the Earnwise Elite Academy Master Tutor.
+        const responseStream = await ai.models.generateContentStream({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [{
+                text: `You are the Earnwise Elite Academy Master Tutor.
                     Student is studying: "${courseTitle || courseId}".
                     Current Course Context: ${context || 'General earning strategy'}.
-                    Student Question: ${question}`,
-                stream: true
-              });
-              
-              for await (const event of stream) {
-                if (event.event_type === "step.delta" && event.delta.type === "text") {
-                  res.write(event.delta.text);
-                }
-              }
-              res.end();
-              streamSuccess = true;
-              return;
-            } catch (err: any) {
-              lastTutorErr = err;
-              if ((err.status === 503 || err.status === 429) && attempt < 1) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                continue;
-              }
-              break;
+                    Student Question: ${question}`
+              }]
             }
+          ],
+          config: {
+            temperature: 0.5,
+            topP: 0.8,
+            maxOutputTokens: 800,
           }
-          if (streamSuccess) break;
+        });
+
+        for await (const chunk of responseStream) {
+          if (chunk.text) {
+            res.write(chunk.text);
+          }
         }
-        if (!streamSuccess) throw lastTutorErr || new Error("Tutor AI failed");
+        res.end();
       } catch (aiErr: any) {
         console.error("[ACADEMY] AI Generation failed:", aiErr);
-        try {
-          const fbStream = await requestAiClient.interactions.create({
-             model: "gemini-2.5-flash",
-             input: `System: Fallback answer.\nCourse: ${courseTitle}\nQuestion: ${question}`,
-             stream: true
-          });
-          for await (const event of fbStream) {
-             if (event.event_type === "step.delta" && event.delta.type === "text") {
-                res.write(event.delta.text);
-             }
-          }
-          res.end();
-        } catch (fbErr) {
-          res.write("\n\n*AI temporarily decentralized. Please try again soon.*");
-          res.end();
-        }
+        res.write("\n\n*AI Tutor temporarily offline. Please try again soon.*");
+        res.end();
       }
     } catch (err: any) {
       console.error("[ACADEMY] AI Tutor Error:", err);
@@ -3254,8 +3221,18 @@ Provide your response strictly in the JSON format requested.`;
 
   const server = http.createServer(app);
 
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({ noServer: true });
   
+  server.on('upgrade', (request, socket, head) => {
+    if (request.url && request.url.startsWith('/api/ws')) {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
+
   wss.on('connection', (ws) => {
     console.log('[WS] Client connected to Wise AI Stream');
     
@@ -3266,91 +3243,38 @@ Provide your response strictly in the JSON format requested.`;
         
         if (!message) return;
 
-        const streamFallbackText = (txt: string) => {
-          let index = 0;
-          const chunkSize = 5;
-          const streamInterval = setInterval(() => {
-            if (index < txt.length) {
-              const chunk = txt.substring(index, index + chunkSize);
-              ws.send(JSON.stringify({ type: 'chunk', content: chunk }));
-              index += chunkSize;
-            } else {
-              clearInterval(streamInterval);
-              ws.send(JSON.stringify({ type: 'done', fullContent: txt }));
-            }
-          }, 15);
-        };
-
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey || apiKey === "your_gemini_api_key_here") {
-          streamFallbackText(getFallbackAssistantResponse(message));
+          ws.send(JSON.stringify({ type: 'chunk', content: "API Key not configured." }));
+          ws.send(JSON.stringify({ type: 'done' }));
           return;
         }
 
-        const genAI = new GoogleGenAI({ apiKey });
-        
-        const tools = [];
-
-        const models = ["gemini-2.5-flash"];
-        let lastWsErr;
-        let wsStreamSuccess = false;
-
-        for (const modelName of models) {
-          try {
-            // Prepare inputs for interaction using Step[] format to fix "parts" error
-            const interactionSteps = history.map((h: any) => ({
-              type: h.role === 'user' ? 'user_input' : 'model_output',
-              content: [{ type: 'text', text: h.content || "" }]
-            }));
-
-            // Priming messages to ensure the AI knows its role
-            const userInputs = [
-                { type: 'user_input', content: [{ type: 'text', text: "You are 'Wise AI', the official mentor for Earnwise. Earnwise is Nigeria's #1 digital tasks platform where users earn Naira by completing social media tasks. Do not hallucinate about activation codes or vendors." }] },
-                { type: 'model_output', content: [{ type: 'text', text: "Understood. I am Wise AI. I will provide accurate guidance about Earnwise tasks, upgrades via wallet balance, and bank withdrawals." }] },
-                ...interactionSteps,
-                { type: 'user_input', content: [{ type: 'text', text: message }] }
-            ];
-            
-            let stream = await genAI.interactions.create({ 
-              model: modelName,
-              input: userInputs as any,
-              tools: tools,
-              system_instruction: "You are 'Wise AI', the ultimate financial coach for Earnwise members. \n\nCRITICAL INSTRUCTIONS:\n- ONLY answer what the user is explicitly asking about. Keep it conversational, helpful, and natural.\n- OWNER & CEO: ONLY if explicitly asked 'who is the owner/CEO', say it is Johnathan Sterling. NEVER spit these facts out randomly in a general guide.\n- UPGRADING & PLANS: Users MUST NOT contact vendors or use activation codes. To upgrade/buy plans, go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.\n- REWARDS & EARNINGS: Give accurate answers. Users earn ₦ by interacting with sponsored ads, social media, uploading screenshots, taking courses, lucky spin, and referrals.\n- TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).\n- WITHDRAWAL: Minimum ₦1,000 to any Nigerian bank.\n- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. Do NOT volunteer this by default.",
-              generation_config: {
-                temperature: 0.5, // Lower temperature for more consistent tool calling
-                top_p: 0.8,
-                max_output_tokens: 800,
-              },
-              stream: true
-            });
-
-            const handleStream = async (targetStream: any) => {
-              let fullResponse = "";
-              for await (const event of targetStream) {
-                if (event.event_type === "step.delta" && event.delta.type === "text") {
-                  const chunkText = event.delta.text;
-                  fullResponse += chunkText;
-                  ws.send(JSON.stringify({ type: 'chunk', content: chunkText }));
-                } else if (event.event_type === "interaction.completed") {
-                    // Interaction completed event details
-                }
-              }
-              ws.send(JSON.stringify({ type: 'done', fullContent: fullResponse }));
-            };
-
-            await handleStream(stream);
-            wsStreamSuccess = true;
-            break;
-          } catch (err: any) {
-            lastWsErr = err;
-            if (err.status === 503 || err.status === 429) {
-                continue;
+        try {
+          const responseStream = await ai.models.generateContentStream({
+            model: "gemini-2.5-flash",
+            contents: [
+                ...history.map((h: any) => ({
+                    role: h.role === 'user' ? 'user' : 'model',
+                    parts: [{ text: h.content || "" }]
+                })),
+                { role: 'user', parts: [{ text: message }] }
+            ],
+            config: {
+              systemInstruction: "You are 'Wise AI', the ultimate financial coach for Earnwise members. \n\nCRITICAL INSTRUCTIONS:\n- ONLY answer what the user is explicitly asking about. Keep it conversational, helpful, and natural.\n- OWNER & CEO: ONLY if explicitly asked 'who is the owner/CEO', say it is Johnathan Sterling. NEVER spit these facts out randomly in a general guide.\n- UPGRADING & PLANS: Users MUST NOT contact vendors or use activation codes. To upgrade/buy plans, go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.\n- REWARDS & EARNINGS: Give accurate answers. Users earn ₦ by interacting with sponsored ads, social media, uploading screenshots, taking courses, lucky spin, and referrals.\n- TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).\n- WITHDRAWAL: Minimum ₦1,000 to any Nigerian bank.\n- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. Do NOT volunteer this by default.",
+              temperature: 0.5,
+              topP: 0.8,
+              maxOutputTokens: 800,
             }
-            break;
+          });
+
+          for await (const chunk of responseStream) {
+            ws.send(JSON.stringify({ type: 'chunk', content: chunk.text }));
           }
-        }
-        if (!wsStreamSuccess) {
-          streamFallbackText(getFallbackAssistantResponse(message));
+          ws.send(JSON.stringify({ type: 'done' }));
+        } catch (err: any) {
+          console.error("[WS] Gemini Error:", err);
+          ws.send(JSON.stringify({ type: 'error', message: "I'm having a little trouble with the connection right now." }));
         }
 
       } catch (error: any) {

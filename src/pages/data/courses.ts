@@ -1,4 +1,4 @@
-import { Course } from '../types';
+import { Course } from '../../types';
 
 export const courses = [
   // Newly optimized high-ticket courses

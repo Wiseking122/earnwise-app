@@ -167,7 +167,7 @@ export default function Home() {
     } catch (err: any) {
       console.warn("AI backend connection failed, activating local smart engine:", err);
       // Fallback local AI engine ensures Wise AI always works
-      const estimatedEarning = Number(profile?.balance || 0) + (profile?.plan === 'vip' ? 15000 : profile?.plan === 'gold' ? 7500 : 2500);
+      const estimatedEarning = Number(profile?.balance || 0) + (profile?.plan === 'golden' ? 15000 : profile?.plan === 'platinum' ? 7500 : 2500);
       setAiInsights({
         prediction: `₦${estimatedEarning.toLocaleString()} daily earning potential based on your ${profile?.plan || 'free'} tier`,
         insights: [

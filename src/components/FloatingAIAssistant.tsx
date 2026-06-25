@@ -13,10 +13,11 @@ export default function FloatingAIAssistant() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  useEffect(() => {
-    // Initialize WebSocket
+  const connect = () => {
     const socket = new WebSocket(WS_BASE_URL);
-
+    
+    socket.onopen = () => console.log('WS Connection Open');
+    
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'chunk') {
@@ -50,15 +51,26 @@ export default function FloatingAIAssistant() {
       } else if (data.type === 'done') {
         setLoading(false);
       } else if (data.type === 'error') {
-        setMessages(prev => [...prev, { role: 'ai', content: `Error: ${data.message}` }]);
+        setMessages(prev => [...prev, { role: 'ai', content: "I'm having a little trouble with the connection right now. Please try again in a moment, or refresh the page if the issue persists." }]);
         setLoading(false);
       }
     };
 
-    socket.onclose = () => console.log('WS Shared Connection Closed');
-    wsRef.current = socket;
+    socket.onerror = (err) => {
+      console.error('WS Connection Error:', err);
+    };
 
-    return () => socket.close();
+    socket.onclose = () => {
+      console.log('WS Shared Connection Closed. Reconnecting in 3s...');
+      setTimeout(connect, 3000);
+    };
+    
+    wsRef.current = socket;
+  };
+
+  useEffect(() => {
+    connect();
+    return () => wsRef.current?.close();
   }, []);
 
   useEffect(() => {
@@ -68,18 +80,73 @@ export default function FloatingAIAssistant() {
   }, [messages, loading]);
 
   const sendMessage = async (action: 'generate-text', p: string) => {
-    if (!p.trim() || !wsRef.current) return;
+    if (!p.trim()) return;
+
     setLoading(true);
     setMessages(prev => [...prev, { role: 'user', content: p }]);
     setPrompt("");
 
-    wsRef.current.send(JSON.stringify({
-      message: p,
-      history: messages.map(m => ({ 
-        role: m.role === 'user' ? 'user' : 'model', 
-        parts: [{ text: m.content }] 
-      }))
-    }));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        message: p,
+        history: messages.map(m => ({ 
+          role: m.role === 'user' ? 'user' : 'model', 
+          parts: [{ text: m.content }] 
+        }))
+      }));
+    } else {
+      // Fallback to HTTP POST with real-time stream reading
+      try {
+        const response = await fetch(getApiUrl('/api/ai/assistant'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'generate-text',
+            payload: { 
+              prompt: p,
+              history: messages.map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                content: m.content
+              }))
+            }
+          })
+        });
+
+        if (!response.body) {
+          throw new Error("No response stream available");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let done = false;
+
+        // Initialize empty AI message to start streaming content into
+        setMessages(prev => [...prev, { role: 'ai', content: "" }]);
+        setLoading(false);
+
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          const chunkValue = decoder.decode(value, { stream: !done });
+          
+          if (chunkValue) {
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === 'ai') {
+                updated[updated.length - 1] = { ...last, content: last.content + chunkValue };
+              }
+              return updated;
+            });
+          }
+        }
+      } catch (err: any) {
+        console.error("HTTP streaming error:", err);
+        setMessages(prev => [...prev, { role: 'ai', content: "I'm experiencing a minor connectivity issue right now, but I'm here to help. Please try sending your message again in a moment, or ensure your network connection is stable." }]);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   return (
