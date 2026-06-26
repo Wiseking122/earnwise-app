@@ -14,7 +14,8 @@ import {
   getDoc,
   runTransaction,
   getDocs,
-  limit
+  limit,
+  increment
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Task, TaskType, TaskCompletion } from '../../types';
@@ -41,6 +42,7 @@ export default function AdminTasks() {
   const [activeTab, setActiveTab] = useState<'manage' | 'verify' | 'ads'>('manage');
   const [isAdding, setIsAdding] = useState(false);
   const [selectedScreenshotForModal, setSelectedScreenshotForModal] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   
   // New Task Form
   const [newTitle, setNewTitle] = useState('');
@@ -158,6 +160,10 @@ export default function AdminTasks() {
         status: 'active',
         durationDays: duration,
         expiresAt: expiresAt,
+        requiresProof: true,
+        targetCount: Math.floor(budget / cpa) || 100,
+        completedCount: 0,
+        clicksCount: 0,
         createdAt: serverTimestamp()
       });
 
@@ -191,8 +197,12 @@ export default function AdminTasks() {
   };
 
   const handleDeleteTask = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this task?")) {
+    if (deletingId === id) {
       await deleteDoc(doc(db, 'tasks', id));
+      setDeletingId(null);
+    } else {
+      setDeletingId(id);
+      setTimeout(() => setDeletingId(prev => prev === id ? null : prev), 3000);
     }
   };
 
@@ -215,7 +225,23 @@ export default function AdminTasks() {
       await runTransaction(db, async (transaction) => {
         const compRef = doc(db, 'completions', completion.id);
         const userRef = doc(db, 'users', completion.userId);
-        
+        const referrerRef = referrerId ? doc(db, 'users', referrerId) : null;
+        const taskRef = completion.taskId ? doc(db, 'tasks', completion.taskId) : null;
+
+        // ---- ALL READS FIRST ----
+        const uSnap = await transaction.get(userRef);
+
+        let referrerSnap = null;
+        if (referrerRef) {
+          referrerSnap = await transaction.get(referrerRef);
+        }
+
+        let taskSnap = null;
+        if (taskRef) {
+          taskSnap = await transaction.get(taskRef);
+        }
+
+        // ---- ALL WRITES AFTER ----
         transaction.update(compRef, { 
           status, 
           verifiedAt: serverTimestamp() 
@@ -239,15 +265,25 @@ export default function AdminTasks() {
         });
 
         if (status === 'approved') {
-          const uSnap = await transaction.get(userRef);
+          // Update Task tracking
+          if (taskRef && taskSnap && taskSnap.exists()) {
+            const taskData = taskSnap.data();
+            const cost = (taskData.userPayout || 0) + (taskData.platformMargin || 0);
+            const currentCompletedCount = (taskData.completedCount || 0) + 1;
+            const currentTargetCount = taskData.targetCount || Math.floor((taskData.totalBudget || 0) / (cost || 1)) || 100;
+            const nextRemainingBudget = Math.max(0, (taskData.remainingBudget || 0) - cost);
+            const shouldAutoPause = currentCompletedCount >= currentTargetCount || nextRemainingBudget <= 0;
+
+            transaction.update(taskRef, {
+              completedCount: increment(1),
+              remainingBudget: nextRemainingBudget,
+              status: shouldAutoPause ? 'completed' : taskData.status,
+              updatedAt: serverTimestamp()
+            });
+          }
+
           if (uSnap.exists()) {
             const uData = uSnap.data();
-            
-            // IMPORTANT: Manual manual tasks go to WITHDRAWABLE directly if the admin wants.
-            // For now, we will add to both balance (total) and pendingBalance (escrow)
-            // unless we decide on a different platform policy.
-            // USER REQUEST FIX: The admin was unable to "approve into funds" because
-            // previous code only hit pendingBalance which wasn't used for withdrawals.
             
             transaction.update(userRef, { 
               balance: (uData.balance || 0) + completion.rewardEarned,
@@ -262,34 +298,31 @@ export default function AdminTasks() {
               userId: completion.userId,
               amount: completion.rewardEarned,
               type: 'earning',
-              status: 'completed', // Manually approved tasks are finalized immediately
+              status: 'completed',
               description: `Manual Reward: ${taskIdent}`,
               createdAt: serverTimestamp()
             });
 
-            if (referrerId) {
-              const referrerRef = doc(db, 'users', referrerId);
-              const referrerSnap = await transaction.get(referrerRef);
-              if (referrerSnap.exists()) {
-                const referralBonus = 2.00;
-                const rData = referrerSnap.data();
-                transaction.update(referrerRef, { 
-                  pendingBalance: (rData.pendingBalance || 0) + referralBonus,
-                  referralEarnings: (rData.referralEarnings || 0) + referralBonus
-                });
-                transaction.update(userRef, { hasReceivedReferralBonus: true });
+            if (referrerId && referrerRef && referrerSnap && referrerSnap.exists()) {
+              const referralBonus = 2.00;
+              const rData = referrerSnap.data();
+              transaction.update(referrerRef, { 
+                balance: (rData.balance || 0) + referralBonus,
+                withdrawableBalance: (rData.withdrawableBalance || 0) + referralBonus,
+                referralBalance: (rData.referralBalance || 0) + referralBonus,
+                referralEarnings: (rData.referralEarnings || 0) + referralBonus
+              });
+              transaction.update(userRef, { hasReceivedReferralBonus: true });
 
-                const refTransRef = doc(collection(db, 'transactions'));
-                transaction.set(refTransRef, {
-                  userId: referrerId,
-                  amount: referralBonus,
-                  type: 'referral',
-                  status: 'pending',
-                  availableAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                  description: `Referral bonus for ${uData.displayName || 'Friend'}`,
-                  createdAt: serverTimestamp()
-                });
-              }
+              const refTransRef = doc(collection(db, 'transactions'));
+              transaction.set(refTransRef, {
+                userId: referrerId,
+                amount: referralBonus,
+                type: 'referral',
+                status: 'completed',
+                description: `Referral bonus for ${uData.displayName || 'Friend'}`,
+                createdAt: serverTimestamp()
+              });
             }
           }
         }
@@ -373,9 +406,11 @@ export default function AdminTasks() {
                       </button>
                       <button 
                         onClick={() => handleDeleteTask(ad.id)}
-                        className="bg-red-50 text-red-600 p-3 rounded-xl"
+                        className={`p-3 rounded-xl transition-all flex items-center justify-center ${
+                          deletingId === ad.id ? 'bg-red-600 text-white animate-pulse font-black text-[10px] px-4' : 'bg-red-50 text-red-600'
+                        }`}
                       >
-                        <Trash2 size={18} />
+                        {deletingId === ad.id ? 'Confirm?' : <Trash2 size={18} />}
                       </button>
                     </div>
                  </div>
@@ -502,37 +537,61 @@ export default function AdminTasks() {
             )}
 
             <div className="space-y-3">
-              {tasks.map(task => (
-                <div key={task.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-gray-900">{task.title}</h4>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
-                      Creator: {task.advertiserId === 'internal_platform' || !task.advertiserId ? '🛡️ Admin' : `👤 User Advertiser (${task.advertiserId.slice(0, 8)})`}
-                    </p>
-                    <p className="text-xs font-black text-blue-600 mt-1">
-                      ₦{(task.userPayout || 0).toFixed(2)} Payout • {task.type} • Tag: {task.tag || 'none'}
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        task.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                      }`}>
-                        {task.status}
-                      </span>
-                      <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                        Remaining: ₦{task.remainingBudget?.toFixed(2) || '0.00'}
-                      </span>
+              {tasks.map(task => {
+                const computedTarget = task.targetCount || (task.userPayout ? Math.floor((task.totalBudget || 0) / ((task.userPayout || 1) / 0.7)) : 100) || 100;
+                const completedCount = task.completedCount || 0;
+                const clicksCount = task.clicksCount || 0;
+                const percent = Math.min(100, Math.round((completedCount / computedTarget) * 100));
+
+                return (
+                  <div key={task.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-gray-900">{task.title}</h4>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
+                        Creator: {task.advertiserId === 'internal_platform' || !task.advertiserId ? '🛡️ Admin' : `👤 User Advertiser (${task.advertiserId.slice(0, 8)})`}
+                      </p>
+                      <p className="text-xs font-black text-blue-600 mt-1">
+                        ₦{(task.userPayout || 0).toFixed(2)} Payout • {task.type} • Tag: {task.tag || 'none'}
+                      </p>
+                      
+                      <div className="mt-2 w-64 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <div className="flex gap-4 mt-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                        <span>Completed: <strong className="text-gray-700">{completedCount}</strong> / {computedTarget} ({percent}%)</span>
+                        <span>Clicks: <strong className="text-gray-700">{clicksCount}</strong></span>
+                      </div>
+
+                      <div className="mt-2 flex gap-2">
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                          task.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {task.status}
+                        </span>
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                          Remaining: ₦{task.remainingBudget?.toFixed(2) || '0.00'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => toggleTaskStatus(task)} className="p-2 bg-gray-50 text-gray-500 rounded-lg">
+                        {task.status === 'active' ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteTask(task.id)} 
+                        className={`p-2 rounded-lg transition-all flex items-center justify-center ${
+                          deletingId === task.id ? 'bg-red-600 text-white animate-pulse font-black text-[10px] px-3' : 'bg-red-50 text-red-550 group hover:bg-red-100 transition-colors'
+                        }`}
+                      >
+                        {deletingId === task.id ? 'Confirm?' : <Trash2 size={18} />}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => toggleTaskStatus(task)} className="p-2 bg-gray-50 text-gray-500 rounded-lg">
-                      {task.status === 'active' ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-                    </button>
-                    <button onClick={() => handleDeleteTask(task.id)} className="p-2 bg-red-50 text-red-550 rounded-lg group hover:bg-red-100 transition-colors">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : (

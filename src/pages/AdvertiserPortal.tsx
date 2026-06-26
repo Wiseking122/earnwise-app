@@ -215,6 +215,9 @@ export default function AdvertiserPortal() {
           status: 'pending', // review queues
           tag: selectedPlatform.toLowerCase(),
           requiresProof: true,
+          targetCount: quantity,
+          completedCount: 0,
+          clicksCount: 0,
           createdAt: serverTimestamp()
         });
 

@@ -111,10 +111,8 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         isAdmin() ||
         (request.auth.uid == userId && (
-          !incoming().diff(existing()).affectedKeys().hasAny(['role']) || 
-          existing().role == incoming().role
-        )) ||
-        (incoming().diff(existing()).affectedKeys().hasOnly(['totalReferrals']))
+          !incoming().diff(existing()).affectedKeys().hasAny(['role'])
+        ))
       );
     }
 
@@ -127,20 +125,20 @@ service cloud.firestore {
     }
 
     match /completions/{completionId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.isSpin == true || resource.data.isAdNetwork == true || isAdmin());
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.isSpin == true || resource.data.isAdNetwork == true));
       allow create: if isSignedIn() && (incoming().userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
     match /withdrawals/{withdrawalId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid));
       allow create: if isSignedIn() && isValidWithdrawal(incoming()) && isValidId(withdrawalId);
       allow update, delete: if isAdmin();
     }
 
     match /transactions/{transactionId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid));
+      allow create: if isAdmin() || (isSignedIn() && (incoming().userId == request.auth.uid));
       allow update, delete: if isAdmin();
     }
 
@@ -158,6 +156,7 @@ service cloud.firestore {
     match /coursePurchases/{purchaseId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidCoursePurchase(incoming()) && isValidId(purchaseId);
+      allow update, delete: if isAdmin();
     }
 
     match /vault_entries/{vaultEntryId} {

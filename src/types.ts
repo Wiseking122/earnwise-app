@@ -37,6 +37,7 @@ export interface UserProfile {
   taskEarnings?: number;
   referralEarnings?: number;
   bonusEarnings?: number;
+  totalEarnings?: number;
   balance: number;
   taskBalance: number;
   referralBalance: number;
@@ -116,6 +117,9 @@ export interface Task {
   status: 'active' | 'paused' | 'completed' | 'pending' | 'pending_payment' | 'rejected';
   durationDays?: number;
   expiresAt?: any;
+  targetCount?: number;
+  completedCount?: number;
+  clicksCount?: number;
   createdAt: any;
 }
 

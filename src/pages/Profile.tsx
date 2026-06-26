@@ -36,7 +36,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { updateDoc, doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { WithdrawalRequest } from '../types';
-import { sendNotification, NotificationType } from '../lib/notifications';
+import { sendNotification, NotificationType, requestNotificationPermission } from '../lib/notifications';
 
 export default function Profile() {
   const { profile, logout, user } = useAuth();
@@ -188,8 +188,19 @@ export default function Profile() {
   const toggleSetting = async (key: 'dailyEmailEnabled' | 'dailyPushEnabled', currentValue: boolean) => {
     if (!profile) return;
     try {
+      const newValue = !currentValue;
+      
+      // If turning on push, request permission
+      if (key === 'dailyPushEnabled' && newValue) {
+        const token = await requestNotificationPermission(profile.uid);
+        if (!token && 'Notification' in window && Notification.permission === 'denied') {
+          alert("Push notifications are blocked in your browser. Please enable them in your browser settings to receive alerts.");
+          return;
+        }
+      }
+
       await updateDoc(doc(db, 'users', profile.uid), {
-        [key]: !currentValue,
+        [key]: newValue,
         updatedAt: new Date()
       });
     } catch (err: any) {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Clock, Coins, Tv, CheckCircle, X, Sparkles, Loader2 } from 'lucide-react';
@@ -6,7 +7,6 @@ import { Play, Clock, Coins, Tv, CheckCircle, X, Sparkles, Loader2 } from 'lucid
 declare global {
   interface Window {
     fluidPlayer: any;
-    Telegram: any;
   }
 }
 
@@ -55,6 +55,7 @@ const VIDEO_TASKS: VideoTask[] = [
 ];
 
 export default function VideoAdsSection() {
+  const { user } = useAuth();
   const [pointsToday, setPointsToday] = useState<number>(() => {
     const saved = localStorage.getItem('earnwise_video_points_today');
     return saved ? parseInt(saved, 10) : 0;
@@ -94,8 +95,7 @@ export default function VideoAdsSection() {
 
   useEffect(() => {
     if (showOverlay && activeAd && videoRef.current && window.fluidPlayer) {
-      // Get User ID from Telegram WebApp InitData
-      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'guest_user';
+      const userId = user?.uid || 'guest_user';
       const vastBaseUrl = 'https://runative-syndicate.com/do2/a76028f599d54130a11dff96118b3b3f/vast?';
       const dynamicVastUrl = `${vastBaseUrl}&subid=${userId}`;
 
@@ -157,7 +157,7 @@ export default function VideoAdsSection() {
         playerInstance.current = null;
       }
     };
-  }, [showOverlay, activeAd]);
+  }, [showOverlay, activeAd, user]);
 
   const handleClosePlayer = () => {
     setShowOverlay(false);

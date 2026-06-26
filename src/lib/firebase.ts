@@ -1,15 +1,25 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
+import { getMessaging, onMessage } from 'firebase/messaging';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-// @ts-ignore - firestoreDatabaseId is dynamically added by the platform
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId || '(default)');
+export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+// Initialize Messaging if supported
+let messaging: any = null;
+if (typeof window !== 'undefined') {
+  try {
+    messaging = getMessaging(app);
+  } catch (err) {
+    console.warn("Firebase Messaging could not be initialized:", err);
+  }
+}
+
+export { messaging, onMessage };
 
 // Force localStorage persistence for better Telegram Mini App compatibility
 setPersistence(auth, browserLocalPersistence).catch((err) => {
@@ -32,19 +42,6 @@ if (typeof window !== 'undefined') {
 export { analytics };
 
 // Test connection
-async function testConnection() {
-  try {
-    // We attempt to read a doc - if it fails with 'offline', it's usually a config/network mismatch
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error: any) {
-    console.warn("Connection test warning:", error.message);
-    if(error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration or internet connection. (Project ID: " + firebaseConfig.projectId + ")");
-    }
-  }
-}
-testConnection();
-
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

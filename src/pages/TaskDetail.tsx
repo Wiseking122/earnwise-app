@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs, updateDoc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Task, TaskCompletion, PlanType } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -103,24 +103,76 @@ export default function TaskDetail() {
     setError('');
     
     try {
-      await addDoc(collection(db, 'completions'), {
-        userId: user.uid,
-        taskId: task.id,
-        status: 'pending',
-        rewardEarned: calculatedReward,
-        submittedAt: serverTimestamp(),
-        proofText: proof || 'No additional text provided.',
-        screenshot: screenshot, // Base64 data URL
-        isCampaignTask: true,
-        advertiserId: task.advertiserId,
-        taskTitle: task.title,
-        taskType: task.type,
-        taskPlatform: task.tag || ''
+      const response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          taskId: task.id,
+          taskTitle: task.title,
+          proof: proof || 'Screenshot Proof Provided',
+          rewardAmount: calculatedReward,
+          screenshot: screenshot // Base64 data
+        })
       });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Verification request failed. Please try again.');
+      }
+
+      const data = await response.json();
       
+      if (data.fallback) {
+        // Run client-side verification fallback
+        const userDocRef = doc(db, 'users', user.uid);
+        const completionDocRef = doc(db, 'completions', `${user.uid}_${task.id}`);
+        const transactionRef = doc(collection(db, 'transactions'));
+
+        const payoutAmount = calculatedReward;
+
+        await setDoc(completionDocRef, {
+          userId: user.uid,
+          taskId: task.id,
+          status: 'approved',
+          proof: proof || 'Screenshot Proof Provided',
+          screenshot: screenshot || null,
+          rewardEarned: payoutAmount,
+          createdAt: serverTimestamp()
+        });
+
+        await updateDoc(userDocRef, {
+          balance: increment(payoutAmount),
+          withdrawableBalance: increment(payoutAmount),
+          taskBalance: increment(payoutAmount),
+          taskEarnings: increment(payoutAmount),
+          totalEarnings: increment(payoutAmount),
+          tasksCompleted: increment(1),
+          updatedAt: serverTimestamp()
+        });
+
+        await setDoc(transactionRef, {
+          userId: user.uid,
+          amount: payoutAmount,
+          type: 'earning',
+          status: 'completed',
+          description: `Verified Task: ${task.title || 'Activity'}`,
+          createdAt: serverTimestamp()
+        });
+
+        setWiseAiMessage(`Wise AI Fallback: Reward of ₦${payoutAmount.toFixed(2)} added to your task wallet.`);
+      } else if (data.approved) {
+        setWiseAiMessage(`Wise AI: ${data.message} Reward of ₦${calculatedReward.toFixed(2)} added to your task wallet.`);
+      } else {
+        setError(`Wise AI Rejected: ${data.message}`);
+        setSubmitting(false);
+        return;
+      }
+
       playRewardSound();
       setSubmitted(true);
-      setWiseAiMessage("Your proof has been successfully submitted to the admin panel for review. Rewards will be credited upon approval.");
       setTimeout(() => navigate('/earnings'), 3000);
     } catch (err: any) {
       setError(err.message || 'Error submitting campaign completion');
@@ -177,9 +229,47 @@ export default function TaskDetail() {
         })
       });
       
+      const data = await resp.json();
+
       if (!resp.ok) {
-        const data = await resp.json();
         throw new Error(data.error || 'Failed to complete task');
+      }
+
+      if (data.fallback) {
+        // Run client-side verification fallback
+        const userDocRef = doc(db, 'users', user.uid);
+        const completionDocRef = doc(db, 'completions', `${user.uid}_${task.id}`);
+        const transactionRef = doc(collection(db, 'transactions'));
+
+        const payoutAmount = calculatedReward;
+
+        // Perform writes directly
+        await setDoc(completionDocRef, {
+          userId: user.uid,
+          taskId: task.id,
+          status: 'approved',
+          rewardEarned: payoutAmount,
+          submittedAt: serverTimestamp()
+        });
+
+        await updateDoc(userDocRef, {
+          balance: increment(payoutAmount),
+          withdrawableBalance: increment(payoutAmount),
+          taskBalance: increment(payoutAmount),
+          taskEarnings: increment(payoutAmount),
+          totalEarnings: increment(payoutAmount),
+          tasksCompleted: increment(1),
+          updatedAt: serverTimestamp()
+        });
+
+        await setDoc(transactionRef, {
+          userId: user.uid,
+          amount: payoutAmount,
+          type: 'earning',
+          status: 'completed',
+          description: `Verified Reward: ${task.title}`,
+          createdAt: serverTimestamp()
+        });
       }
 
       playRewardSound();
@@ -201,6 +291,11 @@ export default function TaskDetail() {
         if (taskSnap.exists()) {
           const taskData = { id: taskSnap.id, ...taskSnap.data() } as Task;
           setTask(taskData);
+
+          // Increment clicksCount tracking
+          await updateDoc(doc(db, 'tasks', id), {
+            clicksCount: increment(1)
+          }).catch(err => console.error("Error incrementing clicksCount:", err));
 
           // Check if already completed if not repeatable
           if (!taskData.isRepeatable) {
@@ -227,30 +322,7 @@ export default function TaskDetail() {
   const userPlan = profile?.plan || 'free';
   const planDetails = PLANS.find(p => p.id === userPlan);
   const multiplier = planDetails?.multiplier || 1.0;
-  const calculatedReward = task ? task.reward * multiplier : 0;
-
-  const handleSubmit = async () => {
-    if (!task || !user || alreadyCompleted) return;
-    setSubmitting(true);
-    setError('');
-
-    try {
-      await addDoc(collection(db, 'completions'), {
-        userId: user.uid,
-        taskId: task.id,
-        status: 'pending',
-        rewardEarned: calculatedReward,
-        submittedAt: serverTimestamp()
-      });
-      playRewardSound();
-      setSubmitted(true);
-      setTimeout(() => navigate('/earnings'), 2000);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const calculatedReward = task ? (task.reward ?? task.userPayout ?? 0) * multiplier : 0;
 
   const [wiseAiMessage, setWiseAiMessage] = useState<string>('');
 
@@ -270,24 +342,72 @@ export default function TaskDetail() {
           taskId: task.id,
           taskTitle: task.title,
           proof: proof,
+          screenshot: screenshot, // Send screenshot proof
           rewardAmount: calculatedReward
         })
       });
 
-      if (!response.ok) {
-        throw new Error('Verification request failed. Please try again.');
-      }
-
       const data = await response.json();
 
-      if (data.approved) {
-        setWiseAiMessage(`Wise AI: ${data.message}`);
-        playRewardSound();
-        setSubmitted(true);
-        setTimeout(() => navigate('/earnings'), 3000);
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification request failed. Please try again.');
+      }
+
+      if (data.fallback) {
+        const payoutAmount = calculatedReward;
+        console.log("[DEBUG] Fallback logic running for:", user.uid, "task:", task.id, "payout:", payoutAmount);
+        try {
+          await setDoc(completionDocRef, {
+            userId: user.uid,
+            taskId: task.id,
+            status: 'approved',
+            proof: proof || 'Screenshot provided',
+            screenshot: screenshot || null,
+            rewardEarned: payoutAmount,
+            submittedAt: serverTimestamp(),
+            createdAt: serverTimestamp()
+          });
+          console.log("[DEBUG] Completion doc set.");
+
+          await updateDoc(userDocRef, {
+            balance: increment(payoutAmount),
+            withdrawableBalance: increment(payoutAmount),
+            taskBalance: increment(payoutAmount),
+            taskEarnings: increment(payoutAmount),
+            totalEarnings: increment(payoutAmount),
+            tasksCompleted: increment(1),
+            updatedAt: serverTimestamp()
+          });
+          console.log("[DEBUG] User wallet updated.");
+
+          await setDoc(transactionRef, {
+            userId: user.uid,
+            amount: payoutAmount,
+            type: 'earning',
+            status: 'completed',
+            description: `Verified Task: ${task.title || 'Activity'}`,
+            createdAt: serverTimestamp()
+          });
+          console.log("[DEBUG] Transaction log set.");
+        } catch (dbErr) {
+          console.error("[DEBUG] DB update FAILED:", dbErr);
+          throw dbErr;
+        }
+
+        setWiseAiMessage(`Wise AI Fallback: Reward of ₦${payoutAmount.toFixed(2)} added to your task wallet.`);
+      } else if (data.status === 'pending') {
+        setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
+      } else if (data.approved) {
+        setWiseAiMessage(`Wise AI: ${data.message} Reward of ₦${calculatedReward.toFixed(2)} added to your task wallet.`);
       } else {
         setError(`Wise AI Rejected: ${data.message}`);
+        setSubmitting(false);
+        return;
       }
+
+      playRewardSound();
+      setSubmitted(true);
+      setTimeout(() => navigate('/earnings'), 3000);
 
     } catch (err: any) {
       setError(err.message);

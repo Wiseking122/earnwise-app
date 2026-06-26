@@ -150,7 +150,7 @@ export default function Withdrawal() {
       case 'silver': return 30000;
       case 'platinum': return 45000;
       case 'golden': return 75000;
-      default: return 0; // Free cannot execute withdrawals
+      default: return 0; // Free cannot execute withdrawals unless they are an admin
     }
   }
 
@@ -311,6 +311,7 @@ export default function Withdrawal() {
     const plan = profile.plan || 'free';
     const isAdmin = profile.role === 'admin';
     const cap = isAdmin ? 1000000000 : getPlanWithdrawalCap(plan);
+    
     if (!isAdmin && (plan === 'free' || cap === 0)) {
       setError('Free plans do not have payout capacity. Please upgrade to a verified plan.');
       return;

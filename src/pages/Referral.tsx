@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { 
   Users, 
   Copy, 
@@ -21,6 +23,19 @@ export default function Referral() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Auto-generate referral code if missing
+  useEffect(() => {
+    if (profile && !profile.referralCode) {
+      const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const userDocRef = doc(db, 'users', profile.uid);
+      updateDoc(userDocRef, {
+        referralCode: generatedCode
+      }).catch(err => {
+        console.error("Failed to generate referral code inside Referral page:", err);
+      });
+    }
+  }, [profile]);
 
   // Use the cleaner invite path
   const referralLink = `${window.location.origin}/invite/${profile?.referralCode}`;
