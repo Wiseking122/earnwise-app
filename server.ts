@@ -2297,19 +2297,24 @@ Please verify if the submission is a plausible and honest completion of a social
       });
 
       const data = response.data.data;
+      console.log(`[PAYMENT] Paystack response for ref ${reference}:`, data);
       if (data.status === "success") {
         const verifiedAmount = data.amount / 100; // to Naira
+        console.log(`[PAYMENT] Verified amount for ref ${reference}:`, verifiedAmount);
         
         // STRICTOR VALIDATION ENFORCEMENT:
         // Reject attempts to inflate the balance where the body amount is different from what Paystack verified.
         if (amount) {
           const clientSuppliedNaira = Number(amount);
-          if (!isNaN(clientSuppliedNaira) && Math.abs(clientSuppliedNaira - verifiedAmount) > 0.05) {
+          console.log(`[PAYMENT] Client claimed: ${clientSuppliedNaira}`);
+          if (!isNaN(clientSuppliedNaira) && Math.abs(clientSuppliedNaira - verifiedAmount) > 5.0) { // Relaxed to 5 Naira
             console.error(`[SECURITY ALERT] Possible balance inflation attempt! User ${userId} claimed ₦${clientSuppliedNaira}, but Paystack verified response is ₦${verifiedAmount}. Reference: ${reference}`);
             return res.status(400).json({
               status: "failed",
               message: `Transaction verification mismatch. Claimed amount (₦${clientSuppliedNaira.toLocaleString()}) does not match Paystack verified record (₦${verifiedAmount.toLocaleString()}).`
             });
+          } else if (!isNaN(clientSuppliedNaira) && Math.abs(clientSuppliedNaira - verifiedAmount) > 0.05) {
+            console.warn(`[PAYMENT] Minor amount mismatch (within fee tolerance): User ${userId} claimed ₦${clientSuppliedNaira}, verified ₦${verifiedAmount}. Proceeding...`);
           }
         }
 
@@ -2321,12 +2326,14 @@ Please verify if the submission is a plausible and honest completion of a social
           return res.json({ status: "success", message: "Deposit already reflected", amount: verifiedAmount });
         }
 
+        console.log(`[PAYMENT] Updating user ${userId} balance for reference ${reference}, amount: ${verifiedAmount}`);
         await userRef.update({
           balance: admin.firestore.FieldValue.increment(verifiedAmount),
           withdrawableBalance: admin.firestore.FieldValue.increment(verifiedAmount),
           depositBalance: admin.firestore.FieldValue.increment(verifiedAmount),
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+        console.log(`[PAYMENT] Updated user ${userId} balance successfully.`);
 
         await dbAdmin.collection('transactions').add({
           userId,
@@ -2356,8 +2363,14 @@ Please verify if the submission is a plausible and honest completion of a social
         res.status(400).json({ status: "failed", message: "Payment not successful" });
       }
     } catch (error: any) {
-      console.error("Verify deposit error:", error.response?.data || error.message);
-      res.status(500).json({ error: "Failed to verify deposit" });
+      console.error("[PAYMENT] Verify deposit error:", error.response?.data || error.message);
+      
+      // If the error is not due to a payment mismatch, try to return a clearer message
+      res.status(500).json({ 
+        status: "failed",
+        message: "Server verification failed. Please try again later.",
+        details: error.message 
+      });
     }
   });
 
