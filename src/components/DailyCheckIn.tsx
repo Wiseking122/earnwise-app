@@ -138,13 +138,13 @@ export const DailyCheckIn: React.FC = () => {
         {/* Glow effect on the borders */}
         <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-blue-500/10 rounded-2xl sm:rounded-3xl pointer-events-none" />
         
-        <div className="bg-[#020617] rounded-[14px] sm:rounded-[22px] p-4 sm:p-5 space-y-4 sm:space-y-5 relative z-10">
+        <div className="bg-[#020617] rounded-[14px] sm:rounded-[22px] p-3 sm:p-5 space-y-3.5 sm:space-y-5 relative z-10">
           
           {/* Header section with streak badge */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="flex items-center gap-2.5 sm:gap-3.5">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-md relative shrink-0">
-                <Flame size={20} className="text-white animate-pulse sm:w-6 sm:h-6" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3.5">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-md relative shrink-0">
+                <Flame size={18} className="text-white animate-pulse sm:w-6 sm:h-6" />
                 {canCheckIn && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 border-2 border-slate-950 rounded-full animate-ping" />
                 )}
@@ -203,7 +203,7 @@ export const DailyCheckIn: React.FC = () => {
 
           {/* Tab 1: Grid Visualization */}
           {activeTab === 'grid' && (
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1 sm:gap-2">
               {DAILY_REWARDS.map((item) => {
                 // Determine claim state relative to cycle indexes
                 const isClaimed = canCheckIn ? item.day < cycleDayNumber : item.day <= cycleDayNumber;
@@ -214,7 +214,7 @@ export const DailyCheckIn: React.FC = () => {
                   <motion.div
                     key={item.day}
                     whileHover={!isLocked ? { scale: 1.02 } : {}}
-                    className={`relative p-2 sm:p-2.5 rounded-xl border transition-all flex flex-col items-center text-center justify-between min-h-[76px] sm:min-h-[86px] ${
+                    className={`relative p-1.5 sm:p-2.5 rounded-xl border transition-all flex flex-col items-center text-center justify-between min-h-[68px] sm:min-h-[86px] ${
                       isToday 
                         ? 'bg-amber-500/10 border-amber-400 shadow shadow-amber-400/5 ring-1 ring-amber-400' 
                         : isClaimed 

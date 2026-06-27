@@ -1207,7 +1207,7 @@ async function startServer() {
       }
 
       const requestAiClient = ai;
-      const models = ["gemini-flash-latest"];
+      const models = ["gemini-3.5-flash"];
       let lastErr;
       let finalData = { subtasks: [] };
 
@@ -1349,7 +1349,7 @@ IMPORTANT INSTRUCTIONS:
           ];
 
           const responseStream = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.5-flash",
             contents: contents,
             config: {
               systemInstruction: systemInstruction,
@@ -1447,7 +1447,7 @@ Screenshot uploaded: ${screenshot ? 'Yes' : 'No'}
 Please verify if the submission is a plausible and honest completion of a social media task (e.g., following, liking, subscribing). Be generous and supportive. Respond ONLY with a JSON object containing keys "approved" (boolean) and "reason" (string).`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3.5-flash",
             contents: prompt,
             config: {
               responseMimeType: "application/json",
@@ -1465,22 +1465,47 @@ Please verify if the submission is a plausible and honest completion of a social
         }
       }
 
-      // Always create a pending completion for manual review
+      // Handle the results based on Wise AI decision
+      const finalStatus = verificationResult.approved ? 'approved' : 'pending';
+
       await dbAdmin.runTransaction(async (transaction) => {
         const completionRef = dbAdmin.collection('completions').doc(`${userId}_${taskId}`);
+        const userRef = dbAdmin.collection('users').doc(userId);
         
-        // 1. Write Completion Doc as pending
+        // 1. Write Completion Doc
         transaction.set(completionRef, {
             userId,
             taskId,
             taskTitle: taskTitle || 'Social Task',
-            status: 'pending',
+            status: finalStatus,
             proof: proof || 'Screenshot provided',
             screenshot: screenshot || null,
             rewardEarned: numericReward,
             submittedAt: admin.firestore.FieldValue.serverTimestamp(),
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            aiVerified: verificationResult.approved,
+            aiReason: verificationResult.reason
         });
+
+        // 2. If approved, add reward to balance
+        if (verificationResult.approved) {
+          transaction.update(userRef, {
+            balance: admin.firestore.FieldValue.increment(numericReward),
+            taskBalance: admin.firestore.FieldValue.increment(numericReward),
+            taskEarnings: admin.firestore.FieldValue.increment(numericReward)
+          });
+
+          // 3. Log transaction
+          const txRef = dbAdmin.collection('transactions').doc();
+          transaction.set(txRef, {
+            userId,
+            amount: numericReward,
+            type: 'task_completion',
+            status: 'completed',
+            description: `Wise AI Verified: ${taskTitle}`,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
       });
 
       return res.json({ 
@@ -3144,7 +3169,7 @@ Please verify if the submission is a plausible and honest completion of a social
 
       try {
         const responseStream = await ai.models.generateContentStream({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.5-flash",
           contents: [
             {
               role: "user",
@@ -3318,7 +3343,7 @@ Please verify if the submission is a plausible and honest completion of a social
 
         try {
           const responseStream = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.5-flash",
             contents: [
                 ...history.map((h: any) => ({
                     role: h.role === 'user' ? 'user' : 'model',

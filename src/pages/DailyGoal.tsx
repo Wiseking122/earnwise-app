@@ -146,26 +146,26 @@ export const DailyGoal: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm relative overflow-hidden"
+        className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-sm relative overflow-hidden"
       >
         {/* Glow effect on 100% completion */}
         {isCompleted && (
           <div className="absolute inset-0 bg-linear-to-tr from-emerald-500/5 via-teal-500/5 to-transparent pointer-events-none animate-pulse-slow" />
         )}
         
-        <div className="relative z-10 space-y-4">
+        <div className="relative z-10 space-y-3">
           {/* Header section */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all ${
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all ${
                 isCompleted 
                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm shadow-emerald-50' 
                   : 'bg-blue-50 text-blue-600'
               }`}>
-                {isCompleted ? <Trophy size={16} /> : <Target size={16} />}
+                {isCompleted ? <Trophy size={14} /> : <Target size={14} />}
               </div>
               <div>
-                <h4 className="font-display font-black text-slate-800 text-xs sm:text-sm tracking-tight">Your Daily Goal</h4>
+                <h4 className="font-display font-black text-slate-800 text-[11px] sm:text-sm tracking-tight leading-none mb-0.5">Your Daily Goal</h4>
                 <p className="text-[8px] sm:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest leading-none">
                   Focus on high-yield tasks
                 </p>
@@ -177,38 +177,38 @@ export const DailyGoal: React.FC = () => {
               <button 
                 onClick={() => handleAdjustTarget(-1)}
                 disabled={dailyTarget <= 1}
-                className="w-6 h-6 sm:w-7 sm:h-7 bg-white rounded-lg sm:rounded-xl flex items-center justify-center border border-slate-100 hover:border-slate-200 text-slate-600 active:scale-90 disabled:opacity-40 transition-all cursor-pointer shadow-xs"
+                className="w-5 h-5 sm:w-7 sm:h-7 bg-white rounded-lg sm:rounded-xl flex items-center justify-center border border-slate-100 hover:border-slate-200 text-slate-600 active:scale-90 disabled:opacity-40 transition-all cursor-pointer shadow-xs"
                 title="Decrease Daily Target"
               >
-                <Minus size={10} strokeWidth={3} />
+                <Minus size={9} strokeWidth={3} />
               </button>
-              <span className="text-[11px] sm:text-xs font-black text-slate-800 px-1.5 sm:px-2 min-w-[16px] sm:min-w-[20px] text-center select-none">
+              <span className="text-[10px] sm:text-xs font-black text-slate-800 px-1.5 sm:px-2 min-w-[14px] sm:min-w-[20px] text-center select-none">
                 {dailyTarget}
               </span>
               <button 
                 onClick={() => handleAdjustTarget(1)}
                 disabled={dailyTarget >= 25}
-                className="w-6 h-6 sm:w-7 sm:h-7 bg-white rounded-lg sm:rounded-xl flex items-center justify-center border border-slate-100 hover:border-slate-200 text-slate-600 active:scale-90 disabled:opacity-40 transition-all cursor-pointer shadow-xs"
+                className="w-5 h-5 sm:w-7 sm:h-7 bg-white rounded-lg sm:rounded-xl flex items-center justify-center border border-slate-100 hover:border-slate-200 text-slate-600 active:scale-90 disabled:opacity-40 transition-all cursor-pointer shadow-xs"
                 title="Increase Daily Target"
               >
-                <Plus size={10} strokeWidth={3} />
+                <Plus size={9} strokeWidth={3} />
               </button>
             </div>
           </div>
 
           {/* Central progress visualizer */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex justify-between items-end">
               <div className="flex items-baseline gap-1 flex-wrap">
-                <span className={`font-display font-black text-2xl sm:text-3xl leading-none tracking-tight ${
+                <span className={`font-display font-black text-xl sm:text-3xl leading-none tracking-tight ${
                   isCompleted ? 'text-emerald-600' : 'text-slate-900'
                 }`}>
                   {completionsToday}
                 </span>
-                <span className="text-slate-400 font-bold text-sm sm:text-lg select-none">
+                <span className="text-slate-400 font-bold text-xs sm:text-lg select-none">
                   / {dailyTarget}
                 </span>
-                <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block ml-1 ${
+                <span className={`text-[7px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-block ml-1 ${
                   isCompleted 
                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
                     : 'bg-slate-50 text-slate-400'
@@ -218,7 +218,7 @@ export const DailyGoal: React.FC = () => {
               </div>
               
               <div className="text-right">
-                <span className={`text-[11px] sm:text-xs font-black tracking-tighter ${
+                <span className={`text-[10px] sm:text-xs font-black tracking-tighter ${
                   isCompleted ? 'text-emerald-600' : 'text-blue-600'
                 }`}>
                   {percentage.toFixed(0)}%
@@ -227,7 +227,7 @@ export const DailyGoal: React.FC = () => {
             </div>
 
             {/* Premium Progress Bar */}
-            <div className="h-3 sm:h-3.5 bg-slate-50 border border-slate-100 rounded-full overflow-hidden relative p-0.5">
+            <div className="h-2.5 sm:h-3.5 bg-slate-50 border border-slate-100 rounded-full overflow-hidden relative p-0.5">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${percentage}%` }}

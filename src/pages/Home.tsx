@@ -401,6 +401,46 @@ export default function Home() {
         {/* Daily Tasks Goal Progression */}
         <DailyGoal />
 
+        {/* Wise AI Assistant Section */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Wise AI Mentor</h3>
+            </div>
+          </div>
+
+          <div 
+            onClick={viewAiPlan}
+            className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-2xl sm:rounded-[2rem] p-3.5 sm:p-5 text-white relative overflow-hidden shadow-2xl cursor-pointer group hover:border-blue-400/50 transition-all active:scale-[0.98]"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)' }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-transparent pointer-events-none" />
+            
+            <div className="relative z-10 flex items-center gap-3.5">
+              <div className="w-11 h-11 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-center text-blue-400 shadow-inner group-hover:scale-110 transition-transform">
+                <Bot size={24} className="drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h4 className="font-display font-black text-base leading-tight uppercase italic text-white group-hover:text-blue-200 transition-colors">
+                    Wise AI Strategy
+                  </h4>
+                  <div className="bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-500/30">
+                    <span className="text-[7px] font-black text-blue-300 uppercase tracking-widest">Dune & Oak</span>
+                  </div>
+                </div>
+                <p className="text-slate-400 text-[10px] font-medium leading-tight max-w-xs">
+                  Generate personalized daily earning strategy with AI.
+                </p>
+              </div>
+              <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-blue-600 transition-colors">
+                <ArrowRight size={16} className="text-white" />
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Refer & Earn (20% Team Program) Widget */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
@@ -543,24 +583,24 @@ export default function Home() {
              <div className="grid grid-cols-2 gap-3">
                <Link 
                 to="/tasks?category=survey"
-                className="bg-orange-500/10 border border-orange-500/30 p-3.5 sm:p-4 rounded-2xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
+                className="bg-orange-500/10 border border-orange-500/30 p-3 sm:p-4 rounded-2xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white mb-2.5 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
-                   <Search size={16} className="sm:w-[18px] sm:h-[18px]" />
+                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white mb-2 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
+                   <Search size={14} className="sm:w-[18px] sm:h-[18px]" />
                  </div>
-                 <h4 className="font-display font-black text-white text-xs sm:text-base uppercase italic tracking-tighter">Paid Surveys</h4>
-                 <p className="text-orange-400 text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1">CPX Global Network</p>
+                 <h4 className="font-display font-black text-white text-[11px] sm:text-base uppercase italic tracking-tighter">Paid Surveys</h4>
+                 <p className="text-orange-400 text-[7px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5">CPX Network</p>
                </Link>
                
                <Link 
                 to="/tasks?category=ad"
-                className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 sm:p-4 rounded-2xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
+                className="bg-emerald-500/10 border border-emerald-500/30 p-3 sm:p-4 rounded-2xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-2.5 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
-                   <Play size={16} className="fill-white sm:w-[18px] sm:h-[18px]" />
+                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-2 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
+                   <Play size={14} className="fill-white sm:w-[18px] sm:h-[18px]" />
                  </div>
-                 <h4 className="font-display font-black text-white text-xs sm:text-base uppercase italic tracking-tighter">Ads Center</h4>
-                 <p className="text-emerald-400 text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1">Montage Network</p>
+                 <h4 className="font-display font-black text-white text-[11px] sm:text-base uppercase italic tracking-tighter">Ads Center</h4>
+                 <p className="text-emerald-400 text-[7px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5">Montage</p>
                </Link>
              </div>
 
