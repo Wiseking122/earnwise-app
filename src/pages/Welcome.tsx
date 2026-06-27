@@ -20,8 +20,10 @@ import axios from 'axios';
 import { safeStorage } from '../lib/storage';
 
 export default function Welcome() {
-  const { user: currentUser, loading: authLoading } = useAuth();
+  const { user: currentUser, loading: authLoading, signInWithUserId } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  const [isUserIdMode, setIsUserIdMode] = useState(false);
+  const [userIdValue, setUserIdValue] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -235,6 +237,26 @@ export default function Welcome() {
     }
   };
 
+  const handleUserIdSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = userIdValue.trim().toLowerCase().replace(/\s+/g, '');
+    if (!cleanId) {
+      setError('Please enter a valid User ID.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithUserId(cleanId);
+      navigate('/');
+    } catch (err: any) {
+      console.error("User ID login error:", err);
+      setError(err.message || 'Failed to access with User ID.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgotPassword = async () => {
     if (!email) {
       setError('Please enter your email address to reset password.');
@@ -364,20 +386,52 @@ export default function Welcome() {
 
           <div className="flex gap-2 p-1.5 bg-slate-800/50 rounded-[1.5rem] ring-1 ring-white/5 border border-white/5 shadow-inner">
             <button 
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-black transition-all transform duration-300 ${isLogin ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
+              type="button"
+              onClick={() => { setIsLogin(true); setIsUserIdMode(false); }}
+              className={`flex-1 py-3 px-1 rounded-xl text-xs font-black transition-all transform duration-300 ${isLogin && !isUserIdMode ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
             >
               Sign In
             </button>
             <button 
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-black transition-all transform duration-300 ${!isLogin ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
+              type="button"
+              onClick={() => { setIsLogin(false); setIsUserIdMode(false); }}
+              className={`flex-1 py-3 px-1 rounded-xl text-xs font-black transition-all transform duration-300 ${!isLogin && !isUserIdMode ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
             >
-              Create Account
+              Register
+            </button>
+            <button 
+              type="button"
+              onClick={() => { setIsUserIdMode(true); }}
+              className={`flex-1 py-3 px-1 rounded-xl text-xs font-black transition-all transform duration-300 ${isUserIdMode ? 'bg-blue-600 shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-white scale-100' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              User ID
             </button>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-4">
+          {isUserIdMode ? (
+            <form onSubmit={handleUserIdSubmit} className="space-y-4">
+              <div className="space-y-1 relative">
+                <input 
+                  type="text" 
+                  placeholder="Enter User ID (e.g. one)"
+                  required
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
+                  value={userIdValue}
+                  onChange={(e) => setUserIdValue(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 font-bold leading-relaxed px-1">
+                💡 Tip: Use a memorable ID like <span className="text-emerald-400 font-extrabold">one</span> to access your account instantly across any browser or mobile device, retaining your exact balance forever.
+              </p>
+              <button 
+                disabled={loading}
+                className="w-full bg-white hover:bg-slate-200 text-slate-900 font-black py-4 rounded-[1.5rem] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+              >
+                {loading ? 'Entering...' : 'Enter Account'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleAuth} className="space-y-4">
               {!isLogin && (
                 <div className="grid grid-cols-2 gap-4">
                   <input 
@@ -469,6 +523,7 @@ export default function Welcome() {
                 {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
               </button>
           </form>
+          )}
 
           <div className="relative my-4 text-center">
             <span className="bg-slate-900 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-full relative z-10 border border-white/5 py-1">or</span>

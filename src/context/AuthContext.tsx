@@ -18,6 +18,7 @@ interface AuthContextType {
   accessToken: string | null;
   logout: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithUserId: (id: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +33,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check if custom user ID is saved in local storage
+    const savedCustomUid = safeStorage.getItem('customUserId');
+    if (savedCustomUid) {
+      const mockUser = {
+        uid: savedCustomUid,
+        email: savedCustomUid === 'one' ? 'one@earnwise.com' : `${savedCustomUid}@earnwise.com`,
+        displayName: savedCustomUid === 'one' ? 'User One' : `User ${savedCustomUid}`,
+        emailVerified: true,
+        isAnonymous: false,
+        metadata: {},
+        providerData: [],
+        delete: async () => {},
+        getIdToken: async () => 'mock-token',
+        getIdTokenResult: async () => ({ token: 'mock-token' } as any),
+        reload: async () => {},
+        toJSON: () => ({})
+      } as unknown as FirebaseUser;
+      
+      setUser(mockUser);
+      setLoading(false);
+      return;
+    }
+
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (!firebaseUser) {
@@ -239,10 +263,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => signOut(auth);
+  const signInWithUserId = async (id: string) => {
+    const cleanId = id.trim().toLowerCase();
+    if (!cleanId) throw new Error("Invalid User ID");
+    
+    safeStorage.setItem('customUserId', cleanId);
+    
+    const mockUser = {
+      uid: cleanId,
+      email: cleanId === 'one' ? 'one@earnwise.com' : `${cleanId}@earnwise.com`,
+      displayName: cleanId === 'one' ? 'User One' : `User ${cleanId}`,
+      emailVerified: true,
+      isAnonymous: false,
+      metadata: {},
+      providerData: [],
+      delete: async () => {},
+      getIdToken: async () => 'mock-token',
+      getIdTokenResult: async () => ({ token: 'mock-token' } as any),
+      reload: async () => {},
+      toJSON: () => ({})
+    } as unknown as FirebaseUser;
+    
+    setUser(mockUser);
+  };
+
+  const logout = async () => {
+    safeStorage.removeItem('customUserId');
+    await signOut(auth);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, accessToken, logout, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, profile, loading, accessToken, logout, signInWithGoogle, signInWithUserId }}>
       {children}
     </AuthContext.Provider>
   );

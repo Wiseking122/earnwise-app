@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://earnwise-o30u.onrender.com/api/:path*"
+      "destination": "https://earnwise-c30u.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
