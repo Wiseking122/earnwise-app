@@ -7,16 +7,19 @@ import {
   Globe, 
   TrendingUp, 
   Timer,
-  ChevronLeft
+  ChevronLeft,
+  Image as ImageIcon,
+  Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
-import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot } from 'firebase/firestore';
 import { useAuth } from './context/AuthContext';
 import { playRewardSound } from './pages/sounds';
 import VideoAd from './components/VideoAd';
 import VastVideoPlayer from './components/VastVideoPlayer';
 import { MONETAG_LINKS, getMonetagLink } from './lib/adManager';
+import { getApiUrl } from './lib/config';
 
 export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022826',
@@ -36,6 +39,8 @@ interface AdTask {
   color: string;
   icon: any;
   link?: string;
+  mediaUrl?: string;
+  isCustom?: boolean;
 }
 
 interface AdsSectionProps {
@@ -50,9 +55,24 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   const [activeTimerTask, setActiveTimerTask] = useState<AdTask | null>(null);
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(30);
   const [vastAd, setVastAd] = useState<string>('');
+  const [dbAds, setDbAds] = useState<any[]>([]);
 
   useEffect(() => {
-    if (activeTimerTask) {
+    const q = query(collection(db, 'ads'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setDbAds(list);
+    }, (err) => {
+      console.error("Failed to fetch ads from firestore:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (activeTimerTask && !activeTimerTask.isCustom) {
        setVastAd(VAST_ADS[Math.floor(Math.random() * VAST_ADS.length)]);
     }
   }, [activeTimerTask]);
@@ -64,6 +84,12 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
         if (prev <= 1) {
           clearInterval(interval);
           return 0;
+        }
+        // Increment watchTime in firestore if it's a custom ad
+        if (activeTimerTask.isCustom) {
+          const adRef = doc(db, 'ads', activeTimerTask.id);
+          updateDoc(adRef, { watchTime: increment(1) })
+            .catch(err => console.error("Error incrementing watchTime:", err));
         }
         return prev - 1;
       });
@@ -114,6 +140,19 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     }
   };
 
+  const mappedDbTasks: AdTask[] = dbAds.map(ad => ({
+    id: ad.id,
+    name: ad.title || 'Premium Sponsor Offer',
+    provider: 'Featured Sponsor',
+    reward: Number(ad.reward) || 25.00,
+    type: ad.type === 'video' ? 'video' : 'click',
+    color: ad.type === 'video' ? 'bg-amber-600' : 'bg-pink-600',
+    icon: ad.type === 'video' ? Video : ImageIcon,
+    link: ad.url || '#',
+    mediaUrl: ad.mediaUrl || '',
+    isCustom: true
+  }));
+
   const monetagTasks: AdTask[] = MONETAG_LINKS.map((link, idx) => ({
     id: link.id,
     name: `Premium Sponsor Ad Stream - Channel ${idx + 1}`,
@@ -126,6 +165,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   }));
 
   const adTasks: AdTask[] = [
+    ...mappedDbTasks,
     {
       id: 'video_1',
       name: 'Understanding Ads Center',
@@ -159,6 +199,12 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     ...monetagTasks
   ];
 
+  const handleAdClickMetric = (adId: string) => {
+    const adRef = doc(db, 'ads', adId);
+    updateDoc(adRef, { clicks: increment(1) })
+      .catch(err => console.error("Error incrementing clicks:", err));
+  };
+
   const handleTaskClick = (task: AdTask) => {
     if (isAdCompletedToday(task.id)) {
       setRewardMsg("You've already earned from this ad today!");
@@ -166,7 +212,24 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       return;
     }
 
-    if (task.type === 'video') {
+    if (task.isCustom) {
+      // 1. Increment Views
+      const adRef = doc(db, 'ads', task.id);
+      updateDoc(adRef, { views: increment(1) })
+        .catch(err => console.error("Error incrementing views:", err));
+
+      // 2. Increment Clicks too if click type ad
+      if (task.type === 'click') {
+        updateDoc(adRef, { clicks: increment(1) })
+          .catch(err => console.error("Error incrementing clicks:", err));
+      }
+
+      if (task.link && task.link !== '#') {
+        window.open(task.link, '_blank', 'noopener,noreferrer');
+      }
+      setActiveTimerTask(task);
+      setTimerSecondsLeft(30);
+    } else if (task.type === 'video') {
       const videoType = task.id === 'video_2' ? 'premium' : 'standard';
       navigate(`/player?video=${videoType}&reward=${task.reward}`);
     } else if (task.link && task.link !== '#') {
@@ -238,8 +301,59 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                 </p>
               </div>
 
-              <div className="flex flex-col items-center justify-center py-6">
-                {vastAd && (
+              <div className="flex flex-col items-center justify-center py-6 w-full space-y-4">
+                {activeTimerTask.isCustom && activeTimerTask.mediaUrl && (
+                  <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-black/40 p-1">
+                    {activeTimerTask.type === 'video' ? (
+                      <div className="relative group w-full">
+                        <video 
+                          key={activeTimerTask.id}
+                          src={getApiUrl(activeTimerTask.mediaUrl)} 
+                          autoPlay 
+                          muted
+                          controls 
+                          playsInline
+                          loop
+                          preload="auto"
+                          className="w-full aspect-video object-contain rounded-xl" 
+                        />
+                        <div 
+                          onClick={() => {
+                            if (activeTimerTask.link && activeTimerTask.link !== '#') {
+                              window.open(activeTimerTask.link, '_blank', 'noopener,noreferrer');
+                              handleAdClickMetric(activeTimerTask.id);
+                            }
+                          }}
+                          className="absolute top-2 right-2 bg-black/60 hover:bg-black/90 text-white text-[9px] font-black px-2.5 py-1 rounded-lg cursor-pointer transition-all uppercase border border-white/10"
+                        >
+                          Visit Sponsor
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => {
+                          if (activeTimerTask.link && activeTimerTask.link !== '#') {
+                            window.open(activeTimerTask.link, '_blank', 'noopener,noreferrer');
+                            handleAdClickMetric(activeTimerTask.id);
+                          }
+                        }}
+                        className="cursor-pointer hover:opacity-90 transition-all relative group"
+                        title="Click to visit partner website"
+                      >
+                        <img 
+                          src={getApiUrl(activeTimerTask.mediaUrl)} 
+                          alt={activeTimerTask.name} 
+                          className="w-full max-h-48 object-contain rounded-2xl p-2 mx-auto transition-transform group-hover:scale-[1.02]"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                          <span className="text-white text-xs font-black uppercase tracking-wider bg-slate-900/90 px-4 py-2 rounded-xl border border-white/10">Visit Partner Website</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!activeTimerTask.isCustom && vastAd && (
                   <VastVideoPlayer vastUrl={vastAd} onAdEnded={() => {}} />
                 )}
                 <div className="relative w-36 h-36 flex items-center justify-center">
@@ -297,6 +411,65 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Featured Banner Ads */}
+      {mappedDbTasks.filter(t => t.type === 'click').length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-3 bg-linear-to-b from-pink-500 to-rose-500 rounded-full" />
+            <h4 className="font-display font-black text-slate-900 uppercase tracking-tighter text-sm italic">Featured Sponsor Banners</h4>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {mappedDbTasks.filter(t => t.type === 'click').map((task) => {
+              const completedToday = isAdCompletedToday(task.id);
+              return (
+                <div 
+                  key={task.id}
+                  className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all flex flex-col relative group ${
+                    completedToday ? 'opacity-60 grayscale' : ''
+                  }`}
+                >
+                  {task.mediaUrl && (
+                    <div className="w-full h-36 bg-slate-950 flex items-center justify-center overflow-hidden relative">
+                      <img 
+                        src={getApiUrl(task.mediaUrl)} 
+                        alt={task.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-3 right-3 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2 py-1 rounded-lg text-emerald-400 font-mono text-[9px] font-black">
+                        ₦{task.reward.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  <div className="p-4 flex flex-col justify-between flex-1">
+                    <div>
+                      <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest">{task.provider}</span>
+                      <h5 className="font-display font-black text-slate-900 text-sm uppercase italic leading-tight mt-1">{task.name}</h5>
+                    </div>
+                    <button
+                      onClick={() => handleTaskClick(task)}
+                      disabled={loading || completedToday}
+                      className={`mt-3 w-full py-2.5 rounded-xl font-display font-black text-[10px] uppercase tracking-wider transition-all text-center ${
+                        completedToday 
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-slate-950 text-white hover:bg-blue-600'
+                      }`}
+                    >
+                      {completedToday ? 'Completed Today' : 'Click & Earn'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 mt-4">
+        <span className="w-1.5 h-3 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full" />
+        <h4 className="font-display font-black text-slate-900 uppercase tracking-tighter text-sm italic">Ad Streams & Video Tasks</h4>
+      </div>
 
       <div className="grid gap-4">
         {adTasks.map((task, index) => {

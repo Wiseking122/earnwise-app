@@ -127,48 +127,28 @@ export default function TaskDetail() {
       
       if (data.fallback) {
         // Run client-side verification fallback
-        const userDocRef = doc(db, 'users', user.uid);
         const completionDocRef = doc(db, 'completions', `${user.uid}_${task.id}`);
-        const transactionRef = doc(collection(db, 'transactions'));
-
         const payoutAmount = calculatedReward;
 
         await setDoc(completionDocRef, {
           userId: user.uid,
           taskId: task.id,
-          status: 'approved',
+          taskTitle: task.title,
+          status: 'pending',
           proof: proof || 'Screenshot Proof Provided',
           screenshot: screenshot || null,
           rewardEarned: payoutAmount,
+          submittedAt: serverTimestamp(),
           createdAt: serverTimestamp()
         });
 
-        await updateDoc(userDocRef, {
-          balance: increment(payoutAmount),
-          withdrawableBalance: increment(payoutAmount),
-          taskBalance: increment(payoutAmount),
-          taskEarnings: increment(payoutAmount),
-          totalEarnings: increment(payoutAmount),
-          tasksCompleted: increment(1),
-          updatedAt: serverTimestamp()
-        });
-
-        await setDoc(transactionRef, {
-          userId: user.uid,
-          amount: payoutAmount,
-          type: 'earning',
-          status: 'completed',
-          description: `Verified Task: ${task.title || 'Activity'}`,
-          createdAt: serverTimestamp()
-        });
-
-        setWiseAiMessage(`Wise AI Fallback: Reward of ₦${payoutAmount.toFixed(2)} added to your task wallet.`);
+        setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
+      } else if (data.status === 'pending') {
+        setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       } else if (data.approved) {
         setWiseAiMessage(`Wise AI: ${data.message} Reward of ₦${calculatedReward.toFixed(2)} added to your task wallet.`);
       } else {
-        setError(`Wise AI Rejected: ${data.message}`);
-        setSubmitting(false);
-        return;
+        setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       }
 
       playRewardSound();
@@ -355,46 +335,27 @@ export default function TaskDetail() {
 
       if (data.fallback) {
         const payoutAmount = calculatedReward;
+        const completionDocRef = doc(db, 'completions', `${user.uid}_${task.id}`);
         console.log("[DEBUG] Fallback logic running for:", user.uid, "task:", task.id, "payout:", payoutAmount);
         try {
           await setDoc(completionDocRef, {
             userId: user.uid,
             taskId: task.id,
-            status: 'approved',
+            taskTitle: task.title,
+            status: 'pending',
             proof: proof || 'Screenshot provided',
             screenshot: screenshot || null,
             rewardEarned: payoutAmount,
             submittedAt: serverTimestamp(),
             createdAt: serverTimestamp()
           });
-          console.log("[DEBUG] Completion doc set.");
-
-          await updateDoc(userDocRef, {
-            balance: increment(payoutAmount),
-            withdrawableBalance: increment(payoutAmount),
-            taskBalance: increment(payoutAmount),
-            taskEarnings: increment(payoutAmount),
-            totalEarnings: increment(payoutAmount),
-            tasksCompleted: increment(1),
-            updatedAt: serverTimestamp()
-          });
-          console.log("[DEBUG] User wallet updated.");
-
-          await setDoc(transactionRef, {
-            userId: user.uid,
-            amount: payoutAmount,
-            type: 'earning',
-            status: 'completed',
-            description: `Verified Task: ${task.title || 'Activity'}`,
-            createdAt: serverTimestamp()
-          });
-          console.log("[DEBUG] Transaction log set.");
+          console.log("[DEBUG] Completion doc set as pending in fallback.");
         } catch (dbErr) {
           console.error("[DEBUG] DB update FAILED:", dbErr);
           throw dbErr;
         }
 
-        setWiseAiMessage(`Wise AI Fallback: Reward of ₦${payoutAmount.toFixed(2)} added to your task wallet.`);
+        setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       } else if (data.status === 'pending') {
         setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       } else if (data.approved) {

@@ -133,51 +133,51 @@ export const DailyCheckIn: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-slate-950 p-[2px] rounded-[3rem] border border-slate-900 shadow-2xl relative overflow-hidden group"
+        className="bg-slate-950 p-[1.5px] rounded-2xl sm:rounded-3xl border border-slate-900 shadow-xl relative overflow-hidden group"
       >
         {/* Glow effect on the borders */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-blue-500/10 rounded-[3rem] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-blue-500/10 rounded-2xl sm:rounded-3xl pointer-events-none" />
         
-        <div className="bg-[#020617] rounded-[2.9rem] p-5 sm:p-7 space-y-6 relative z-10">
+        <div className="bg-[#020617] rounded-[14px] sm:rounded-[22px] p-4 sm:p-5 space-y-4 sm:space-y-5 relative z-10">
           
           {/* Header section with streak badge */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-lg shadow-amber-500/10 relative">
-                <Flame size={26} className="text-white animate-pulse" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2.5 sm:gap-3.5">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-md relative shrink-0">
+                <Flame size={20} className="text-white animate-pulse sm:w-6 sm:h-6" />
                 {canCheckIn && (
-                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 border-2 border-slate-950 rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 border-2 border-slate-950 rounded-full animate-ping" />
                 )}
               </div>
               <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-extrabold text-base text-white tracking-tight">Earning Streak Dashboard</h4>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight">Earning Streak</h4>
                   <button 
                     onClick={() => setShowRuleModal(true)}
-                    className="text-slate-500 hover:text-slate-300 transition-colors"
+                    className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
                     title="Streak Rules"
                   >
-                    <Info size={14} />
+                    <Info size={13} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-400 font-extrabold text-xs flex items-center gap-1 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-amber-400 font-extrabold text-[9px] sm:text-xs flex items-center gap-1 bg-amber-400/10 px-1.5 sm:px-2 py-0.5 rounded-full shrink-0">
                     {rawStreak} Days Streak
                   </span>
-                  <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                  <p className="text-slate-400 text-[8px] sm:text-[10px] uppercase font-bold tracking-wider">
                     {canCheckIn ? "Claim Daily Reward" : `Next Claim in ${timeUntilNextCheckIn()}`}
                   </p>
                 </div>
               </div>
             </div>
-
+          
             {/* Quick stats / Mode Toggles */}
-            <div className="flex items-center bg-slate-900/60 p-1 rounded-xl border border-white/5 w-fit self-start sm:self-auto">
+            <div className="flex items-center bg-slate-900/60 p-0.5 rounded-lg border border-white/5 w-fit self-start sm:self-auto">
               <button
                 onClick={() => setActiveTab('grid')}
-                className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                className={`px-2 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-[10px] font-black uppercase tracking-wider rounded transition-all ${
                   activeTab === 'grid' 
-                    ? 'bg-amber-500 text-slate-950 shadow-md' 
+                    ? 'bg-amber-500 text-slate-950 shadow-sm' 
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -185,9 +185,9 @@ export const DailyCheckIn: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('rewards')}
-                className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                className={`px-2 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-[10px] font-black uppercase tracking-wider rounded transition-all ${
                   activeTab === 'rewards' 
-                    ? 'bg-amber-500 text-slate-950 shadow-md' 
+                    ? 'bg-amber-500 text-slate-950 shadow-sm' 
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -197,13 +197,13 @@ export const DailyCheckIn: React.FC = () => {
           </div>
 
           {/* Subtitle description */}
-          <p className="text-slate-400 text-xs leading-relaxed max-w-xl">
+          <p className="text-slate-400 text-[11px] sm:text-xs leading-relaxed max-w-xl">
             Maximize your daily allowance! Completing consecutive claims scales your base payout. If you miss a day, your streak reverts to Day 1.
           </p>
 
           {/* Tab 1: Grid Visualization */}
           {activeTab === 'grid' && (
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2.5">
+            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-2">
               {DAILY_REWARDS.map((item) => {
                 // Determine claim state relative to cycle indexes
                 const isClaimed = canCheckIn ? item.day < cycleDayNumber : item.day <= cycleDayNumber;
@@ -214,57 +214,57 @@ export const DailyCheckIn: React.FC = () => {
                   <motion.div
                     key={item.day}
                     whileHover={!isLocked ? { scale: 1.02 } : {}}
-                    className={`relative p-3 rounded-2xl border transition-all flex flex-col items-center text-center justify-between min-h-[92px] ${
+                    className={`relative p-2 sm:p-2.5 rounded-xl border transition-all flex flex-col items-center text-center justify-between min-h-[76px] sm:min-h-[86px] ${
                       isToday 
-                        ? 'bg-amber-500/10 border-amber-400 shadow-lg shadow-amber-400/5 ring-1 ring-amber-400' 
+                        ? 'bg-amber-500/10 border-amber-400 shadow shadow-amber-400/5 ring-1 ring-amber-400' 
                         : isClaimed 
                           ? 'bg-slate-900/40 border-emerald-500/30 opacity-75' 
                           : 'bg-slate-900/20 border-slate-900 opacity-50'
                     }`}
                   >
                     {/* Top indicator icons */}
-                    <div className="absolute top-1 right-1.5">
+                    <div className="absolute top-1 right-1">
                       {isClaimed ? (
-                        <CheckCircle2 size={12} className="text-emerald-400" />
+                        <CheckCircle2 size={10} className="text-emerald-400" />
                       ) : isLocked ? (
-                        <Lock size={9} className="text-slate-600" />
+                        <Lock size={8} className="text-slate-600" />
                       ) : (
-                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                       )}
                     </div>
 
                     {/* Day identifier */}
-                    <span className={`text-[9px] font-black uppercase tracking-wider ${
+                    <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${
                       isToday ? 'text-amber-400' : isClaimed ? 'text-emerald-400/80' : 'text-slate-500'
                     }`}>
                       Day {item.day}
                     </span>
 
                     {/* Day Main Reward Graphic */}
-                    <div className="py-2.5">
+                    <div className="py-1 sm:py-1.5">
                       {item.isChest ? (
                         <div className="relative group/chest">
                           <Trophy 
-                            size={22} 
-                            className={`mx-auto ${isToday ? 'text-amber-400 animate-bounce' : isClaimed ? 'text-emerald-400' : 'text-slate-600'}`} 
+                            size={16} 
+                            className={`mx-auto ${isToday ? 'text-amber-400 animate-bounce' : isClaimed ? 'text-emerald-400' : 'text-slate-600'} sm:w-[18px] sm:h-[18px]`} 
                           />
                         </div>
                       ) : (
                         <Coins 
-                          size={18} 
-                          className={`mx-auto ${isToday ? 'text-yellow-400 animate-pulse' : isClaimed ? 'text-emerald-500' : 'text-slate-600'}`} 
+                          size={14} 
+                          className={`mx-auto ${isToday ? 'text-yellow-400 animate-pulse' : isClaimed ? 'text-emerald-500' : 'text-slate-600'} sm:w-[16px] sm:h-[16px]`} 
                         />
                       )}
                     </div>
 
                     {/* Value Badge label */}
                     <div className="space-y-0.5">
-                      <span className={`text-xs font-black block ${
+                      <span className={`text-[10px] sm:text-xs font-black block leading-none ${
                         isToday ? 'text-white' : isClaimed ? 'text-slate-400' : 'text-slate-400'
                       }`}>
                         ₦{item.amount}
                       </span>
-                      <span className="text-[8px] font-bold text-slate-500 block">
+                      <span className="text-[7.5px] sm:text-[8px] font-bold text-slate-500 block leading-none">
                         +{item.xp} XP
                       </span>
                     </div>
@@ -276,27 +276,27 @@ export const DailyCheckIn: React.FC = () => {
 
           {/* Tab 2: Detailed rewards multiplier benefits */}
           {activeTab === 'rewards' && (
-            <div className="bg-slate-900/40 rounded-2xl border border-slate-800 p-4 space-y-3.5">
-              <h5 className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Trophy size={14} className="text-amber-400" /> High Loyalty Booster Multipliers
+            <div className="bg-slate-900/40 rounded-xl border border-slate-800 p-3 space-y-2.5">
+              <h5 className="font-extrabold text-[10px] sm:text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Trophy size={12} className="text-amber-400" /> High Loyalty Booster Multipliers
               </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-950 border border-white/5">
                     <span className="text-slate-400 font-medium">Standard Daily Base</span>
                     <span className="text-white font-black">₦15.00 / 20 XP</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5">
+                  <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-950 border border-white/5">
                     <span className="text-slate-400 font-medium">Peak High Yield (Day 6)</span>
                     <span className="text-amber-400 font-black">₦46.00 / 60 XP</span>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-amber-400/20">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-950 border border-amber-400/20">
                     <span className="text-amber-400 font-extrabold">Day 7 Grand Reward</span>
                     <span className="text-yellow-300 font-black">₦75.00 + 120 XP 👑</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 font-medium italic pl-1 leading-normal">
+                  <p className="text-[9px] text-slate-500 font-medium italic pl-1 leading-normal">
                     * The absolute cycle restarts automatically immediately upon Day 7 claim execution. Or breaks instantly if you miss any daily check-in sequence slot.
                   </p>
                 </div>
@@ -305,12 +305,12 @@ export const DailyCheckIn: React.FC = () => {
           )}
 
           {/* Reward Status Progress Strip */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500">
               <span>7-Day Progress Goal</span>
               <span className="text-amber-400">{Math.round((cycleDayNumber / 7) * 100)}% Complete</span>
             </div>
-            <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+            <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${(cycleDayNumber / 7) * 100}%` }}
@@ -320,12 +320,12 @@ export const DailyCheckIn: React.FC = () => {
           </div>
 
           {/* Action Trigger Button */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-            <div className="flex items-center gap-2.5 text-slate-400">
-              <Clock size={16} className="text-slate-500" />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Clock size={14} className="text-slate-500 shrink-0" />
               <div className="text-left">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Last Check-In Time</p>
-                <p className="text-xs font-bold text-slate-300 italic">
+                <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">Last Check-In Time</p>
+                <p className="text-[10px] sm:text-xs font-bold text-slate-300 italic">
                   {lastCheckInTime ? lastCheckInTime.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : "Never Claimed"}
                 </p>
               </div>
@@ -334,18 +334,18 @@ export const DailyCheckIn: React.FC = () => {
             <button
               onClick={handleCheckIn}
               disabled={!canCheckIn || loading}
-              className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all text-center flex items-center justify-center gap-2 group/btn ${
+              className={`w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-wider active:scale-95 transition-all text-center flex items-center justify-center gap-2 group/btn cursor-pointer ${
                 canCheckIn 
-                  ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg shadow-orange-500/10 active:scale-98" 
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-md shadow-orange-500/10 active:scale-98" 
                   : "bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed"
               }`}
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
               ) : canCheckIn ? (
                 <>
                   Claim Day {cycleDayNumber} Reward (+₦{currentReward.amount})
-                  <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                  <ArrowRight size={12} className="group-hover/btn:translate-x-1 transition-transform" />
                 </>
               ) : (
                 "Today's Reward Secured ✓"

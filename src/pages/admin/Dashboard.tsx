@@ -125,6 +125,7 @@ export default function AdminDashboard() {
     { label: 'Verify Tasks', icon: CheckCircle, path: '/admin/tasks', count: stats.pendingCompletions, color: 'orange' },
     { label: 'User Directory', icon: Users, path: '/admin/users', count: stats.users, color: 'purple' },
     { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },
+    { label: 'Ad Management', icon: Megaphone, path: '/admin/ads', count: 0, color: 'indigo' },
   ];
 
   return (
@@ -229,9 +230,6 @@ export default function AdminDashboard() {
                 <h3 className="font-black text-xl tracking-tight">Broadcast Center</h3>
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Deploy Global Communications</p>
               </div>
-            </div>
-            <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-indigo-100 shadow-sm">
-               Active Node: 01
             </div>
           </div>
           

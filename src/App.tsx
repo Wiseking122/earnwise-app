@@ -36,6 +36,7 @@ import AdminTasks from './pages/admin/Tasks';
 import AdminPayments from './pages/admin/Payments';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
+import AdminAds from './pages/admin/Ads';
 import InstallAppModal from './components/InstallAppModal';
 import { TelegramJoinPopup } from './components/TelegramJoinPopup';
 
@@ -97,6 +98,7 @@ function AppRoutes() {
         <Route path="/admin/payments" element={<PrivateRoute adminOnly bypassPlanCheck><AdminPayments /></PrivateRoute>} />
         <Route path="/admin/users" element={<PrivateRoute adminOnly bypassPlanCheck><AdminUsers /></PrivateRoute>} />
         <Route path="/admin/courses" element={<PrivateRoute adminOnly bypassPlanCheck><AdminCourses /></PrivateRoute>} />
+        <Route path="/admin/ads" element={<PrivateRoute adminOnly bypassPlanCheck><AdminAds /></PrivateRoute>} />
         
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

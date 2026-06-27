@@ -358,7 +358,7 @@ export default function AdminPayments() {
     <Layout title="Payouts" showBack>
       <div className="p-4 space-y-6">
         {/* Payout Control Center Widget */}
-        <div className="bg-slate-900 text-white rounded-[2rem] p-6 shadow-xl border border-slate-800">
+        <div className="bg-slate-900 text-white rounded-[2rem] p-6 shadow-xl border border-slate-800 space-y-4">
           <div className="flex flex-col gap-5">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-400">
@@ -402,7 +402,7 @@ export default function AdminPayments() {
                     : 'bg-slate-700 text-slate-300 border border-slate-600 hover:bg-slate-600'
                 }`}
               >
-                {controls.payoutsForceClosed ? '🔴 Shield Active (Click to Disable)' : '🟢 Gateway Open (Click to Shield)'}
+                {controls.payoutsForceClosed ? '🔴 Shield Active (Click to Shield)' : '🟢 Gateway Open (Click to Shield)'}
               </button>
             </div>
           </div>

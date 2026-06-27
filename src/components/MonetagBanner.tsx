@@ -15,9 +15,9 @@ export const MonetagBanner = () => {
   }, []);
 
   return (
-    <div className="block bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm mb-4 overflow-hidden">
+    <div className="block bg-gradient-to-r from-slate-900 to-slate-800 text-white border border-slate-700 p-8 rounded-[2.5rem] shadow-xl mb-4 overflow-hidden relative">
         {/* Monetag Native Banner container */}
-        <div data-zone="11109974" />
+        <div data-zone="11109974" className="relative z-10" />
     </div>
   );
 };

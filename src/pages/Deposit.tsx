@@ -134,30 +134,7 @@ export default function Deposit() {
             readBy: []
           });
 
-          // Award dynamic 20% referral deposit bonus
-          if (profile?.referredBy) {
-            console.log("[PAYMENT] Direct referral credit applied for:", profile.referredBy);
-            const refUserRef = doc(db, 'users', profile.referredBy);
-            const referralBonus = depositAmt * 0.20; // 20% deposit bonus
-            await updateDoc(refUserRef, {
-              balance: increment(referralBonus),
-              referralBalance: increment(referralBonus),
-              referralEarnings: increment(referralBonus),
-              totalEarnings: increment(referralBonus),
-              updatedAt: serverTimestamp()
-            });
-
-            const refTransId = `REF_BONUS_${Date.now()}`;
-            await setDoc(doc(db, 'transactions', refTransId), {
-              userId: profile.referredBy,
-              amount: referralBonus,
-              type: 'referral',
-              status: 'completed',
-              description: `Referral Deposit Bonus (From ${profile.fullName || 'User'})`,
-              createdAt: serverTimestamp()
-            });
-          }
-
+          // Referral deposit bonus deprecated as referral rewards are now only active on plan activations.
           setVerifyStatus('success');
           setTimeout(() => {
             navigate(`/earnings?deposit_success=true&amount=${depositAmt}`);

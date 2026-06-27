@@ -273,86 +273,8 @@ async function startServer() {
   async function handleReferralDepositBonus(userId: string, depositAmount: number, reference: string) {
     if (!isDbAdminCapable) return;
     try {
-      console.log(`[REFERRAL_REWARD] Checking referral reward eligibility: User ${userId}, Deposit ₦${depositAmount}, Ref: ${reference}`);
-      
-      const rewardAmount = Number((depositAmount * 0.20).toFixed(2));
-      if (rewardAmount <= 0) {
-        console.log(`[REFERRAL_REWARD] Calculated reward amount (₦${rewardAmount}) is zero or less. Skipping.`);
-        return;
-      }
-
-      const referralBonusRefId = `REF_BONUS_${reference}`;
-
-      await dbAdmin.runTransaction(async (transaction) => {
-        // 1. Check idempotency: Have we already processed a referral bonus for this transaction reference?
-        const bonusDocRef = dbAdmin.collection('transactions').doc(referralBonusRefId);
-        const bonusDocSnap = await transaction.get(bonusDocRef);
-        
-        if (bonusDocSnap.exists) {
-          console.warn(`[REFERRAL_REWARD] Referral reward already processed for reference: ${reference}. Rejecting to prevent double-crediting.`);
-          return;
-        }
-
-        // 2. Retrieve the depositor (referred user) document
-        const userRef = dbAdmin.collection('users').doc(userId);
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) {
-          console.error(`[REFERRAL_REWARD] User document not found for user ${userId}.`);
-          return;
-        }
-
-        const userData = userDoc.data();
-        const referredByCode = userData?.referredBy;
-        if (!referredByCode) {
-          console.log(`[REFERRAL_REWARD] User ${userId} was not referred by anyone (referredBy is null).`);
-          return;
-        }
-
-        // 3. Find the inviter (referrer) by code
-        const referrersQuery = dbAdmin.collection('users').where('referralCode', '==', referredByCode).limit(1);
-        const referrersSnap = await transaction.get(referrersQuery);
-        if (referrersSnap.empty) {
-          console.warn(`[REFERRAL_REWARD] Inviter with referral code ${referredByCode} not found in database.`);
-          return;
-        }
-
-        const referrerDoc = referrersSnap.docs[0];
-        const referrerId = referrerDoc.id;
-        const referredUserDisplayName = userData?.displayName || userData?.email || 'Your referral';
-
-        // 4. Safely increment the inviter's referralBalance, withdrawableBalance, and referral earnings
-        transaction.update(referrerDoc.ref, {
-          balance: admin.firestore.FieldValue.increment(rewardAmount),
-          referralBalance: admin.firestore.FieldValue.increment(rewardAmount),
-          withdrawableBalance: admin.firestore.FieldValue.increment(rewardAmount),
-          referralEarnings: admin.firestore.FieldValue.increment(rewardAmount),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // 5. Add a transaction record for the referrer to prevent double-crediting (it uses our unique REF_BONUS_${reference})
-        transaction.set(bonusDocRef, {
-          userId: referrerId,
-          amount: rewardAmount,
-          type: 'referral',
-          description: `20% Referral Commission on ₦${depositAmount.toLocaleString()} wallet deposit by ${referredUserDisplayName}`,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          reference: referralBonusRefId
-        });
-
-        // 6. Send notification to the inviter
-        const notifRef = dbAdmin.collection('notifications').doc();
-        transaction.set(notifRef, {
-          userId: referrerId,
-          title: '👥 Referral Commission Credit!',
-          message: `You earned ₦${rewardAmount.toLocaleString()} (20% bonus) because your referral ${referredUserDisplayName} deposited ₦${depositAmount.toLocaleString()} into their wallet!`,
-          type: 'reward',
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          readBy: []
-        });
-
-        console.log(`[REFERRAL_REWARD] Awarded 20% bonus of ₦${rewardAmount} to referrer ${referrerId} for user ${userId}'s deposit.`);
-      });
-
+      console.log(`[REFERRAL_REWARD] Deposit referral bonus is deprecated per user instructions. Rewards are only given upon plan activation. Skipping for User ${userId}, Ref: ${reference}`);
+      return;
     } catch (err: any) {
       console.error("[REFERRAL_REWARD] Fail inside handleReferralDepositBonus:", err.message);
     }
@@ -1543,137 +1465,29 @@ Please verify if the submission is a plausible and honest completion of a social
         }
       }
 
-      if (verificationResult.approved) {
-        await dbAdmin.runTransaction(async (transaction) => {
-          const userRef = dbAdmin.collection('users').doc(userId);
-          const taskRef = dbAdmin.collection('tasks').doc(taskId);
-          const completionRef = dbAdmin.collection('completions').doc(`${userId}_${taskId}`);
-          
-          const [userDoc, taskDoc, completionDoc] = await Promise.all([
-            transaction.get(userRef),
-            transaction.get(taskRef),
-            transaction.get(completionRef)
-          ]);
-
-          if (!userDoc.exists) throw new Error("User profile not found.");
-          if (!taskDoc.exists) throw new Error("Task target not found.");
-
-          const userData = userDoc.data()!;
-          const taskData = taskDoc.data()!;
-
-          // Restriction: Allowed for everyone
-          // if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin') {
-          //    throw new Error("Upgrade your plan to start earning.");
-          // }
-
-          if (completionDoc.exists && completionDoc.data()?.status === 'approved') {
-             throw new Error("Task already approved.");
-          }
-
-          // Calculate dynamic reward based on tier multiplier
-          const multiplier = TIER_MULTIPLIERS[userData.plan || 'free'] || 1.0;
-          const finalPayout = taskData.userPayout * multiplier;
-          console.log(`[VERIFY-PROOF] DEBUG: User ${userId}, Plan ${userData.plan}, Multiplier ${multiplier}, TaskPayout ${taskData.userPayout}, FinalPayout ${finalPayout}`);
-
-          // 1. Write Completion Doc as approved
-          transaction.set(completionRef, {
-             userId,
-             taskId,
-             status: 'approved',
-             proof: proof || 'Screenshot provided',
-             screenshot: screenshot || null,
-             rewardEarned: finalPayout,
-             submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-
-          // 2. Atomic multi-variable update - Immediate Payout
-          console.log(`[VERIFY-PROOF] Updating wallet for user ${userId} with payout ${finalPayout}`);
-          try {
-            transaction.update(userRef, {
-               balance: admin.firestore.FieldValue.increment(finalPayout),
-               withdrawableBalance: admin.firestore.FieldValue.increment(finalPayout),
-               taskBalance: admin.firestore.FieldValue.increment(finalPayout),
-               taskEarnings: admin.firestore.FieldValue.increment(finalPayout),
-               totalEarnings: admin.firestore.FieldValue.increment(finalPayout),
-               tasksCompleted: admin.firestore.FieldValue.increment(1),
-               updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            console.log(`[VERIFY-PROOF] Transaction update scheduled successfully for ${userId}`);
-          } catch (e) {
-            console.error(`[VERIFY-PROOF] Transaction update FAILED for ${userId}:`, e);
-            throw e;
-          }
-
-          // 3. Award Task Referral Bonus (10%)
-          if (userData.referredBy) {
-            const referrers = await dbAdmin.collection('users').where('referralCode', '==', userData.referredBy).limit(1).get();
-            if (!referrers.empty) {
-               const referrerDoc = referrers.docs[0];
-               const taskReferralBonus = finalPayout * 0.10;
-               if (taskReferralBonus > 0) {
-                 transaction.update(referrerDoc.ref, {
-                   balance: admin.firestore.FieldValue.increment(taskReferralBonus),
-                   referralBalance: admin.firestore.FieldValue.increment(taskReferralBonus),
-                   withdrawableBalance: admin.firestore.FieldValue.increment(taskReferralBonus),
-                   referralEarnings: admin.firestore.FieldValue.increment(taskReferralBonus),
-                   updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                 });
-
-                 // Log referral bonus transaction
-                 const refTxRef = dbAdmin.collection('transactions').doc();
-                 transaction.set(refTxRef, {
-                   userId: referrerDoc.id,
-                   amount: taskReferralBonus,
-                   type: 'referral',
-                   description: `Task Bonus from ${userData.displayName || 'referred user'}`,
-                   createdAt: admin.firestore.FieldValue.serverTimestamp()
-                 });
-               }
-            }
-          }
-
-          // 4. Deduct from task pool and update task's completion counters
-          const cost = (taskData.userPayout || 0) + (taskData.platformMargin || 0);
-          const currentCompletedCount = (taskData.completedCount || 0) + 1;
-          const currentTargetCount = taskData.targetCount || Math.floor((taskData.totalBudget || 0) / (cost || 1)) || 100;
-          const nextRemainingBudget = Math.max(0, (taskData.remainingBudget || 0) - cost);
-          const shouldAutoPause = currentCompletedCount >= currentTargetCount || nextRemainingBudget <= 0;
-
-          transaction.update(taskRef, {
-            completedCount: admin.firestore.FieldValue.increment(1),
-            remainingBudget: nextRemainingBudget,
-            status: shouldAutoPause ? 'completed' : taskData.status,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-
-          // 5. Create transaction log: Immediate
-          const transRef = dbAdmin.collection('transactions').doc();
-          transaction.set(transRef, {
-             userId,
-             amount: finalPayout,
-             type: 'earning',
-             status: 'completed',
-             description: `Verified Task: ${taskData.title}`,
-             createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
+      // Always create a pending completion for manual review
+      await dbAdmin.runTransaction(async (transaction) => {
+        const completionRef = dbAdmin.collection('completions').doc(`${userId}_${taskId}`);
+        
+        // 1. Write Completion Doc as pending
+        transaction.set(completionRef, {
+            userId,
+            taskId,
+            taskTitle: taskTitle || 'Social Task',
+            status: 'pending',
+            proof: proof || 'Screenshot provided',
+            screenshot: screenshot || null,
+            rewardEarned: numericReward,
+            submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+      });
 
-        res.json({ approved: true, message: verificationResult.reason });
-      } else {
-        // If not approved instantly, put it as pending review so they have a manual backup path
-        await dbAdmin.collection('completions').doc(`${userId}_${taskId}`).set({
-          userId,
-          taskId,
-          status: 'pending',
-          proof: proof || 'Screenshot provided',
-          screenshot: screenshot || null,
-          rewardEarned: numericReward,
-          submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        res.json({ approved: false, status: "pending", message: "Verification completed but flagged for manual review: " + verificationResult.reason });
-      }
+      return res.json({ 
+        approved: false, 
+        status: "pending", 
+        message: "Proof submitted successfully. Awaiting admin manual review." 
+      });
     } catch (error: any) {
       console.error("Verification Error:", error);
       res.status(500).json({ error: error.message });
@@ -1838,6 +1652,50 @@ Please verify if the submission is a plausible and honest completion of a social
     } catch (error) {
       console.error("Admin Processor Error:", error);
       res.status(500).json({ error: "Failed to process advertiser contract and platform split" });
+    }
+  });
+
+  /**
+   * POST /api/v1/admin/upload-media
+   * Receives base64 fileData and fileName, writes to ./uploads and returns URL.
+   */
+  app.post("/api/v1/admin/upload-media", async (req, res) => {
+    const { fileData, fileName } = req.body;
+    if (!fileData) {
+      return res.status(400).json({ error: "No file data provided" });
+    }
+
+    try {
+      let buffer: Buffer;
+      let ext = "bin";
+      if (fileData.startsWith("data:")) {
+        const matches = fileData.match(/^data:([^;]+);base64,([\s\S]+)$/);
+        if (!matches || matches.length !== 3) {
+          return res.status(400).json({ error: "Invalid base64 file data format" });
+        }
+        const mime = matches[1];
+        buffer = Buffer.from(matches[2], "base64");
+        ext = mime.split("/")[1] || "bin";
+      } else {
+        buffer = Buffer.from(fileData, "base64");
+      }
+
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const safeName = (fileName || "file").replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const uniqueFilename = `${Date.now()}_${safeName}`;
+      const uploadPath = path.join(uploadsDir, uniqueFilename);
+
+      fs.writeFileSync(uploadPath, buffer);
+
+      const mediaUrl = `/uploads/${uniqueFilename}`;
+      res.json({ success: true, url: mediaUrl });
+    } catch (err: any) {
+      console.error("Media Upload API Error:", err);
+      res.status(500).json({ error: "Failed to write uploaded media to disk: " + err.message });
     }
   });
 
@@ -3320,6 +3178,13 @@ Please verify if the submission is a plausible and honest completion of a social
       else res.end();
     }
   });
+
+  // --- Static Uploads Folder ---
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
 
   // --- Vite / Static Files ---
   if (!isProd) {

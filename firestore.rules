@@ -182,6 +182,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /ads/{adId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Default Deny at the bottom
     match /{document=**} {
       allow read, write: if false;

@@ -34,7 +34,11 @@ import {
   ExternalLink,
   ChevronDown,
   Bot,
-  Search
+  Search,
+  Video,
+  Copy,
+  CheckCircle2,
+  Share2
 } from 'lucide-react';
 
 import { DailyCheckIn } from '../components/DailyCheckIn';
@@ -58,7 +62,57 @@ export default function Home() {
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [aiInsightsError, setAiInsightsError] = useState<string | null>(null);
 
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
   const globalActivities = useLiveActivities(3);
+
+  const referralLink = profile?.referralCode 
+    ? `${window.location.origin}/invite/${profile.referralCode}` 
+    : '';
+  const shareMessage = `Join Earnwise and start earning money today! I'm inviting you to the world's best earning platform.\n\nSign up here: ${referralLink}`;
+
+  const copyCodeToClipboard = () => {
+    if (copiedCode || !profile?.referralCode) return;
+    navigator.clipboard.writeText(profile.referralCode);
+    setCopiedCode(true);
+    setToastMessage('Referral code copied successfully!');
+    setShowToast(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+    setTimeout(() => setShowToast(false), 2500);
+  };
+
+  const copyLinkToClipboard = () => {
+    if (copiedLink || !referralLink) return;
+    navigator.clipboard.writeText(referralLink);
+    setCopiedLink(true);
+    setToastMessage('Referral link copied successfully!');
+    setShowToast(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+    setTimeout(() => setShowToast(false), 2500);
+  };
+
+  const handleShare = async () => {
+    if (!referralLink) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join Earnwise',
+          text: shareMessage,
+          url: referralLink,
+        });
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error("Error sharing:", err);
+          copyLinkToClipboard();
+        }
+      }
+    } else {
+      copyLinkToClipboard();
+    }
+  };
 
   // Monitor level up
   useEffect(() => {
@@ -347,6 +401,96 @@ export default function Home() {
         {/* Daily Tasks Goal Progression */}
         <DailyGoal />
 
+        {/* Refer & Earn (20% Team Program) Widget */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Team Program</h3>
+            </div>
+            <Link to="/referral" className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-400 transition-colors">
+              View Analytics
+            </Link>
+          </div>
+
+          <div className="bg-gradient-to-br from-indigo-950/90 to-slate-900 border border-indigo-500/30 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 text-white relative overflow-hidden shadow-2xl">
+            {/* Ambient glows */}
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-12 -mt-12 opacity-50" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%)' }} />
+            <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full pointer-events-none -ml-8 -mb-8 opacity-30" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)' }} />
+
+            <div className="relative z-10 flex flex-col lg:flex-row gap-4 sm:gap-5 items-stretch lg:items-center justify-between">
+              <div className="space-y-2 text-center lg:text-left flex-1 min-w-0">
+                <div className="flex items-center justify-center lg:justify-start gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full w-fit mx-auto lg:mx-0">
+                  <Gift size={12} className="text-indigo-400" />
+                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Instant 20% Rewards</span>
+                </div>
+                <h4 className="font-display font-black text-base sm:text-lg leading-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-white to-blue-200">
+                  Invite Friends & Earn Commission
+                </h4>
+                <p className="text-slate-400 text-[11px] sm:text-xs font-medium max-w-sm leading-relaxed mx-auto lg:mx-0">
+                  Earn 20% commission instantly on all plan upgrades. Grow your team and earn dynamic direct commissions.
+                </p>
+                
+                {/* Micro Stats inside home widget */}
+                <div className="flex items-center justify-center lg:justify-start gap-3 pt-1">
+                  <div className="bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-center min-w-[5rem] sm:min-w-[5.5rem] flex-1 sm:flex-initial">
+                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-1">Total Referred</p>
+                    <p className="text-xs sm:text-sm font-black text-indigo-300">{profile?.totalReferrals || 0}</p>
+                  </div>
+                  <div className="bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-center min-w-[5rem] sm:min-w-[5.5rem] flex-1 sm:flex-initial">
+                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-1">Total Earnings</p>
+                    <p className="text-xs sm:text-sm font-black text-amber-400">₦{(profile?.referralEarnings || 0).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full lg:w-auto bg-slate-950/60 backdrop-blur-md rounded-2xl p-4 border border-white/5 space-y-3 flex-shrink-0 lg:max-w-xs">
+                <div>
+                  <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest text-center mb-1.5">Your Referral Code</p>
+                  <div className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 px-3 py-2 rounded-xl">
+                    <span className="font-mono font-black text-white text-sm sm:text-base tracking-[0.2em]">{profile?.referralCode || 'N/A'}</span>
+                    <motion.button 
+                      whileTap={{ scale: 0.9 }}
+                      onClick={copyCodeToClipboard}
+                      className="text-indigo-400 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <AnimatePresence mode="wait">
+                        {copiedCode ? <CheckCircle2 size={14} className="text-green-400" /> : <Copy size={14} />}
+                      </AnimatePresence>
+                    </motion.button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={copyLinkToClipboard}
+                    className="flex-1 py-2 sm:py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest cursor-pointer shadow-sm text-center flex items-center justify-center gap-1"
+                  >
+                    <AnimatePresence mode="wait">
+                      {copiedLink ? (
+                        <span className="text-green-400 flex items-center gap-1"><CheckCircle2 size={12} /> Copied</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><ExternalLink size={11} /> Copy Link</span>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
+
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleShare}
+                    className="flex-1 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest cursor-pointer shadow-md text-center flex items-center justify-center gap-1"
+                  >
+                    <Share2 size={11} /> Share
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Quick Links Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           <Link to="/lucky-spin" className="dark-glass-card p-4 rounded-2xl text-white group relative overflow-hidden active:scale-[0.98] transition-all">
@@ -395,28 +539,28 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-3.5">
-             {/* Surveys & Ads Center Preview */}
+             {/* Earning Channels Grid */}
              <div className="grid grid-cols-2 gap-3">
                <Link 
                 to="/tasks?category=survey"
-                className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-2xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
+                className="bg-orange-500/10 border border-orange-500/30 p-3.5 sm:p-4 rounded-2xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white mb-3 shadow-md group-hover:rotate-12 transition-transform">
-                   <Search size={18} />
+                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white mb-2.5 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
+                   <Search size={16} className="sm:w-[18px] sm:h-[18px]" />
                  </div>
-                 <h4 className="font-display font-black text-white text-sm sm:text-base uppercase italic tracking-tighter">Paid Surveys</h4>
-                 <p className="text-orange-400 text-[8.5px] font-bold uppercase tracking-widest mt-1">High-Yield Global</p>
+                 <h4 className="font-display font-black text-white text-xs sm:text-base uppercase italic tracking-tighter">Paid Surveys</h4>
+                 <p className="text-orange-400 text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1">CPX Global Network</p>
                </Link>
                
                <Link 
                 to="/tasks?category=ad"
-                className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
+                className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 sm:p-4 rounded-2xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-3 shadow-md group-hover:rotate-12 transition-transform">
-                   <Play size={18} className="fill-white" />
+                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-2.5 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
+                   <Play size={16} className="fill-white sm:w-[18px] sm:h-[18px]" />
                  </div>
-                 <h4 className="font-display font-black text-white text-sm sm:text-base uppercase italic tracking-tighter">Ads Center</h4>
-                 <p className="text-emerald-400 text-[8.5px] font-bold uppercase tracking-widest mt-1">Montage Network</p>
+                 <h4 className="font-display font-black text-white text-xs sm:text-base uppercase italic tracking-tighter">Ads Center</h4>
+                 <p className="text-emerald-400 text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1">Montage Network</p>
                </Link>
              </div>
 
@@ -746,6 +890,24 @@ export default function Home() {
               )}
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Elegant Floating Toast Notification Overlay */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
+            exit={{ opacity: 0, y: 20, scale: 0.9, x: '-50%' }}
+            transition={{ type: 'spring', duration: 0.35 }}
+            className="fixed bottom-6 left-1/2 z-[150] flex items-center gap-3 bg-slate-900/95 backdrop-blur-md text-white py-3 px-5 rounded-2xl shadow-2xl border border-white/10 max-w-[90%] w-72"
+          >
+            <div className="bg-emerald-500 text-white rounded-full p-0.5 flex-shrink-0">
+              <CheckCircle2 size={14} />
+            </div>
+            <span className="text-xs font-bold tracking-wide">{toastMessage}</span>
+          </motion.div>
         )}
       </AnimatePresence>
     </Layout>
