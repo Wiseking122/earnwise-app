@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { PLANS } from '../constants/plans';
 import { 
   Users, 
   Copy, 
@@ -14,7 +15,10 @@ import {
   Zap,
   Award,
   TrendingUp,
-  ExternalLink
+  ExternalLink,
+  UserCheck,
+  ChevronRight,
+  Clock
 } from 'lucide-react';
 
 export default function Referral() {
@@ -23,6 +27,38 @@ export default function Referral() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [referralsList, setReferralsList] = useState<any[]>([]);
+  const [loadingReferrals, setLoadingReferrals] = useState(true);
+
+  // Fetch recently referred users
+  useEffect(() => {
+    async function fetchReferrals() {
+      if (!profile?.referralCode) return;
+      
+      try {
+        setLoadingReferrals(true);
+        const referralsQuery = query(
+          collection(db, 'users'),
+          where('referredBy', '==', profile.referralCode),
+          orderBy('createdAt', 'desc'),
+          limit(10)
+        );
+        
+        const querySnapshot = await getDocs(referralsQuery);
+        const list = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setReferralsList(list);
+      } catch (err) {
+        console.error("Error fetching referrals:", err);
+      } finally {
+        setLoadingReferrals(false);
+      }
+    }
+
+    fetchReferrals();
+  }, [profile?.referralCode]);
 
   // Auto-generate referral code if missing
   useEffect(() => {
@@ -251,6 +287,64 @@ export default function Referral() {
                 <p className="text-xs text-green-700 font-medium">Earn 20% instantly when your friend successfully activates a plan.</p>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* My Team Section */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xl font-black">My Team</h3>
+            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-widest">Recent 10</span>
+          </div>
+
+          <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+            {loadingReferrals ? (
+              <div className="p-10 flex flex-col items-center justify-center space-y-3">
+                <div className="w-8 h-8 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading team...</p>
+              </div>
+            ) : referralsList.length > 0 ? (
+              <div className="divide-y divide-slate-50">
+                {referralsList.map((ref) => (
+                  <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold text-sm">
+                        {ref.displayName?.charAt(0) || 'U'}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 truncate max-w-[120px]">
+                          {ref.displayName || 'Anonymous'}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Clock size={10} />
+                          <span className="text-[9px] font-bold uppercase tracking-tighter">
+                            {ref.createdAt?.seconds ? new Date(ref.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${ref.plan && ref.plan !== 'free' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {ref.plan && ref.plan !== 'free' ? ref.plan : 'Inactive'}
+                      </div>
+                      {ref.plan && ref.plan !== 'free' && (
+                        <span className="text-[10px] font-black text-emerald-600 mt-1">₦{((PLANS.find(p => p.id === ref.plan)?.cost || 0) * 0.2).toLocaleString()} Earned</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                  <Users size={32} />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900">No team members yet</h4>
+                  <p className="text-xs text-slate-500 font-medium mt-1 px-4">Start sharing your link to build your team and earn commissions!</p>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

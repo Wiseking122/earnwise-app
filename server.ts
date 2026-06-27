@@ -1447,19 +1447,19 @@ Screenshot uploaded: ${screenshot ? 'Yes' : 'No'}
 Please verify if the submission is a plausible and honest completion of a social media task (e.g., following, liking, subscribing). Be generous and supportive. Respond ONLY with a JSON object containing keys "approved" (boolean) and "reason" (string).`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: {
               responseMimeType: "application/json",
             }
           });
 
-          // if (response?.text) {
-          //   const parsed = JSON.parse(response.text.trim());
-          //   if (typeof parsed.approved === 'boolean') {
-          //     verificationResult = parsed;
-          //   }
-          // }
+          if (response?.text) {
+             const parsed = JSON.parse(response.text.trim());
+             if (typeof parsed.approved === 'boolean') {
+               verificationResult = parsed;
+             }
+          }
         } catch (error: any) {
           console.warn("Wise AI Verification failed due to API model error (approving proof automatically):", error.message || error);
         }
@@ -1484,9 +1484,11 @@ Please verify if the submission is a plausible and honest completion of a social
       });
 
       return res.json({ 
-        approved: false, 
-        status: "pending", 
-        message: "Proof submitted successfully. Awaiting admin manual review." 
+        approved: verificationResult.approved, 
+        status: verificationResult.approved ? "approved" : "pending", 
+        message: verificationResult.approved 
+            ? verificationResult.reason 
+            : "Proof submitted successfully. Awaiting admin manual review." 
       });
     } catch (error: any) {
       console.error("Verification Error:", error);
