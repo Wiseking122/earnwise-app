@@ -3,7 +3,32 @@ import Layout from '../../components/Layout';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
 import { getApiUrl } from '../../lib/config';
+import { sendNotification, NotificationType } from '../../lib/notifications';
 import { Plus, Trash2, BarChart2, Video, Image as ImageIcon, Clock, Upload } from 'lucide-react';
+
+const isYouTubeUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('youtube.com') || url.includes('youtu.be');
+};
+
+const getYouTubeEmbedUrl = (url: string) => {
+  try {
+    let videoId = '';
+    if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1].split(/[?#]/)[0];
+    } else if (url.includes('embed/')) {
+      videoId = url.split('embed/')[1].split(/[?#]/)[0];
+    } else {
+      const match = url.match(/[?&]v=([^&#]*)/);
+      if (match) {
+        videoId = match[1];
+      }
+    }
+    return `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=1`;
+  } catch (e) {
+    return url;
+  }
+};
 
 export default function AdminAds() {
   const [ads, setAds] = useState<any[]>([]);
@@ -89,6 +114,20 @@ export default function AdminAds() {
             views: 0,
             watchTime: 0
         });
+
+        // Notify all users about the newly created ad
+        try {
+          await sendNotification({
+            userId: 'all',
+            title: `New Ad Alert: ${newAd.title}`,
+            message: `Earn instant rewards! Watch or view the newly sponsored ad "${newAd.title}" now.`,
+            type: NotificationType.SYSTEM,
+            actionUrl: '/tasks'
+          });
+        } catch (notifErr) {
+          console.error("Failed to broadcast new ad notification to users:", notifErr);
+        }
+
         setNewAd({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0 });
         setFile(null);
         showStatus("Ad created successfully!", 'success');
@@ -200,13 +239,24 @@ export default function AdminAds() {
                 {ad.mediaUrl && (
                   <div className="w-full h-32 rounded-2xl bg-slate-950 border border-slate-100 overflow-hidden relative flex items-center justify-center">
                     {ad.type === 'video' ? (
-                      <video 
-                        src={getApiUrl(ad.mediaUrl)} 
-                        className="w-full h-full object-contain" 
-                        muted 
-                        playsInline
-                        preload="metadata"
-                      />
+                      isYouTubeUrl(ad.mediaUrl) ? (
+                        <iframe 
+                          src={getYouTubeEmbedUrl(ad.mediaUrl)} 
+                          title={ad.title} 
+                          className="w-full h-full border-0" 
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video 
+                          src={getApiUrl(ad.mediaUrl)} 
+                          className="w-full h-full object-contain" 
+                          muted 
+                          playsInline
+                          controls
+                          preload="metadata"
+                        />
+                      )
                     ) : (
                       <img 
                         src={getApiUrl(ad.mediaUrl)} 

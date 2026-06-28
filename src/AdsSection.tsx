@@ -28,6 +28,30 @@ export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022829',
 ];
 
+const isYouTubeUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('youtube.com') || url.includes('youtu.be');
+};
+
+const getYouTubeEmbedUrl = (url: string) => {
+  try {
+    let videoId = '';
+    if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1].split(/[?#]/)[0];
+    } else if (url.includes('embed/')) {
+      videoId = url.split('embed/')[1].split(/[?#]/)[0];
+    } else {
+      const match = url.match(/[?&]v=([^&#]*)/);
+      if (match) {
+        videoId = match[1];
+      }
+    }
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
+  } catch (e) {
+    return url;
+  }
+};
+
 // Ads Config Block
 
 interface AdTask {
@@ -306,17 +330,27 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                   <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-black/40 p-1">
                     {activeTimerTask.type === 'video' ? (
                       <div className="relative group w-full">
-                        <video 
-                          key={activeTimerTask.id}
-                          src={getApiUrl(activeTimerTask.mediaUrl)} 
-                          autoPlay 
-                          muted
-                          controls 
-                          playsInline
-                          loop
-                          preload="auto"
-                          className="w-full aspect-video object-contain rounded-xl" 
-                        />
+                        {isYouTubeUrl(activeTimerTask.mediaUrl) ? (
+                          <iframe 
+                            src={getYouTubeEmbedUrl(activeTimerTask.mediaUrl)} 
+                            title={activeTimerTask.name} 
+                            className="w-full aspect-video rounded-xl border-0" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowFullScreen
+                          />
+                        ) : (
+                          <video 
+                            key={activeTimerTask.id}
+                            src={getApiUrl(activeTimerTask.mediaUrl)} 
+                            autoPlay 
+                            muted
+                            controls 
+                            playsInline
+                            loop
+                            preload="auto"
+                            className="w-full aspect-video object-contain rounded-xl" 
+                          />
+                        )}
                         <div 
                           onClick={() => {
                             if (activeTimerTask.link && activeTimerTask.link !== '#') {

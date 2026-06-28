@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider
 } from 'firebase/auth';
-import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, addDoc, collection, query, where, getDocs, increment } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, addDoc, collection, query, where, getDocs, increment, limit } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { getApiUrl } from '../lib/config';
@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // If the user's document does not exist, auto-create it immediately for self-healing
         const finalUsername = user.displayName?.replace(/\s+/g, '').toLowerCase() || `user_${user.uid.substring(0, 5)}`;
+        const referralCodeFromStorage = safeStorage.getItem('referralCode')?.toLowerCase().trim() || null;
         const fallbackProfile = {
           uid: user.uid,
           email: user.email,
@@ -129,13 +130,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           subscriptionTier: 'free',
           dailyEmailEnabled: true,
           dailyPushEnabled: true,
-          referredBy: safeStorage.getItem('referralCode') || null,
+          referredBy: referralCodeFromStorage,
+          totalReferrals: 0,
+          hasReceivedReferralBonus: false,
+          referralCounted: false,
           createdAt: serverTimestamp()
         };
+
+        if (referralCodeFromStorage) {
+          try {
+            const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', referralCodeFromStorage), limit(1));
+            const referrerSnap = await getDocs(referrerQuery);
+            if (!referrerSnap.empty) {
+              const referrerDoc = referrerSnap.docs[0];
+              await updateDoc(referrerDoc.ref, {
+                totalReferrals: increment(1)
+              });
+              fallbackProfile.referralCounted = true;
+              console.log(`[REFERRAL_AUTH] Successfully incremented totalReferrals for referrer: ${referralCodeFromStorage}`);
+            }
+          } catch (err) {
+            console.error("Failed to increment referral count in AuthContext:", err);
+          }
+        }
 
         try {
           await setDoc(userDocRef, fallbackProfile, { merge: true });
           setProfile({ id: user.uid, ...fallbackProfile } as any);
+          safeStorage.removeItem('referralCode');
         } catch (err) {
           console.error("Failed to auto-create missing profile:", err);
           // Set local state anyway so user has a working session

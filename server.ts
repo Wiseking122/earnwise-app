@@ -3266,12 +3266,12 @@ Please verify if the submission is a plausible and honest completion of a social
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath, { index: false }));
+    app.use(express.static(distPath));
     app.get("*", (req, res, next) => {
       // Don't handle API routes here
       if (req.path.startsWith('/api')) return next();
       
-      res.json({ status: "online", message: "Earnwise API Gateway Active" });
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 

@@ -18,16 +18,19 @@ interface NotificationOptions {
   message: string;
   type: NotificationType;
   actionLink?: string;
+  actionUrl?: string;
 }
 
-export async function sendNotification({ userId, title, message, type, actionLink }: NotificationOptions) {
+export async function sendNotification({ userId, title, message, type, actionLink, actionUrl }: NotificationOptions) {
   try {
+    const link = actionLink || actionUrl || null;
     await addDoc(collection(db, 'notifications'), {
       userId,
       title,
       message,
       type,
-      actionLink: actionLink || null,
+      actionLink: link,
+      actionUrl: link,
       read: false,
       readBy: [],
       createdAt: serverTimestamp()

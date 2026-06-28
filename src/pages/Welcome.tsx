@@ -117,13 +117,12 @@ export default function Welcome() {
           referredBy: existingData?.referredBy || finalReferralCode || null,
           totalReferrals: existingData?.totalReferrals ?? 0,
           hasReceivedReferralBonus: existingData?.hasReceivedReferralBonus ?? false,
+          referralCounted: existingData?.referralCounted ?? false,
           createdAt: existingData?.createdAt || serverTimestamp()
         };
 
-        await setDoc(userDocRef, userData, { merge: true });
-
         // Increment Referral Count for Referrer if we have a valid referral and this is a new referral for this user
-        const shouldIncrement = finalReferralCode && (!existingData || !existingData.referredBy);
+        const shouldIncrement = finalReferralCode && !userData.referralCounted;
         if (shouldIncrement) {
           try {
             const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode), limit(1));
@@ -133,12 +132,15 @@ export default function Welcome() {
               await updateDoc(referrerDoc.ref, {
                 totalReferrals: increment(1)
               });
+              userData.referralCounted = true;
               console.log(`[REFERRAL] Successfully incremented totalReferrals for referrer: ${finalReferralCode}`);
             }
           } catch (err) {
             console.error("Failed to increment referral count:", err);
           }
         }
+
+        await setDoc(userDocRef, userData, { merge: true });
 
         safeStorage.removeItem('referralCode');
 
