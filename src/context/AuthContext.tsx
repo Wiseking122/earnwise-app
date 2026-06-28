@@ -98,7 +98,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setLoading(false);
       } else {
-        // If the user's document does not exist, auto-create it immediately for self-healing
+        // Double-check the server directly to verify if the profile document exists,
+        // avoiding local cache sync lags or initial listener ticks from overwriting real server data.
+        try {
+          const directSnap = await getDoc(userDocRef);
+          if (directSnap.exists()) {
+            const serverData = directSnap.data();
+            const finalReferralCode = serverData.referralCode || serverData.username || Math.random().toString(36).substring(2, 8).toLowerCase();
+            setProfile({
+              id: directSnap.id,
+              uid: directSnap.id,
+              ...serverData,
+              referralCode: finalReferralCode,
+              totalReferrals: serverData.totalReferrals !== undefined ? serverData.totalReferrals : 0,
+              referralEarnings: serverData.referralEarnings !== undefined ? serverData.referralEarnings : 0
+            } as any);
+            setLoading(false);
+            return;
+          }
+        } catch (serverErr) {
+          console.error("Failed to verify profile existence on Firestore server:", serverErr);
+          // CRITICAL: If we are offline or unable to reach the server, do NOT proceed to write a fallback profile.
+          // Doing so would overwrite the real server document with a blank profile (clearing user balance to 0).
+          // We abort and wait for the connection to recover.
+          return;
+        }
+
+        // If the user's document really does not exist on the server, auto-create it immediately for self-healing
         const finalUsername = user.displayName?.replace(/\s+/g, '').toLowerCase() || `user_${user.uid.substring(0, 5)}`;
         const referralCodeFromStorage = safeStorage.getItem('referralCode')?.toLowerCase().trim() || null;
         const fallbackProfile = {

@@ -38,10 +38,10 @@ export const TelegramJoinPopup = () => {
               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Send size={32} />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Join Our Telegram</h2>
-              <p className="text-slate-600 mb-6">Stay updated and get exclusive rewards by joining our official Telegram channel.</p>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Join Our Telegram Group</h2>
+              <p className="text-slate-600 mb-6">Stay updated and get exclusive rewards by joining our official Telegram group.</p>
               <a
-                href="https://t.me/Earnwise01"
+                href="https://t.me/earnwise0"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={closePopup}
