@@ -10,8 +10,8 @@ export default function Invite() {
 
   useEffect(() => {
     if (code) {
-      safeStorage.setItem('referralCode', code);
-      console.log('Referral code saved:', code);
+      safeStorage.setItem('referralCode', code.toLowerCase().trim());
+      console.log('Referral code saved:', code.toLowerCase().trim());
     }
     // Small delay for better UX feel
     const timer = setTimeout(() => {

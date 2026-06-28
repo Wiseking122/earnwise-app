@@ -138,6 +138,7 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!user) return;
       try {
         const q = query(collection(db, 'tasks'), where('status', '==', 'active'), limit(3));
         const snap = await getDocs(q);
@@ -190,7 +191,7 @@ export default function Home() {
 
     fetchData();
     if (profile) checkStreak();
-  }, [profile?.uid]);
+  }, [user, profile?.uid]);
 
   const viewAiPlan = async () => {
     if (loadingInsights) return;

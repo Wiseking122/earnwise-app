@@ -68,6 +68,7 @@ export default function TaskList() {
   const multiplier = planDetails?.multiplier || 1.0;
 
   useEffect(() => {
+    if (!user) return;
     const q = query(collection(db, 'tasks'), where('status', '==', 'active'));
     
     const unsubscribe = onSnapshot(q, (snap) => {
@@ -80,7 +81,7 @@ export default function TaskList() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let result = [...tasks];

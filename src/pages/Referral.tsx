@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, limit, orderBy, getCountFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { PLANS } from '../constants/plans';
 import { 
@@ -33,23 +33,53 @@ export default function Referral() {
   // Fetch recently referred users
   useEffect(() => {
     async function fetchReferrals() {
-      if (!profile?.referralCode) return;
+      if (!profile?.referralCode || !profile?.uid) return;
       
       try {
         setLoadingReferrals(true);
+
+        // 1. Fetch total count of referred users for self-healing
+        const totalReferralsQuery = query(
+          collection(db, 'users'),
+          where('referredBy', '==', profile.referralCode)
+        );
+        const countSnap = await getCountFromServer(totalReferralsQuery);
+        const actualCount = countSnap.data().count;
+        
+        // If there's a discrepancy, heal it in Firestore
+        if (profile.totalReferrals !== actualCount) {
+          try {
+            const userDocRef = doc(db, 'users', profile.uid);
+            await updateDoc(userDocRef, {
+              totalReferrals: actualCount
+            });
+            console.log(`[REFERRAL_HEAL] Updated referral count to ${actualCount} for user ${profile.uid}`);
+          } catch (healErr) {
+            console.error("Failed to self-heal referral count:", healErr);
+          }
+        }
+
+        // 2. Fetch recent referrals to display in "My Team"
         const referralsQuery = query(
           collection(db, 'users'),
           where('referredBy', '==', profile.referralCode),
-          orderBy('createdAt', 'desc'),
-          limit(10)
+          limit(50)
         );
         
         const querySnapshot = await getDocs(referralsQuery);
         const list = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
-        setReferralsList(list);
+        })) as any[];
+
+        // Sort in memory to avoid needing a composite index
+        list.sort((a, b) => {
+          const timeA = a.createdAt?.toMillis?.() || (a.createdAt instanceof Date ? a.createdAt.getTime() : 0);
+          const timeB = b.createdAt?.toMillis?.() || (b.createdAt instanceof Date ? b.createdAt.getTime() : 0);
+          return timeB - timeA;
+        });
+
+        setReferralsList(list.slice(0, 10));
       } catch (err) {
         console.error("Error fetching referrals:", err);
       } finally {
@@ -58,15 +88,15 @@ export default function Referral() {
     }
 
     fetchReferrals();
-  }, [profile?.referralCode]);
+  }, [profile?.referralCode, profile?.uid]);
 
   // Auto-generate referral code if missing
   useEffect(() => {
     if (profile && !profile.referralCode) {
-      const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const generatedCode = profile.username || Math.random().toString(36).substring(2, 8).toLowerCase();
       const userDocRef = doc(db, 'users', profile.uid);
       updateDoc(userDocRef, {
-        referralCode: generatedCode
+        referralCode: generatedCode.toLowerCase().trim()
       }).catch(err => {
         console.error("Failed to generate referral code inside Referral page:", err);
       });

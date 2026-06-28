@@ -130,11 +130,23 @@ const PORT = 3000;
 const isProd = process.env.NODE_ENV === "production";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
-// Initialize Gemini
-const ai = new GoogleGenAI({ 
-  apiKey: (process.env.GEMINI_API_KEY || "").trim(),
-  httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-});
+// --- GEMINI INITIALIZATION ---
+let aiInstance: GoogleGenAI | null = null;
+function getAi() {
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey || apiKey === "your_gemini_api_key_here") {
+    return null;
+  }
+  
+  if (!aiInstance) {
+    console.log(`[GEMINI] Initializing client with key: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
+    aiInstance = new GoogleGenAI({ 
+      apiKey: apiKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+  }
+  return aiInstance;
+}
 // --- CONFIGURATION: Membership Tiers & Multipliers ---
 // Defines the exact payout boost for each membership level
 const TIER_MULTIPLIERS: Record<string, number> = {
@@ -172,6 +184,49 @@ const CPA_CHART: Record<string, number> = {
 // --- SECURITY: Velocity Gate State ---
 // In-memory store to track user activity timing (Anti-Bot)
 const lastUserActivity = new Map<string, number>();
+
+// --- GEMINI RETRY HELPER ---
+async function withRetry<T>(fn: (modelName: string) => Promise<T>, maxRetries = 6, initialDelay = 2000): Promise<T> {
+  let lastError: any;
+  // Use permitted Gemini 3 series models as defined by the SDK skill rules
+  const models = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+  
+  for (let i = 0; i < maxRetries; i++) {
+    const modelIndex = i % models.length;
+    const currentModel = models[modelIndex];
+    try {
+      return await fn(currentModel);
+    } catch (err: any) {
+      lastError = err;
+      
+      const errorMessage = err.message || "";
+      const errorStatus = err.status || (errorMessage.includes('503') ? 503 : errorMessage.includes('429') ? 429 : 0);
+      
+      // Retry on transient errors OR if a specific model is not found (might be version mismatch)
+      const isRetryable = 
+        errorStatus === 503 || 
+        errorStatus === 429 || 
+        errorStatus === 404 || // Model not found for this specific version/key, try next in rotation
+        errorMessage.toLowerCase().includes('unavailable') ||
+        errorMessage.toLowerCase().includes('busy') ||
+        errorMessage.toLowerCase().includes('high demand') ||
+        errorMessage.toLowerCase().includes('overloaded') ||
+        errorMessage.toLowerCase().includes('not found') ||
+        errorMessage.toLowerCase().includes('deadline exceeded');
+
+      if (isRetryable && i < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, Math.floor(i / models.length)) + Math.random() * 1000;
+        console.warn(`[GEMINI] Retryable error (${errorStatus}) on ${currentModel}. Retrying with ${models[(i+1)%models.length]} in ${Math.round(delay)}ms... (Attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      console.error(`[GEMINI] Fatal error on ${currentModel}:`, errorMessage);
+      throw err;
+    }
+  }
+  throw lastError;
+}
 
 async function startServer() {
   const app = express();
@@ -369,7 +424,7 @@ async function startServer() {
       });
 
       const getWebAppUrl = (path = "") => {
-        const baseUrl = process.env.APP_URL || currentAppUrl || "https://ais-dev-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app";
+        const baseUrl = "https://earnwise1.vercel.app";
         return path ? `${baseUrl}${path}` : baseUrl;
       };
       
@@ -1201,58 +1256,37 @@ async function startServer() {
     ];
 
     try {
-      const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
-      if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+      const ai = getAi();
+      if (!ai) {
         return res.json({ subtasks: mockSubtasks });
       }
 
-      const requestAiClient = ai;
-      const models = ["gemini-3.5-flash"];
-      let lastErr;
       let finalData = { subtasks: [] };
-
-      for (const modelName of models) {
-        let interactionSuccess = false;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const interaction = await requestAiClient.interactions.create({
-              model: modelName,
-              input: `Break down the following task into 5 specific, high-leverage, actionable sub-tasks that help monetize the effort. Task: "${taskTitle}"`,
-              response_format: {
-                type: Type.OBJECT,
-                properties: {
-                  subtasks: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        title: { type: Type.STRING },
-                        description: { type: Type.STRING },
-                        monetizationAngle: { type: Type.STRING }
-                      },
-                      required: ["title", "description", "monetizationAngle"]
-                    }
-                  }
-                },
-                required: ["subtasks"]
-              }
-            });
-            const text = interaction.output_text;
-            finalData = JSON.parse(text || '{"subtasks":[]}');
-            interactionSuccess = true;
-            break;
-          } catch (err: any) {
-            lastErr = err;
-            if ((err.status === 503 || err.status === 429) && attempt < 1) {
-              await new Promise(resolve => setTimeout(resolve, 3000));
-              continue;
-            }
-            break;
+      try {
+        const response = await withRetry((modelName) => ai.models.generateContent({
+          model: modelName,
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `Break down the following task into 5 specific, high-leverage, actionable sub-tasks that help monetize the effort. 
+              Task: "${taskTitle}"
+              Return JSON only in this format: { "subtasks": [ { "title": "...", "description": "...", "monetizationAngle": "..." } ] }`
+            }]
+          }],
+          config: {
+            responseMimeType: "application/json"
           }
+        }));
+
+        if (response.text) {
+          finalData = JSON.parse(response.text.trim());
         }
-        if (interactionSuccess) {
-          return res.json(finalData);
-        }
+      } catch (err: any) {
+        console.warn(`[TASK-BREAKDOWN] Generation failed:`, err.message);
+      }
+
+      if (finalData.subtasks && finalData.subtasks.length > 0) {
+        return res.json(finalData);
       }
       return res.json({ subtasks: mockSubtasks });
     } catch (error: any) {
@@ -1339,6 +1373,15 @@ IMPORTANT INSTRUCTIONS:
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
 
+        const ai = getAi();
+        if (!ai) {
+          res.write("\n\n⚠️ AI Key not configured. Using fallback assistant responses.");
+          const fallbackText = getFallbackAssistantResponse(promptMessage);
+          res.write(fallbackText);
+          res.end();
+          return;
+        }
+
         try {
           const contents = [
             ...history.map((h: any) => ({
@@ -1348,8 +1391,8 @@ IMPORTANT INSTRUCTIONS:
             { role: 'user', parts: [{ text: promptMessage }] }
           ];
 
-          const responseStream = await ai.models.generateContentStream({
-            model: "gemini-3.5-flash",
+          const responseStream = await withRetry((modelName) => ai.models.generateContentStream({
+            model: modelName,
             contents: contents,
             config: {
               systemInstruction: systemInstruction,
@@ -1357,7 +1400,7 @@ IMPORTANT INSTRUCTIONS:
               topP: 0.8,
               maxOutputTokens: 800,
             }
-          });
+          }));
 
           for await (const chunk of responseStream) {
             if (chunk.text) {
@@ -1439,29 +1482,32 @@ IMPORTANT INSTRUCTIONS:
       };
 
       if (proof || screenshot) {
-        try {
-          const prompt = `You are the Wise AI Task Auditor for Earnwise. A user is submitting completion proof for a social media task titled: "${taskTitle || 'Social Task'}".
+        const ai = getAi();
+        if (ai) {
+          try {
+            const prompt = `You are the Wise AI Task Auditor for Earnwise. A user is submitting completion proof for a social media task titled: "${taskTitle || 'Social Task'}".
 Proof text/description provided by user: "${proof || 'No description provided'}"
 Screenshot uploaded: ${screenshot ? 'Yes' : 'No'}
 
 Please verify if the submission is a plausible and honest completion of a social media task (e.g., following, liking, subscribing). Be generous and supportive. Respond ONLY with a JSON object containing keys "approved" (boolean) and "reason" (string).`;
 
-          const response = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-            }
-          });
+            const response = await withRetry((modelName) => ai.models.generateContent({
+              model: modelName,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: {
+                responseMimeType: "application/json",
+              }
+            }));
 
-          if (response?.text) {
-             const parsed = JSON.parse(response.text.trim());
-             if (typeof parsed.approved === 'boolean') {
-               verificationResult = parsed;
-             }
+            if (response?.text) {
+               const parsed = JSON.parse(response.text.trim());
+               if (typeof parsed.approved === 'boolean') {
+                 verificationResult = parsed;
+               }
+            }
+          } catch (error: any) {
+            console.warn("Wise AI Verification failed due to API model error (approving proof automatically):", error.message || error);
           }
-        } catch (error: any) {
-          console.warn("Wise AI Verification failed due to API model error (approving proof automatically):", error.message || error);
         }
       }
 
@@ -3154,39 +3200,37 @@ Please verify if the submission is a plausible and honest completion of a social
         return res.status(403).json({ error: "Access Denied: Enrollment required for AI assistance." });
       }
 
-      const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
-      if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
+      const ai = getAi();
+      if (!ai) {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
         res.write(`🎓 **Elite Academy Assistant — Developer Configuration Needed**\n\nPlease add your **GEMINI_API_KEY** in the Secrets section.`);
         return res.end();
       }
 
-      const requestAiClient = ai;
-
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Transfer-Encoding', 'chunked');
 
       try {
-        const responseStream = await ai.models.generateContentStream({
-          model: "gemini-3.5-flash",
+        const responseStream = await withRetry((modelName) => ai.models.generateContentStream({
+          model: modelName,
           contents: [
             {
               role: "user",
               parts: [{
-                text: `You are the Earnwise Elite Academy Master Tutor.
-                    Student is studying: "${courseTitle || courseId}".
+                text: `Student is studying: "${courseTitle || courseId}".
                     Current Course Context: ${context || 'General earning strategy'}.
                     Student Question: ${question}`
               }]
             }
           ],
           config: {
+            systemInstruction: "You are the Earnwise Elite Academy Master Tutor. Your goal is to help students understand financial concepts and earning strategies in the context of Nigeria and the Earnwise platform.",
             temperature: 0.5,
             topP: 0.8,
             maxOutputTokens: 800,
           }
-        });
+        }));
 
         for await (const chunk of responseStream) {
           if (chunk.text) {
@@ -3334,16 +3378,16 @@ Please verify if the submission is a plausible and honest completion of a social
         
         if (!message) return;
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey || apiKey === "your_gemini_api_key_here") {
-          ws.send(JSON.stringify({ type: 'chunk', content: "API Key not configured." }));
+        const ai = getAi();
+        if (!ai) {
+          ws.send(JSON.stringify({ type: 'chunk', content: "API Key not configured. Please add GEMINI_API_KEY to your environment variables." }));
           ws.send(JSON.stringify({ type: 'done' }));
           return;
         }
 
         try {
-          const responseStream = await ai.models.generateContentStream({
-            model: "gemini-3.5-flash",
+          const responseStream = await withRetry((modelName) => ai.models.generateContentStream({
+            model: modelName,
             contents: [
                 ...history.map((h: any) => ({
                     role: h.role === 'user' ? 'user' : 'model',
@@ -3357,10 +3401,12 @@ Please verify if the submission is a plausible and honest completion of a social
               topP: 0.8,
               maxOutputTokens: 800,
             }
-          });
+          }));
 
           for await (const chunk of responseStream) {
-            ws.send(JSON.stringify({ type: 'chunk', content: chunk.text }));
+            if (chunk.text) {
+              ws.send(JSON.stringify({ type: 'chunk', content: chunk.text }));
+            }
           }
           ws.send(JSON.stringify({ type: 'done' }));
         } catch (err: any) {

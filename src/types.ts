@@ -29,6 +29,7 @@ export interface VaultEntry {
 export interface UserProfile {
   uid: string;
   email: string;
+  username?: string;
   displayName: string;
   role: UserRole;
   pendingBalance: number;

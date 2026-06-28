@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  GoogleAuthProvider,
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { setDoc, doc, getDoc, serverTimestamp, query, collection, where, limit, getDocs, updateDoc, increment } from 'firebase/firestore';
@@ -28,6 +24,7 @@ export default function Welcome() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [username, setUsername] = useState('');
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -38,8 +35,8 @@ export default function Welcome() {
   const [checkingRedirect, setCheckingRedirect] = useState(true);
 
   // Compute if they landed with a referral code
-  const referralCodeFromUrl = searchParams.get('ref');
-  const referralCodeFromStorage = safeStorage.getItem('referralCode');
+  const referralCodeFromUrl = searchParams.get('ref')?.toLowerCase().trim();
+  const referralCodeFromStorage = safeStorage.getItem('referralCode')?.toLowerCase().trim();
   const hasReferralOrigin = !!(referralCodeFromUrl || referralCodeFromStorage);
 
   // Pre-fill, select Create Account tab, and permanently lock referral code if referral exists
@@ -59,120 +56,99 @@ export default function Welcome() {
     }
   }, [currentUser, authLoading, navigate]);
 
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          await handleUserDoc(result.user);
-          navigate('/');
-        }
-      } catch (err: any) {
-        console.error("Redirect auth error:", err);
-        if (err.message === "auth/telegram-duplicate") {
-            setError("Account already exists for this Telegram profile.");
-        } else if (err.code === 'auth/account-exists-with-different-credential') {
-            setError("An account already exists with the same email. Please sign in using your original method.");
-        } else if (err.code === 'auth/unauthorized-domain') {
-            setError(`Unauthorized Domain: Please add "${window.location.hostname}" to Authorized Domains in your Firebase Console (Authentication > Settings).`);
-        } else {
-            setError(err.message);
-        }
-      } finally {
-        setCheckingRedirect(false);
-      }
-    };
-    handleRedirectResult();
-  }, [navigate]);
-
   const checkTelegramIdDuplicate = async (tgId: string) => {
     const q = query(collection(db, 'users'), where('telegramId', '==', tgId), limit(1));
     const snap = await getDocs(q);
     return !snap.empty;
   };
 
-  const handleUserDoc = async (user: any, extraData?: { firstName: string, lastName: string, phoneNumber: string, referralCode?: string }) => {
+  const handleUserDoc = async (user: any, extraData?: { firstName: string, lastName: string, phoneNumber: string, username: string, referralCode?: string }) => {
     try {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         const isTargetAdmin = user.email === 'wiseking7890@gmail.com';
+        const existingData = userDoc.exists() ? userDoc.data() : null;
         
-        if (!userDoc.exists()) {
-          const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-          const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
-          
-          if (telegramId) {
-             const duplicate = await checkTelegramIdDuplicate(telegramId);
-             if (duplicate) {
-                await user.delete();
-                throw new Error("auth/telegram-duplicate");
-             }
-          }
+        const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+        const telegramId = telegramUser?.id ? String(telegramUser.id) : (existingData?.telegramId || null);
+        
+        if (telegramId && !existingData?.telegramId) {
+           const duplicate = await checkTelegramIdDuplicate(telegramId);
+           if (duplicate) {
+              await user.delete();
+              throw new Error("auth/telegram-duplicate");
+           }
+        }
 
-          const referralCodeFromUrl = searchParams.get('ref');
-          const referralCodeFromStorage = safeStorage.getItem('referralCode');
-          const finalReferralCode = referralCodeFromUrl || referralCodeFromStorage || extraData?.referralCode;
-          const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const referralCodeFromUrl = searchParams.get('ref')?.toLowerCase().trim();
+        const referralCodeFromStorage = safeStorage.getItem('referralCode')?.toLowerCase().trim();
+        const finalReferralCode = (referralCodeFromUrl || referralCodeFromStorage || extraData?.referralCode)?.toLowerCase().trim();
+        
+        // Use provided username as both the display identifier and the referral code
+        const finalUsername = extraData?.username?.toLowerCase().trim() || existingData?.username || `user_${user.uid.substring(0, 5)}`;
 
-          const userData = {
-            uid: user.uid,
-            email: user.email,
-            displayName: (extraData ? `${extraData.firstName} ${extraData.lastName}`.trim() : user.displayName) || user.email?.split('@')[0],
-            firstName: extraData?.firstName || user.displayName?.split(' ')[0] || '',
-            lastName: extraData?.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
-            phoneNumber: extraData?.phoneNumber || user.phoneNumber || '',
-            role: isTargetAdmin ? 'admin' : 'user',
-            balance: 0,
-            taskBalance: 0,
-            referralBalance: 0,
-            telegramId: telegramId,
-            pendingBalance: 0,
-            withdrawableBalance: 0,
-            depositBalance: 0,
-            taskEarnings: 0,
-            referralEarnings: 0,
-            bonusEarnings: 0,
-            vaultBalance: 0,
-            xp: 0,
-            level: 1,
-            streak: 0,
-            badges: ['Rookie'],
-            plan: 'free',
-            subscriptionTier: 'free',
-            referralCode,
-            referredBy: finalReferralCode || null,
-            totalReferrals: 0,
-            hasReceivedReferralBonus: false,
-            createdAt: serverTimestamp()
-          };
+        const userData = {
+          uid: user.uid,
+          email: user.email,
+          username: finalUsername,
+          displayName: (extraData ? `${extraData.firstName} ${extraData.lastName}`.trim() : user.displayName) || existingData?.displayName || finalUsername,
+          firstName: extraData?.firstName || existingData?.firstName || user.displayName?.split(' ')[0] || '',
+          lastName: extraData?.lastName || existingData?.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
+          phoneNumber: extraData?.phoneNumber || existingData?.phoneNumber || user.phoneNumber || '',
+          role: isTargetAdmin ? 'admin' : (existingData?.role || 'user'),
+          balance: existingData?.balance ?? 0,
+          taskBalance: existingData?.taskBalance ?? 0,
+          referralBalance: existingData?.referralBalance ?? 0,
+          telegramId: telegramId,
+          pendingBalance: existingData?.pendingBalance ?? 0,
+          withdrawableBalance: existingData?.withdrawableBalance ?? 0,
+          depositBalance: existingData?.depositBalance ?? 0,
+          taskEarnings: existingData?.taskEarnings ?? 0,
+          referralEarnings: existingData?.referralEarnings ?? 0,
+          bonusEarnings: existingData?.bonusEarnings ?? 0,
+          vaultBalance: existingData?.vaultBalance ?? 0,
+          xp: existingData?.xp ?? 0,
+          level: existingData?.level ?? 1,
+          streak: existingData?.streak ?? 0,
+          badges: existingData?.badges || ['Rookie'],
+          plan: existingData?.plan || 'free',
+          subscriptionTier: existingData?.subscriptionTier || 'free',
+          referralCode: finalUsername,
+          referredBy: existingData?.referredBy || finalReferralCode || null,
+          totalReferrals: existingData?.totalReferrals ?? 0,
+          hasReceivedReferralBonus: existingData?.hasReceivedReferralBonus ?? false,
+          createdAt: existingData?.createdAt || serverTimestamp()
+        };
 
-          await setDoc(userDocRef, userData, { merge: true });
+        await setDoc(userDocRef, userData, { merge: true });
 
-          // Increment Referral Count for Referrer
-          if (finalReferralCode) {
-            try {
-              const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode), limit(1));
-              const referrerSnap = await getDocs(referrerQuery);
-              if (!referrerSnap.empty) {
-                const referrerDoc = referrerSnap.docs[0];
-                await updateDoc(referrerDoc.ref, {
-                  totalReferrals: increment(1)
-                });
-              }
-            } catch (err) {
-              console.error("Failed to increment referral count:", err);
+        // Increment Referral Count for Referrer if we have a valid referral and this is a new referral for this user
+        const shouldIncrement = finalReferralCode && (!existingData || !existingData.referredBy);
+        if (shouldIncrement) {
+          try {
+            const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode), limit(1));
+            const referrerSnap = await getDocs(referrerQuery);
+            if (!referrerSnap.empty) {
+              const referrerDoc = referrerSnap.docs[0];
+              await updateDoc(referrerDoc.ref, {
+                totalReferrals: increment(1)
+              });
+              console.log(`[REFERRAL] Successfully incremented totalReferrals for referrer: ${finalReferralCode}`);
             }
+          } catch (err) {
+            console.error("Failed to increment referral count:", err);
           }
+        }
 
-          
-          safeStorage.removeItem('referralCode');
+        safeStorage.removeItem('referralCode');
 
-          // Send Welcome Email for new user
-          await axios.post(getApiUrl('/api/auth/send-welcome-email'), { 
-            email: user.email, 
-            name: userData.displayName
-          }).catch(err => console.error("Failed to send welcome email", err));
-        } else if (isTargetAdmin && userDoc.data()?.role !== 'admin') {
+        // Send Welcome Email for new user
+        await axios.post(getApiUrl('/api/auth/send-welcome-email'), { 
+          email: user.email, 
+          name: userData.displayName
+        }).catch(err => console.error("Failed to send welcome email", err));
+        
+        if (isTargetAdmin && userData.role !== 'admin') {
           // Force admin role for the owner if they exist but aren't admin
           await setDoc(userDocRef, { role: 'admin' }, { merge: true });
           console.log("Forced admin role for owner");
@@ -195,19 +171,41 @@ export default function Welcome() {
 
     try {
       if (isLogin) {
-        // Hybrid Login Logic: Check if input is a User ID (no @) or an Email
-        if (email.trim() && !email.includes('@')) {
-          await signInWithUserId(email.trim());
-          navigate('/');
-          return;
+        let loginEmail = email.trim();
+        
+        if (!loginEmail) throw new Error("Please enter your email or username.");
+        if (!password) throw new Error("Please enter your password.");
+
+        // If input is a username (no @), look up the associated email in Firestore
+        if (!loginEmail.includes('@')) {
+          const q = query(collection(db, 'users'), where('username', '==', loginEmail.toLowerCase().trim()), limit(1));
+          const snap = await getDocs(q);
+          
+          if (snap.empty) {
+            throw new Error("No account found with this username. Please check your spelling or sign up.");
+          }
+          
+          loginEmail = snap.docs[0].data().email;
         }
-        await signInWithEmailAndPassword(auth, email, password);
+
+        await signInWithEmailAndPassword(auth, loginEmail, password);
       } else {
+        if (!username.trim()) throw new Error("Username is required");
+        if (!email.trim()) throw new Error("Email is required");
+        if (!password) throw new Error("Password is required");
+        
+        // Check if username is taken
+        const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase().trim()), limit(1));
+        const usernameSnap = await getDocs(q);
+        if (!usernameSnap.empty) {
+          throw new Error("Username is already taken. Please choose another.");
+        }
+
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
         
         // Create user profile
         try {
-          await handleUserDoc(user, { firstName, lastName, phoneNumber, referralCode: referralCodeInput });
+          await handleUserDoc(user, { firstName, lastName, phoneNumber, username, referralCode: referralCodeInput });
         } catch (dbErr: any) {
           if (dbErr.message === "auth/telegram-duplicate") {
              throw dbErr;
@@ -222,17 +220,13 @@ export default function Welcome() {
       if (err.message === "auth/telegram-duplicate") {
          setError("Account already exists for this Telegram profile.");
       } else if (err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password. Please check your credentials and try again.');
+        setError('Invalid email or password. If you previously used Google Login, you may need to use the "Forgot Password" link to set a password for your email.');
       } else if (err.code === 'auth/user-not-found') {
         setError('No account found with this email. Please create an account.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError('An account with this email already exists. Please sign in.');
       } else if (err.code === 'auth/wrong-password') {
         setError('Incorrect password.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Email/Password sign-in is disabled in this project. Please use the "Continue with Google" button below.');
-        // Auto-switch to a more prominent Google UI if we detect it's disabled
-        setIsLogin(true); 
       } else {
         setError(err.message);
       }
@@ -260,75 +254,6 @@ export default function Welcome() {
   };
 
   const isTelegram = !!(window as any).Telegram?.WebApp;
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    setError('');
-    setAuthNetworkError(false);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-
-      // In some environments (Telegram, restricted iframes), popups are blocked.
-      // We try popup first, but if it fails with specific codes, we inform the user.
-      try {
-        const { user } = await signInWithPopup(auth, provider);
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        // If it's a completely new account, enforce duplicate Telegram ID check here
-        if (!userDoc.exists()) {
-            const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-            const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
-            if (telegramId) {
-                const isDuplicate = await checkTelegramIdDuplicate(telegramId);
-                if (isDuplicate) {
-                    await user.delete(); // Rollback account creation
-                    auth.signOut();
-                    setError("Account already exists for this Telegram profile.");
-                    setLoading(false);
-                    return;
-                }
-            }
-        }
-        await handleUserDoc(user);
-        navigate('/');
-      } catch (popupErr: any) {
-        console.warn("Popup sign-in failed, checking fallback:", popupErr);
-        
-        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
-          // If we are in an environment where popups are notoriously difficult (like Telegram), 
-          // we should probably warn the user rather than just redirecting, 
-          // but signInWithRedirect is the standard fallback.
-          if (isTelegram) {
-            setError('Sign-in blocked by Telegram. Please tap the (⋮) menu and "Open in Browser" to sign in with Google, or use Email & Password below.');
-          } else {
-            await signInWithRedirect(auth, provider);
-          }
-        } else if (popupErr.code === 'auth/account-exists-with-different-credential') {
-          setError("An account already exists with the same email. Please sign in using your original method.");
-        } else if (popupErr.code === 'auth/network-request-failed' || popupErr.message?.includes('network-request-failed')) {
-          setAuthNetworkError(true);
-          setError('Google Sign-In failed due to secure iframe/network restrictions. Tap "Troubleshooting Guide" below for immediate steps to fix this.');
-        } else {
-          throw popupErr;
-        }
-      }
-      } catch (err: any) {
-      console.error("Google Sign-in error:", err);
-      if (err.code === 'auth/network-request-failed' || err.message?.includes('network-request-failed')) {
-        setAuthNetworkError(true);
-        setError('Google Sign-In failed due to secure iframe/network restrictions. Tap "Troubleshooting Guide" below for immediate steps to fix this.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Google sign-in is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.');
-      } else if (err.code === 'auth/unauthorized-domain') {
-        setError(`Domain "${window.location.hostname}" is not authorized for Google Sign-in. Please add it to "Authorized domains" in your Firebase Console (Authentication > Settings).`);
-      } else {
-        setError(err.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col p-6 items-center py-10 relative">
@@ -364,7 +289,7 @@ export default function Welcome() {
               ⚡️ Secure Access Gateway
             </span>
             <p className="text-xs text-slate-400 font-bold max-w-[280px] mx-auto pt-1 leading-relaxed">
-              Earnwise utilizes Google OAuth or Credentials for maximum security.
+              Earnwise utilizes high-grade encryption and secure credentials for maximum security.
             </p>
           </div>
 
@@ -387,39 +312,47 @@ export default function Welcome() {
 
           <form onSubmit={handleAuth} className="space-y-4">
               {!isLogin && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="First Name"
+                      required
+                      className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Last Name"
+                      required
+                      className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
                   <input 
                     type="text" 
-                    placeholder="First Name"
+                    placeholder="Username (Invitation Code)"
                     required
                     className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
                   />
                   <input 
-                    type="text" 
-                    placeholder="Last Name"
+                    type="tel" 
+                    placeholder="Phone Number"
                     required
                     className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
                   />
                 </div>
               )}
-              {!isLogin && (
-                <input 
-                  type="tel" 
-                  placeholder="+234 800 000 0000"
-                  required
-                  className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                />
-              )}
               <div className="space-y-1 relative">
                 <input 
-                  type="email" 
-                  placeholder="Email Address"
+                  type="text" 
+                  placeholder={isLogin ? "Email or Username" : "Email Address"}
                   required
                   className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                   value={email}
@@ -466,7 +399,7 @@ export default function Welcome() {
                   placeholder="Referral Code (Optional)"
                   className="w-full bg-slate-800/50 border border-white/10 rounded-[1.25rem] py-4 px-5 text-sm font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500 focus:bg-slate-800 transition-all outline-none"
                   value={referralCodeInput}
-                  onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase().trim())}
+                  onChange={(e) => setReferralCodeInput(e.target.value.toLowerCase().trim())}
                 />
               )}
               
@@ -479,19 +412,9 @@ export default function Welcome() {
           </form>
 
           <div className="relative my-4 text-center">
-            <span className="bg-slate-900 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-full relative z-10 border border-white/5 py-1">or</span>
+            <span className="bg-slate-900 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-full relative z-10 border border-white/5 py-1">Secure Email Access</span>
             <div className="absolute top-1/2 left-0 w-full h-px bg-white/10 -z-0"></div>
           </div>
-
-          <button 
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-[1.5rem] shadow-[0_12px_24px_-8px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-blue-400/30"
-          >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5 brightness-0 invert" alt="Google" />
-            <span className="text-sm tracking-wide">Continue with Google</span>
-          </button>
 
           <AnimatePresence mode="wait">
             {error && (
@@ -503,49 +426,6 @@ export default function Welcome() {
               >
                 <AlertCircle size={14} className="shrink-0" />
                 <span>{error}</span>
-              </motion.div>
-            )}
-            {authNetworkError && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-slate-800/80 border border-amber-500/30 rounded-2xl p-4 text-xs text-slate-300 space-y-3 shadow-lg shrink-0 mt-2 text-left"
-              >
-                <div className="flex items-center gap-2 text-amber-400 font-black uppercase tracking-wider text-[10px] pb-1 border-b border-white/5">
-                  <KeyRound size={14} />
-                  <span>Google Sign-In Troubleshooting Guide</span>
-                </div>
-                
-                <p className="leading-relaxed text-[11px]">
-                  The AI Studio preview runs inside a highly secure and restricted <strong className="text-white">iframe sandbox</strong>. This can block popups, cross-origin web cookies, and socket handshakes.
-                </p>
-
-                <div className="space-y-2 text-[11px]">
-                  <div className="flex gap-2 items-start">
-                    <span className="bg-blue-500/20 text-blue-300 w-4 h-4 rounded-md flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">1</span>
-                    <p className="leading-normal">
-                      <strong className="text-white">Recommended method:</strong> Open this application in a <strong className="text-blue-400 hover:underline cursor-pointer" onClick={() => window.open(window.location.href, '_blank')}>New Tab</strong> using the icon in the top right of the preview toolbar. Running natively in a new window bypasses these browser constraints.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2 items-start">
-                    <span className="bg-blue-500/20 text-blue-300 w-4 h-4 rounded-md flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">2</span>
-                    <p className="leading-normal">
-                      <strong className="text-white">Firebase Setup:</strong> Ensure your project's authorization settings allow this container. In your <strong className="text-white">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains</strong>, make sure you've added:
-                      <code className="block bg-slate-950 p-2 rounded-lg font-mono text-[9px] text-amber-300 mt-1 select-all break-all border border-white/5 font-semibold">
-                        {window.location.hostname}
-                      </code>
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2 items-start">
-                    <span className="bg-blue-500/20 text-blue-300 w-4 h-4 rounded-md flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">3</span>
-                    <p className="leading-normal">
-                      <strong className="text-white">Alternative:</strong> Create a test user directly inside this iframe using the <strong className="text-white">Email &amp; Password form</strong> above (just select <em>Create Account</em>). This does not rely on third-party redirects and works flawlessly inside sandbox frames.
-                    </p>
-                  </div>
-                </div>
               </motion.div>
             )}
             {message && (

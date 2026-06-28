@@ -107,6 +107,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isSignedIn();
+      allow list: if true; // Allow lookup by username/email for login/signup
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (
         isAdmin() ||
@@ -117,7 +118,7 @@ service cloud.firestore {
     }
 
     match /tasks/{taskId} {
-      allow read: if isSignedIn();
+      allow read: if true; // Tasks are public job listings
       allow write: if isAdmin() || (isSignedIn() && (
         (resource == null && request.resource.data.advertiserId == request.auth.uid) ||
         (resource != null && resource.data.advertiserId == request.auth.uid)
