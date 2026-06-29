@@ -666,115 +666,117 @@ export default function Profile() {
               </div>
 
               {/* Automated Progress Tracker Directory */}
-              <div className="space-y-4 pt-4 border-t border-white/5 text-left">
-                <div>
-                  <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
-                    Automated Curriculum Pipeline (10x Daily Drops)
-                  </h5>
-                  <p className="text-[8px] text-slate-500 font-bold uppercase mt-0.5 leading-relaxed">
-                    Syllabus chapters automatically rotate and deliver sequentially to your active channels.
-                  </p>
-                </div>
+              {(profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com') && (
+                <div className="space-y-4 pt-4 border-t border-white/5 text-left">
+                  <div>
+                    <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+                      Automated Curriculum Pipeline (10x Daily Drops)
+                    </h5>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase mt-0.5 leading-relaxed">
+                      Syllabus chapters automatically rotate and deliver sequentially to your active channels.
+                    </p>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    { 
-                      stepIndex: 0, 
-                      title: '💸 Chapter 1: How to Earn Higher', 
-                      desc: 'Active compounding systems, team royalties & multiplier scaling.',
-                      topicId: 'earn_higher',
-                      headline: "The Compound Earning Framework",
-                      quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
-                      tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 20% cash bonus on all their plan activation reserves!"
-                    },
-                    { 
-                      stepIndex: 1, 
-                      title: '⚡ Chapter 2: How to Upgrade Tier', 
-                      desc: 'Bypassing hold times and activating elite withdrawal limits.',
-                      topicId: 'upgrade',
-                      headline: "Level Up Your Task Multipliers",
-                      quote: "Upgraded accounts secure preferential automated validation and unlimited submission limits.",
-                      tip: "Navigate to your Dashboard, click 'Upgrade Tier', and select from the available premium plans. Upgrading instantly increases your task ceiling, grants priority customer support, and shaves withdrawal hold times down to under 10 minutes!"
-                    },
-                    { 
-                      stepIndex: 2, 
-                      title: '🏦 Chapter 3: How to Deposit Funds', 
-                      desc: 'Secure Paystack Virtual Account gateways and instant balance deposits.',
-                      topicId: 'deposit',
-                      headline: "Fund Your Direct Operations Securely",
-                      quote: "Your wallet is the engine that funds advertising budgets and registers course activations.",
-                      tip: "Hover over the Home panel and tap 'Deposit'. Enter your desired amount and click proceed. Our gateway integrates with Paystack, allowing safe bank transfers or card payments instantly. Make sure you copy the single-use virtual account details correctly."
-                    },
-                    { 
-                      stepIndex: 3, 
-                      title: '📢 Chapter 4: How to Run Ad Campaigns', 
-                      desc: 'Multiplying WhatsApp buyer leads and user attraction engines.',
-                      topicId: 'run_ads',
-                      headline: "The Earnwise Self-Serve Advertising Pipeline",
-                      quote: "If you have a great solution, the crowd must hear it. Ads grant you the megaphone.",
-                      tip: "Click on 'Advertise' or 'Create Ad Campaign' in your panel. Choose your daily budget, write a catchy hook, and paste your direct WhatsApp link. Our network of 50,000+ certified Nigerian scholars will begin reviewing and engaging with your campaign within minutes!"
-                    },
-                    { 
-                      stepIndex: 4, 
-                      title: '🎯 Chapter 5: How to Earn from Tasks', 
-                      desc: 'Speedrun micro-gigs, and proper compliance validation workflows.',
-                      topicId: 'earn_tasks',
-                      headline: "The Ultimate Micro-Task Speedrunning Cheat Sheet",
-                      quote: "Success on tasks comes down to speed and unmanipulated compliance proof.",
-                      tip: "Log in around 8 AM and 6 PM when new corporate advertising audits and social follow tasks are assigned. Read task instructions carefully, perform the follow, like, or subscription, and upload the exact screenshot. Our system approves honest submissions instantly!"
-                    },
-                    { 
-                      stepIndex: 5, 
-                      title: '📚 Chapter 6: Sourcing Academy Courses', 
-                      desc: 'Unlocking high-yield developer, copywriting, and design materials.',
-                      topicId: 'buy_course',
-                      headline: "Unlock Permanent High-Yield Strategy Blueprints",
-                      quote: "An investment in knowledge always pays the best interest dividend.",
-                      tip: "Head to the 'Academy' page, browse top blueprints like 'Smartphone Canva & Mobile Design Mastery' or 'WhatsApp Organic Lead Siphon'. Make sure your wallet has sufficient balance, and click 'Enroll Now'. This instantly unlocks the offline lesson plans, strategy guides, and files!"
-                    }
-                  ].map((chapter) => {
-                    const isPassed = (profile?.coachingStep ?? 0) > chapter.stepIndex;
-                    const isActive = (profile?.coachingStep ?? 0) % 6 === chapter.stepIndex;
-                    return (
-                      <div
-                        key={chapter.stepIndex}
-                        onClick={() => setSelectedLesson(chapter)}
-                        className={`border rounded-xl p-3 flex flex-col justify-between transition-all relative overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-[0.98] duration-300 ${
-                          isActive
-                            ? 'bg-blue-600/10 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
-                            : isPassed
-                            ? 'bg-slate-900/40 border-emerald-500/20 opacity-80 hover:border-emerald-500/40'
-                            : 'bg-slate-900/60 border-white/5 opacity-60 hover:opacity-90'
-                        }`}
-                      >
-                        {isActive && (
-                          <div className="absolute top-0 right-0 bg-blue-600 text-white text-[7px] font-black px-2 py-0.5 uppercase rounded-bl-lg tracking-wider">
-                            Active / Scheduled Next
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { 
+                        stepIndex: 0, 
+                        title: '💸 Chapter 1: How to Earn Higher', 
+                        desc: 'Active compounding systems, team royalties & multiplier scaling.',
+                        topicId: 'earn_higher',
+                        headline: "The Compound Earning Framework",
+                        quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
+                        tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 20% cash bonus on all their plan activation reserves!"
+                      },
+                      { 
+                        stepIndex: 1, 
+                        title: '⚡ Chapter 2: How to Upgrade Tier', 
+                        desc: 'Bypassing hold times and activating elite withdrawal limits.',
+                        topicId: 'upgrade',
+                        headline: "Level Up Your Task Multipliers",
+                        quote: "Upgraded accounts secure preferential automated validation and unlimited submission limits.",
+                        tip: "Navigate to your Dashboard, click 'Upgrade Tier', and select from the available premium plans. Upgrading instantly increases your task ceiling, grants priority customer support, and shaves withdrawal hold times down to under 10 minutes!"
+                      },
+                      { 
+                        stepIndex: 2, 
+                        title: '🏦 Chapter 3: How to Deposit Funds', 
+                        desc: 'Secure Paystack Virtual Account gateways and instant balance deposits.',
+                        topicId: 'deposit',
+                        headline: "Fund Your Direct Operations Securely",
+                        quote: "Your wallet is the engine that funds advertising budgets and registers course activations.",
+                        tip: "Hover over the Home panel and tap 'Deposit'. Enter your desired amount and click proceed. Our gateway integrates with Paystack, allowing safe bank transfers or card payments instantly. Make sure you copy the single-use virtual account details correctly."
+                      },
+                      { 
+                        stepIndex: 3, 
+                        title: '📢 Chapter 4: How to Run Ad Campaigns', 
+                        desc: 'Multiplying WhatsApp buyer leads and user attraction engines.',
+                        topicId: 'run_ads',
+                        headline: "The Earnwise Self-Serve Advertising Pipeline",
+                        quote: "If you have a great solution, the crowd must hear it. Ads grant you the megaphone.",
+                        tip: "Click on 'Advertise' or 'Create Ad Campaign' in your panel. Choose your daily budget, write a catchy hook, and paste your direct WhatsApp link. Our network of 50,000+ certified Nigerian scholars will begin reviewing and engaging with your campaign within minutes!"
+                      },
+                      { 
+                        stepIndex: 4, 
+                        title: '🎯 Chapter 5: How to Earn from Tasks', 
+                        desc: 'Speedrun micro-gigs, and proper compliance validation workflows.',
+                        topicId: 'earn_tasks',
+                        headline: "The Ultimate Micro-Task Speedrunning Cheat Sheet",
+                        quote: "Success on tasks comes down to speed and unmanipulated compliance proof.",
+                        tip: "Log in around 8 AM and 6 PM when new corporate advertising audits and social follow tasks are assigned. Read task instructions carefully, perform the follow, like, or subscription, and upload the exact screenshot. Our system approves honest submissions instantly!"
+                      },
+                      { 
+                        stepIndex: 5, 
+                        title: '📚 Chapter 6: Sourcing Academy Courses', 
+                        desc: 'Unlocking high-yield developer, copywriting, and design materials.',
+                        topicId: 'buy_course',
+                        headline: "Unlock Permanent High-Yield Strategy Blueprints",
+                        quote: "An investment in knowledge always pays the best interest dividend.",
+                        tip: "Head to the 'Academy' page, browse top blueprints like 'Smartphone Canva & Mobile Design Mastery' or 'WhatsApp Organic Lead Siphon'. Make sure your wallet has sufficient balance, and click 'Enroll Now'. This instantly unlocks the offline lesson plans, strategy guides, and files!"
+                      }
+                    ].map((chapter) => {
+                      const isPassed = (profile?.coachingStep ?? 0) > chapter.stepIndex;
+                      const isActive = (profile?.coachingStep ?? 0) % 6 === chapter.stepIndex;
+                      return (
+                        <div
+                          key={chapter.stepIndex}
+                          onClick={() => setSelectedLesson(chapter)}
+                          className={`border rounded-xl p-3 flex flex-col justify-between transition-all relative overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-[0.98] duration-300 ${
+                            isActive
+                              ? 'bg-blue-600/10 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
+                              : isPassed
+                              ? 'bg-slate-900/40 border-emerald-500/20 opacity-80 hover:border-emerald-500/40'
+                              : 'bg-slate-900/60 border-white/5 opacity-60 hover:opacity-90'
+                          }`}
+                        >
+                          {isActive && (
+                            <div className="absolute top-0 right-0 bg-blue-600 text-white text-[7px] font-black px-2 py-0.5 uppercase rounded-bl-lg tracking-wider">
+                              Active / Scheduled Next
+                            </div>
+                          )}
+                          {isPassed && (
+                            <div className="absolute top-0 right-0 bg-emerald-500/10 text-emerald-400 text-[7px] font-black px-2 py-0.5 uppercase rounded-bl-lg tracking-wider border-l border-b border-emerald-500/20">
+                              Sent ✓
+                            </div>
+                          )}
+                          <div>
+                            <p className={`text-[9px] font-black uppercase tracking-wider ${isActive ? 'text-blue-400' : isPassed ? 'text-emerald-400' : 'text-slate-300'}`}>
+                              {chapter.title}
+                            </p>
+                            <p className="text-[8px] text-slate-400 font-medium leading-normal mt-1.5">{chapter.desc}</p>
                           </div>
-                        )}
-                        {isPassed && (
-                          <div className="absolute top-0 right-0 bg-emerald-500/10 text-emerald-400 text-[7px] font-black px-2 py-0.5 uppercase rounded-bl-lg tracking-wider border-l border-b border-emerald-500/20">
-                            Sent ✓
+                          <div className="flex items-center gap-1 mt-2.5">
+                            <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-blue-400 animate-pulse' : isPassed ? 'bg-emerald-400' : 'bg-slate-700'}`} />
+                            <span className="text-[7px] font-bold uppercase tracking-wider text-slate-500">
+                              {isActive ? 'Awaiting automatic 2.4-hour cycle delivery' : isPassed ? 'Delivered via Email & Bell' : 'Queued automatically'}
+                            </span>
                           </div>
-                        )}
-                        <div>
-                          <p className={`text-[9px] font-black uppercase tracking-wider ${isActive ? 'text-blue-400' : isPassed ? 'text-emerald-400' : 'text-slate-300'}`}>
-                            {chapter.title}
-                          </p>
-                          <p className="text-[8px] text-slate-400 font-medium leading-normal mt-1.5">{chapter.desc}</p>
                         </div>
-                        <div className="flex items-center gap-1 mt-2.5">
-                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-blue-400 animate-pulse' : isPassed ? 'bg-emerald-400' : 'bg-slate-700'}`} />
-                          <span className="text-[7px] font-bold uppercase tracking-wider text-slate-500">
-                            {isActive ? 'Awaiting automatic 2.4-hour cycle delivery' : isPassed ? 'Delivered via Email & Bell' : 'Queued automatically'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Lesson Modal */}
               <AnimatePresence>

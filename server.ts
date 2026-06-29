@@ -255,6 +255,36 @@ async function startServer() {
 
 
   /**
+   * Helper: Find a referrer doc by referralCode or username in a case-insensitive way.
+   */
+  async function findReferrerDoc(referredBy: string) {
+    if (!referredBy || !isDbAdminCapable) return null;
+    const cleanReferredBy = referredBy.trim();
+    
+    // 1. Try exact match
+    let referrers = await dbAdmin.collection('users').where('referralCode', '==', cleanReferredBy).limit(1).get();
+    if (!referrers.empty) return referrers.docs[0];
+    
+    // 2. Try lowercase match on referralCode
+    referrers = await dbAdmin.collection('users').where('referralCode', '==', cleanReferredBy.toLowerCase()).limit(1).get();
+    if (!referrers.empty) return referrers.docs[0];
+    
+    // 3. Try uppercase match on referralCode
+    referrers = await dbAdmin.collection('users').where('referralCode', '==', cleanReferredBy.toUpperCase()).limit(1).get();
+    if (!referrers.empty) return referrers.docs[0];
+    
+    // 4. Try lowercase match on username
+    referrers = await dbAdmin.collection('users').where('username', '==', cleanReferredBy.toLowerCase()).limit(1).get();
+    if (!referrers.empty) return referrers.docs[0];
+    
+    // 5. Try uppercase match on username
+    referrers = await dbAdmin.collection('users').where('username', '==', cleanReferredBy.toUpperCase()).limit(1).get();
+    if (!referrers.empty) return referrers.docs[0];
+    
+    return null;
+  }
+
+  /**
    * Helper: Awards referral bonus to referrer when a referred user upgrades.
    * Only awarded once per referred user.
    * @param userId The ID of the user who upgraded
@@ -270,11 +300,9 @@ async function startServer() {
       
       // Only award if they haven't received it yet and they have a referrer
       if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
-        const referrers = await dbAdmin.collection('users').where('referralCode', '==', userData.referredBy).limit(1).get();
+        const referrerDoc = await findReferrerDoc(userData.referredBy);
         
-        if (!referrers.empty) {
-          const referrerDoc = referrers.docs[0];
-          
+        if (referrerDoc) {
           // Calculate 20% of plan cost
           const planCost = PLAN_COSTS[planId] || 0;
           const bonusAmount = Math.floor(planCost * 0.2);
@@ -1467,6 +1495,16 @@ IMPORTANT INSTRUCTIONS:
     const numericReward = Math.max(0, Number(rewardAmount) || 0);
 
     try {
+      if (isDbAdminCapable) {
+        const userDoc = await dbAdmin.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data()!;
+          if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
+            return res.status(403).json({ error: "Upgrade your plan to start earning from tasks." });
+          }
+        }
+      }
+
       if (!isDbAdminCapable) {
         console.warn("[FIREBASE] Server Admin SDK is not ready. Returning client-side fallback approval.");
         return res.json({
@@ -1891,10 +1929,10 @@ Please verify if the submission is a plausible and honest completion of a social
         const userData = userDoc.data()!;
         const taskData = taskDoc.data()!;
 
-        // Restriction: Allowed for everyone
-        // if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin') {
-        //    throw new Error("Upgrade your plan to start earning.");
-        // }
+        // Restriction: Free plans are locked
+        if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
+           throw new Error("Upgrade your plan to start earning from tasks.");
+        }
 
         // Security Layer
         if (userData.securityMetrics?.isSuspended) throw new Error("Account is under safety review");
@@ -1917,9 +1955,8 @@ Please verify if the submission is a plausible and honest completion of a social
 
         // Award Task Referral Bonus (10%)
         if (userData.referredBy) {
-          const referrers = await dbAdmin.collection('users').where('referralCode', '==', userData.referredBy).limit(1).get();
-          if (!referrers.empty) {
-             const referrerDoc = referrers.docs[0];
+          const referrerDoc = await findReferrerDoc(userData.referredBy);
+          if (referrerDoc) {
              const taskReferralBonus = finalPayout * 0.10;
              if (taskReferralBonus > 0) {
                transaction.update(referrerDoc.ref, {

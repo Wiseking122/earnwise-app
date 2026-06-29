@@ -17,13 +17,15 @@ import {
   ChevronRight,
   ShieldCheck,
   Zap,
-  TrendingUp
+  TrendingUp,
+  Lock
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
 import VideoAdsSection from '../components/VideoAdsSection';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string, subtext?: string }[] = [
   { id: 'all', label: 'All Jobs', icon: SlidersHorizontal, color: 'bg-slate-900' },
@@ -55,6 +57,7 @@ export default function TaskList() {
   const [activeCategory, setActiveCategory] = useState<TaskType | 'all'>(initialCategory);
   const [searchQuery, setSearchQuery] = useState('');
   const [isZeydooModalOpen, setZeydooModalOpen] = useState(false);
+  const [showRestriction, setShowRestriction] = useState(false);
 
   const taskCounts = {
     survey: 'LIVE', 
@@ -135,6 +138,11 @@ export default function TaskList() {
               <button
                 key={cat.id}
                 onClick={() => {
+                  const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+                  if (isUserFree && cat.id !== 'all' && cat.id !== 'referral') {
+                    setShowRestriction(true);
+                    return;
+                  }
                   setActiveCategory(cat.id);
                 }}
                 className={`p-3.5 rounded-2xl border transition-all flex flex-col items-start gap-3 relative overflow-hidden group ${
@@ -207,55 +215,80 @@ export default function TaskList() {
               }}
               className="space-y-3.5"
             >
-              {filteredTasks.map((task, index) => (
-                <motion.div key={task.id || index} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
-                  <Link 
-                    to={`/tasks/${task.id}`}
-                    className="block group bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
-                    
-                    <div className="flex justify-between items-center relative z-10">
-                      <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
-                        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shrink-0">
-                          <Zap size={18} className="group-hover:fill-white" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{task.type.replace('_', ' ')} Network</span>
-                            {task.isRepeatable && (
-                              <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full border border-amber-100 shrink-0">
-                                <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
-                                <span className="text-[7.5px] font-black uppercase tracking-tighter">Unlimited</span>
-                              </div>
-                            )}
-                          </div>
-                          <h4 className="font-display font-black text-slate-900 text-sm sm:text-base leading-tight uppercase italic group-hover:text-blue-600 transition-colors truncate">
-                            {task.title}
-                          </h4>
-                        </div>
+              {filteredTasks.map((task, index) => {
+                const isFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+                const cardContent = (
+                  <div className="flex justify-between items-center relative z-10">
+                    <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
+                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shrink-0">
+                        {isFree ? <Lock size={18} className="text-amber-500" /> : <Zap size={18} className="group-hover:fill-white" />}
                       </div>
-                      
-                      <div className="text-right shrink-0">
-                        <div className="flex flex-col items-end">
-                          <p className="text-base sm:text-2xl font-display font-black text-slate-900 tracking-tighter">
-                            ₦{((task.userPayout || 0) * multiplier).toFixed(0)}
-                          </p>
-                          {multiplier > 1 ? (
-                            <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md border border-blue-100 mt-0.5">
-                               <TrendingUp size={8} />
-                               <span className="text-[7.5px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{task.type.replace('_', ' ')} Network</span>
+                          {task.isRepeatable && (
+                            <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full border border-amber-100 shrink-0">
+                              <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
+                              <span className="text-[7.5px] font-black uppercase tracking-tighter">Unlimited</span>
                             </div>
-                          ) : (
-                            <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 italic">Verified Rate</span>
                           )}
                         </div>
+                        <h4 className="font-display font-black text-slate-900 text-sm sm:text-base leading-tight uppercase italic group-hover:text-blue-600 transition-colors truncate text-left">
+                          {task.title}
+                        </h4>
                       </div>
                     </div>
-                  </Link>
-                  {(index === 0 || index === 1 || index === 2) && <MonetagBanner />}
-                </motion.div>
-              ))}
+                    
+                    <div className="text-right shrink-0">
+                      <div className="flex flex-col items-end">
+                        {isFree ? (
+                          <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-2 py-1 rounded-xl border border-amber-100">
+                            <Lock size={10} className="stroke-[3px]" />
+                            <span className="text-[9px] font-black uppercase tracking-tight">LOCKED</span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-base sm:text-2xl font-display font-black text-slate-900 tracking-tighter">
+                              ₦{((task.userPayout || 0) * multiplier).toFixed(0)}
+                            </p>
+                            {multiplier > 1 ? (
+                              <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md border border-blue-100 mt-0.5">
+                                 <TrendingUp size={8} />
+                                 <span className="text-[7.5px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
+                              </div>
+                            ) : (
+                              <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 italic">Verified Rate</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+
+                return (
+                  <motion.div key={task.id || index} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
+                    {isFree ? (
+                      <button 
+                        onClick={() => setShowRestriction(true)}
+                        className="w-full text-left block group bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-amber-200 transition-all active:scale-[0.98] relative overflow-hidden cursor-pointer"
+                      >
+                        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)' }} />
+                        {cardContent}
+                      </button>
+                    ) : (
+                      <Link 
+                        to={`/tasks/${task.id}`}
+                        className="block group bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
+                      >
+                        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
+                        {cardContent}
+                      </Link>
+                    )}
+                    {(index === 0 || index === 1 || index === 2) && <MonetagBanner />}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           ) : (activeCategory === 'ad' || activeCategory === 'survey' || activeCategory === 'video') ? null : (
             <div className="text-center py-24 bg-white border border-slate-100 rounded-[3rem] shadow-sm relative overflow-hidden">
@@ -307,6 +340,12 @@ export default function TaskList() {
           </div>
         </div>
       )}
+
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="start or complete tasks" 
+      />
     </Layout>
   );
 }

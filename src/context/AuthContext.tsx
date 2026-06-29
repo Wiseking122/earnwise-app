@@ -143,6 +143,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setLoading(false);
       } else {
+        // If we are currently in the middle of a registration flow (where the signup page is actively creating the user doc),
+        // we MUST NOT write a fallback profile. Writing a fallback profile would race with the signup page,
+        // overwriting the custom username/referralCode with a generic 'user_abc12' fallback.
+        if (safeStorage.getItem('isRegistering') === 'true') {
+          console.log("[AUTH] Registration in progress. Skipping fallback profile auto-creation.");
+          return;
+        }
+
         // Double-check the server directly to verify if the profile document exists,
         // avoiding local cache sync lags or initial listener ticks from overwriting real server data.
         try {
@@ -210,15 +218,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (referralCodeFromStorage) {
           try {
-            const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', referralCodeFromStorage), limit(1));
-            const referrerSnap = await getDocs(referrerQuery);
-            if (!referrerSnap.empty) {
-              const referrerDoc = referrerSnap.docs[0];
+            let referrerDoc = null;
+            let rq = query(collection(db, 'users'), where('referralCode', '==', referralCodeFromStorage), limit(1));
+            let rs = await getDocs(rq);
+            if (!rs.empty) {
+              referrerDoc = rs.docs[0];
+            } else {
+              rq = query(collection(db, 'users'), where('referralCode', '==', referralCodeFromStorage.toUpperCase()), limit(1));
+              rs = await getDocs(rq);
+              if (!rs.empty) {
+                referrerDoc = rs.docs[0];
+              } else {
+                rq = query(collection(db, 'users'), where('username', '==', referralCodeFromStorage), limit(1));
+                rs = await getDocs(rq);
+                if (!rs.empty) {
+                  referrerDoc = rs.docs[0];
+                } else {
+                  rq = query(collection(db, 'users'), where('username', '==', referralCodeFromStorage.toUpperCase()), limit(1));
+                  rs = await getDocs(rq);
+                  if (!rs.empty) {
+                    referrerDoc = rs.docs[0];
+                  }
+                }
+              }
+            }
+
+            if (referrerDoc) {
               await updateDoc(referrerDoc.ref, {
                 totalReferrals: increment(1)
               });
               fallbackProfile.referralCounted = true;
-              console.log(`[REFERRAL_AUTH] Successfully incremented totalReferrals for referrer: ${referralCodeFromStorage}`);
+              const referrerData = referrerDoc.data();
+              fallbackProfile.referredBy = referrerData.referralCode || referrerData.username || referralCodeFromStorage;
+              console.log(`[REFERRAL_AUTH] Successfully matched referrer and incremented totalReferrals: ${fallbackProfile.referredBy}`);
             }
           } catch (err) {
             console.error("Failed to increment referral count in AuthContext:", err);

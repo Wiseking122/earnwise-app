@@ -48,11 +48,6 @@ function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: 
   
   if (!user) return <Navigate to="/welcome" />;
   if (adminOnly && profile?.role !== 'admin' && user.email !== 'wiseking7890@gmail.com') return <Navigate to="/" />;
-
-  // Enforce plan activation for non-admin users on free plan
-  if (!bypassPlanCheck && profile?.role !== 'admin' && user.email !== 'wiseking7890@gmail.com' && profile?.plan === 'free') {
-    return <Navigate to="/upgrade" />;
-  }
   
   return <>{children}</>;
 }

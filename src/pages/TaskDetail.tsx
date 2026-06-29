@@ -96,7 +96,8 @@ export default function TaskDetail() {
   };
 
   const handleCampaignSubmit = async () => {
-    if (profile?.plan === 'free') {
+    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (isUserFree) {
       setShowRestriction(true);
       return;
     }
@@ -201,6 +202,11 @@ export default function TaskDetail() {
   }, [countdown, task]);
 
   const handleAutoSubmit = async () => {
+    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (isUserFree) {
+      setShowRestriction(true);
+      return;
+    }
     if (!task || !user || alreadyCompleted || submitted) return;
     setSubmitting(true);
     try {
@@ -313,7 +319,8 @@ export default function TaskDetail() {
   const [wiseAiMessage, setWiseAiMessage] = useState<string>('');
 
   const handleProofSubmit = async () => {
-    if (profile?.plan === 'free') {
+    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (isUserFree) {
       setShowRestriction(true);
       return;
     }
@@ -388,7 +395,8 @@ export default function TaskDetail() {
   };
 
   const startTask = () => {
-    if (profile?.plan === 'free') {
+    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (isUserFree) {
       setShowRestriction(true);
       return;
     }

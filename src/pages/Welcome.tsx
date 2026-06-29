@@ -125,15 +125,39 @@ export default function Welcome() {
         const shouldIncrement = finalReferralCode && !userData.referralCounted;
         if (shouldIncrement) {
           try {
-            const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode), limit(1));
-            const referrerSnap = await getDocs(referrerQuery);
-            if (!referrerSnap.empty) {
-              const referrerDoc = referrerSnap.docs[0];
+            let referrerDoc = null;
+            let rq = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode), limit(1));
+            let rs = await getDocs(rq);
+            if (!rs.empty) {
+              referrerDoc = rs.docs[0];
+            } else {
+              rq = query(collection(db, 'users'), where('referralCode', '==', finalReferralCode.toUpperCase()), limit(1));
+              rs = await getDocs(rq);
+              if (!rs.empty) {
+                referrerDoc = rs.docs[0];
+              } else {
+                rq = query(collection(db, 'users'), where('username', '==', finalReferralCode), limit(1));
+                rs = await getDocs(rq);
+                if (!rs.empty) {
+                  referrerDoc = rs.docs[0];
+                } else {
+                  rq = query(collection(db, 'users'), where('username', '==', finalReferralCode.toUpperCase()), limit(1));
+                  rs = await getDocs(rq);
+                  if (!rs.empty) {
+                    referrerDoc = rs.docs[0];
+                  }
+                }
+              }
+            }
+
+            if (referrerDoc) {
               await updateDoc(referrerDoc.ref, {
                 totalReferrals: increment(1)
               });
               userData.referralCounted = true;
-              console.log(`[REFERRAL] Successfully incremented totalReferrals for referrer: ${finalReferralCode}`);
+              const referrerData = referrerDoc.data();
+              userData.referredBy = referrerData.referralCode || referrerData.username || finalReferralCode;
+              console.log(`[REFERRAL] Successfully matched referrer and incremented totalReferrals: ${userData.referredBy}`);
             }
           } catch (err) {
             console.error("Failed to increment referral count:", err);
@@ -143,6 +167,7 @@ export default function Welcome() {
         await setDoc(userDocRef, userData, { merge: true });
 
         safeStorage.removeItem('referralCode');
+        safeStorage.removeItem('isRegistering');
 
         // Send Welcome Email for new user
         await axios.post(getApiUrl('/api/auth/send-welcome-email'), { 
@@ -203,12 +228,16 @@ export default function Welcome() {
           throw new Error("Username is already taken. Please choose another.");
         }
 
+        // Set isRegistering flag inside safeStorage BEFORE calling createUserWithEmailAndPassword
+        safeStorage.setItem('isRegistering', 'true');
+
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
         
         // Create user profile
         try {
           await handleUserDoc(user, { firstName, lastName, phoneNumber, username, referralCode: referralCodeInput });
         } catch (dbErr: any) {
+          safeStorage.removeItem('isRegistering');
           if (dbErr.message === "auth/telegram-duplicate") {
              throw dbErr;
           }
@@ -218,6 +247,7 @@ export default function Welcome() {
 
       navigate('/');
     } catch (err: any) {
+      safeStorage.removeItem('isRegistering');
       console.error("Auth error:", err);
       if (err.message === "auth/telegram-duplicate") {
          setError("Account already exists for this Telegram profile.");
