@@ -11,6 +11,7 @@ import { auth, db } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { getApiUrl } from '../lib/config';
 import { safeStorage } from '../lib/storage';
+import { PLANS } from '../constants/plans';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -75,6 +76,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userData.referralEarnings === undefined) {
           updates.referralEarnings = 0;
           needsUpdate = true;
+        }
+
+        // Self-heal: Award the referral upgrade bonus to the referrer if this user is upgraded
+        // but the referrer hasn't received the bonus yet.
+        if (userData.plan && userData.plan !== 'free' && userData.referredBy && !userData.hasReceivedReferralBonus) {
+          const planDetails = PLANS.find(p => p.id === userData.plan);
+          const planCost = planDetails?.cost || 0;
+          const bonusAmount = Math.floor(planCost * 0.2);
+          
+          if (bonusAmount > 0) {
+            console.log(`[REFERRAL_HEAL] Attempting to award missed referral bonus of ₦${bonusAmount} to referrer ${userData.referredBy}`);
+            try {
+              const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', userData.referredBy), limit(1));
+              const referrerSnap = await getDocs(referrerQuery);
+              if (!referrerSnap.empty) {
+                const referrerDoc = referrerSnap.docs[0];
+                
+                // Atomically increment the referrer's balance using Firestore increment
+                await updateDoc(referrerDoc.ref, {
+                  balance: increment(bonusAmount),
+                  referralBalance: increment(bonusAmount),
+                  withdrawableBalance: increment(bonusAmount),
+                  referralEarnings: increment(bonusAmount),
+                  updatedAt: serverTimestamp()
+                });
+                
+                // Create a notification for the referrer
+                await addDoc(collection(db, 'notifications'), {
+                  userId: referrerDoc.id,
+                  title: '🎁 Referral Upgrade Commission!',
+                  message: `Your friend (${userData.displayName || userData.username}) upgraded to ${userData.plan}! You have received a 20% commission of ₦${bonusAmount}.`,
+                  type: 'reward',
+                  createdAt: serverTimestamp(),
+                  readBy: []
+                });
+                
+                updates.hasReceivedReferralBonus = true;
+                needsUpdate = true;
+                console.log(`[REFERRAL_HEAL] Successfully awarded referral bonus to referrer ${userData.referredBy}`);
+              }
+            } catch (err) {
+              console.error("[REFERRAL_HEAL] Failed to self-heal referral bonus:", err);
+            }
+          }
         }
 
         if (needsUpdate) {
