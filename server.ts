@@ -231,8 +231,6 @@ async function withRetry<T>(fn: (modelName: string) => Promise<T>, maxRetries = 
 async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
-  app.use(express.json({ limit: '10mb' }));
-
   app.use(cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
@@ -249,6 +247,8 @@ async function startServer() {
     },
     credentials: true
   }));
+
+  app.use(express.json({ limit: '50mb' })); // Increase body size limit to 50MB for video uploads as well
 
   // Run startup admin check (called from checkDbAdminCapability)
   // ensureOwnerAdminStatus();

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
-import { db } from '../../lib/firebase';
+import { db, storage } from '../../lib/firebase';
 import { collection, addDoc, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getApiUrl } from '../../lib/config';
 import { sendNotification, NotificationType } from '../../lib/notifications';
 import { Plus, Trash2, BarChart2, Video, Image as ImageIcon, Clock, Upload } from 'lucide-react';
@@ -39,7 +40,14 @@ const isVideoFileUrl = (url: string) => {
          cleanUrl.endsWith('.webm') || 
          cleanUrl.endsWith('.ogg') || 
          cleanUrl.endsWith('.mov') || 
-         cleanUrl.endsWith('.m4v');
+         cleanUrl.endsWith('.m4v') ||
+         (cleanUrl.includes('firebasestorage.googleapis.com') && (
+           cleanUrl.includes('.mp4') ||
+           cleanUrl.includes('.webm') ||
+           cleanUrl.includes('.ogg') ||
+           cleanUrl.includes('.mov') ||
+           cleanUrl.includes('.m4v')
+         ));
 };
 
 const getYouTubeEmbedUrl = (url: string) => {
@@ -163,11 +171,10 @@ const renderMediaElement = (mediaUrl: string, title: string, id: string, type: s
       );
     } else {
       return (
-        <iframe 
-          src={mediaUrl} 
-          title={title} 
-          className="w-full h-full border-0" 
-          allowFullScreen
+        <img 
+          src={resolvedUrl} 
+          alt={title} 
+          className="w-full h-full object-contain rounded-xl p-1" 
         />
       );
     }
@@ -232,26 +239,13 @@ export default function AdminAds() {
     let mediaUrl = newAd.mediaUrl;
     try {
         if (file) {
-            const base64Data = await readFileAsBase64(file);
+            // Upload directly and securely to Firebase Storage
+            const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+            const uniqueFilename = `${Date.now()}_${safeName}`;
+            const storageRef = ref(storage, `ads/${uniqueFilename}`);
             
-            const res = await fetch(getApiUrl('/api/v1/admin/upload-media'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    fileData: base64Data,
-                    fileName: file.name
-                })
-            });
-
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || 'Upload failed');
-            }
-
-            const data = await res.json();
-            mediaUrl = data.url;
+            const snapshot = await uploadBytes(storageRef, file);
+            mediaUrl = await getDownloadURL(snapshot.ref);
         }
 
         if (!mediaUrl) {

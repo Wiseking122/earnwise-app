@@ -61,7 +61,14 @@ const isVideoFileUrl = (url: string) => {
          cleanUrl.endsWith('.webm') || 
          cleanUrl.endsWith('.ogg') || 
          cleanUrl.endsWith('.mov') || 
-         cleanUrl.endsWith('.m4v');
+         cleanUrl.endsWith('.m4v') ||
+         (cleanUrl.includes('firebasestorage.googleapis.com') && (
+           cleanUrl.includes('.mp4') ||
+           cleanUrl.includes('.webm') ||
+           cleanUrl.includes('.ogg') ||
+           cleanUrl.includes('.mov') ||
+           cleanUrl.includes('.m4v')
+         ));
 };
 
 const getYouTubeEmbedUrl = (url: string) => {
