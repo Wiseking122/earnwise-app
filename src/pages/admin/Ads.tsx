@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { db, storage } from '../../lib/firebase';
 import { collection, addDoc, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getApiUrl } from '../../lib/config';
 import { sendNotification, NotificationType } from '../../lib/notifications';
 import { Plus, Trash2, BarChart2, Video, Image as ImageIcon, Clock, Upload } from 'lucide-react';
@@ -196,6 +196,7 @@ export default function AdminAds() {
   const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0 });
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -230,8 +231,8 @@ export default function AdminAds() {
   };
 
   const handleAddAd = async () => {
-    if (!newAd.title || !newAd.url) {
-      showStatus("Please enter both Ad Title and Target URL.", 'error');
+    if (!newAd.title) {
+      showStatus("Please enter an Ad Title.", 'error');
       return;
     }
     setUploading(true);
@@ -239,13 +240,70 @@ export default function AdminAds() {
     let mediaUrl = newAd.mediaUrl;
     try {
         if (file) {
-            // Upload directly and securely to Firebase Storage
-            const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-            const uniqueFilename = `${Date.now()}_${safeName}`;
-            const storageRef = ref(storage, `ads/${uniqueFilename}`);
-            
-            const snapshot = await uploadBytes(storageRef, file);
-            mediaUrl = await getDownloadURL(snapshot.ref);
+            try {
+                // Layer 1: Upload directly and securely to Firebase Storage
+                const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+                const uniqueFilename = `${Date.now()}_${safeName}`;
+                const storageRef = ref(storage, `ads/${uniqueFilename}`);
+                
+                const uploadTask = uploadBytesResumable(storageRef, file);
+                
+                mediaUrl = await new Promise<string>((resolve, reject) => {
+                  const timeoutId = setTimeout(() => {
+                    try {
+                      uploadTask.cancel();
+                    } catch (e) {}
+                    reject(new Error("Firebase Storage upload timed out"));
+                  }, 15000); // 15 seconds limit for Firebase before fallback
+
+                  uploadTask.on('state_changed', 
+                    (snapshot) => {
+                      const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                      setUploadProgress(Math.round(progress));
+                    }, 
+                    (error) => {
+                      clearTimeout(timeoutId);
+                      reject(error);
+                    }, 
+                    async () => {
+                      clearTimeout(timeoutId);
+                      try {
+                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve(downloadUrl);
+                      } catch (err) {
+                        reject(err);
+                      }
+                    }
+                  );
+                });
+            } catch (firebaseErr: any) {
+                console.warn("Firebase Storage upload failed/timed out, attempting server upload fallback:", firebaseErr);
+                setUploadProgress(50); // Set progress to 50% for fallback phase
+                
+                const base64Data = await readFileAsBase64(file);
+                const res = await fetch(getApiUrl('/api/v1/admin/upload-media'), {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    fileData: base64Data,
+                    fileName: file.name
+                  })
+                });
+
+                if (!res.ok) {
+                  const errData = await res.json().catch(() => ({}));
+                  throw new Error(errData.error || `Server responded with status ${res.status}`);
+                }
+
+                const data = await res.json();
+                if (data.success && data.url) {
+                  mediaUrl = data.url;
+                } else {
+                  throw new Error("Invalid response from fallback upload server");
+                }
+            }
         }
 
         if (!mediaUrl) {
@@ -254,14 +312,17 @@ export default function AdminAds() {
             return;
         }
 
-        await addDoc(collection(db, 'ads'), {
+        const adData = {
             ...newAd,
+            url: newAd.url.trim() || '#', // Set optional target URL to # if empty
             mediaUrl,
             createdAt: new Date(),
             clicks: 0,
             views: 0,
             watchTime: 0
-        });
+        };
+
+        await addDoc(collection(db, 'ads'), adData);
 
         // Notify all users about the newly created ad
         try {
@@ -284,6 +345,7 @@ export default function AdminAds() {
         showStatus("Upload/Ad creation failed: " + error.message, 'error');
     } finally {
         setUploading(false);
+        setUploadProgress(null);
     }
   };
 
@@ -325,11 +387,29 @@ export default function AdminAds() {
                 <label htmlFor="file-upload" className="flex-1 p-4 border border-slate-200 rounded-2xl flex items-center gap-2 text-slate-500 cursor-pointer hover:bg-slate-50 transition overflow-hidden text-ellipsis whitespace-nowrap">
                     <Upload size={18} /> {file ? file.name : "Or Upload Media File (Image/Video)"}
                 </label>
+                {file && (
+                  <button 
+                    onClick={() => setFile(null)} 
+                    className="p-4 border border-rose-200 text-rose-500 rounded-2xl hover:bg-rose-50 transition font-bold text-sm whitespace-nowrap"
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                )}
             </div>
             <input type="number" placeholder="Reward (Points)" className="p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 transition" value={newAd.reward} onChange={e => setNewAd({...newAd, reward: Number(e.target.value)})} />
           </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 space-y-1">
+            <p className="font-bold">⚠️ Tips for Video or Banner Ad Uploads:</p>
+            <p>Directly uploading files (especially large video files) can be slow on standard networks and may exceed platform limitations or timeout.</p>
+            <p>For a flawless, lightning-fast experience, we highly recommend hosting your media on a service (e.g., Postimg, Cloudinary, Imgur, Google Drive, YouTube) and pasting the link in the <strong>"Or paste Direct Media URL"</strong> field instead of uploading.</p>
+          </div>
+
           <button onClick={handleAddAd} disabled={uploading} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 hover:bg-indigo-700 transition disabled:opacity-50">
-            {uploading ? 'Processing/Uploading...' : <><Plus size={20} /> Create Ad</>}
+            {uploading ? (
+              uploadProgress !== null ? `Uploading: ${uploadProgress}%` : 'Processing/Uploading...'
+            ) : <><Plus size={20} /> Create Ad</>}
           </button>
         </div>
 
