@@ -33,6 +33,37 @@ const isYouTubeUrl = (url: string) => {
   return url.includes('youtube.com') || url.includes('youtu.be');
 };
 
+const isFacebookUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.gg');
+};
+
+const isTikTokUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('tiktok.com');
+};
+
+const isInstagramUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('instagram.com');
+};
+
+const isTwitterUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('twitter.com') || url.includes('x.com');
+};
+
+const isVideoFileUrl = (url: string) => {
+  if (!url) return false;
+  if (url.startsWith('/uploads/') || url.includes('/uploads/')) return true;
+  const cleanUrl = url.split(/[?#]/)[0].toLowerCase();
+  return cleanUrl.endsWith('.mp4') || 
+         cleanUrl.endsWith('.webm') || 
+         cleanUrl.endsWith('.ogg') || 
+         cleanUrl.endsWith('.mov') || 
+         cleanUrl.endsWith('.m4v');
+};
+
 const getYouTubeEmbedUrl = (url: string) => {
   try {
     let videoId = '';
@@ -40,6 +71,8 @@ const getYouTubeEmbedUrl = (url: string) => {
       videoId = url.split('youtu.be/')[1].split(/[?#]/)[0];
     } else if (url.includes('embed/')) {
       videoId = url.split('embed/')[1].split(/[?#]/)[0];
+    } else if (url.includes('shorts/')) {
+      videoId = url.split('shorts/')[1].split(/[?#]/)[0];
     } else {
       const match = url.match(/[?&]v=([^&#]*)/);
       if (match) {
@@ -49,6 +82,138 @@ const getYouTubeEmbedUrl = (url: string) => {
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
   } catch (e) {
     return url;
+  }
+};
+
+const getFacebookEmbedUrl = (url: string) => {
+  return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560&autoplay=1&mute=1`;
+};
+
+const getTikTokEmbedUrl = (url: string) => {
+  const match = url.match(/\/video\/(\d+)/);
+  if (match && match[1]) {
+    return `https://www.tiktok.com/embed/v2/${match[1]}`;
+  }
+  return `https://www.tiktok.com/embed/v2/`;
+};
+
+const getInstagramEmbedUrl = (url: string) => {
+  try {
+    let cleanUrl = url.split(/[?#]/)[0];
+    if (cleanUrl.endsWith('/')) {
+      cleanUrl = cleanUrl.slice(0, -1);
+    }
+    return `${cleanUrl}/embed/`;
+  } catch (e) {
+    return url;
+  }
+};
+
+const getTwitterEmbedUrl = (url: string) => {
+  const match = url.match(/status\/(\d+)/);
+  if (match && match[1]) {
+    return `https://platform.twitter.com/embed/Tweet.html?id=${match[1]}&theme=dark`;
+  }
+  return url;
+};
+
+const renderMediaElement = (mediaUrl: string, title: string, id: string, type: string, onLinkClick?: () => void) => {
+  if (!mediaUrl) return null;
+
+  const resolvedUrl = getApiUrl(mediaUrl);
+
+  if (type === 'video') {
+    if (isYouTubeUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getYouTubeEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full aspect-video rounded-xl border-0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen
+        />
+      );
+    } else if (isFacebookUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getFacebookEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full aspect-video rounded-xl border-0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen
+        />
+      );
+    } else if (isTikTokUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getTikTokEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full aspect-video rounded-xl border-0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen
+        />
+      );
+    } else if (isInstagramUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getInstagramEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full aspect-video rounded-xl border-0" 
+          allowFullScreen
+        />
+      );
+    } else if (isTwitterUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getTwitterEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full aspect-video rounded-xl border-0 bg-black" 
+          allowFullScreen
+        />
+      );
+    } else if (isVideoFileUrl(mediaUrl)) {
+      return (
+        <video 
+          key={id}
+          src={resolvedUrl} 
+          autoPlay 
+          muted
+          controls 
+          playsInline
+          loop
+          preload="auto"
+          className="w-full aspect-video object-contain rounded-xl" 
+        />
+      );
+    } else {
+      return (
+        <iframe 
+          src={mediaUrl} 
+          title={title} 
+          className="w-full aspect-video rounded-xl border-0" 
+          allowFullScreen
+        />
+      );
+    }
+  } else {
+    // Banner / image ad
+    return (
+      <div 
+        onClick={onLinkClick}
+        className="cursor-pointer hover:opacity-90 transition-all relative group w-full"
+        title="Click to visit partner website"
+      >
+        <img 
+          src={resolvedUrl} 
+          alt={title} 
+          className="w-full max-h-48 object-contain rounded-2xl p-2 mx-auto transition-transform group-hover:scale-[1.02]"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+          <span className="text-white text-xs font-black uppercase tracking-wider bg-slate-900/90 px-4 py-2 rounded-xl border border-white/10">Visit Partner Website</span>
+        </div>
+      </div>
+    );
   }
 };
 
@@ -328,29 +493,20 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
               <div className="flex flex-col items-center justify-center py-6 w-full space-y-4">
                 {activeTimerTask.isCustom && activeTimerTask.mediaUrl && (
                   <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-black/40 p-1">
-                    {activeTimerTask.type === 'video' ? (
-                      <div className="relative group w-full">
-                        {isYouTubeUrl(activeTimerTask.mediaUrl) ? (
-                          <iframe 
-                            src={getYouTubeEmbedUrl(activeTimerTask.mediaUrl)} 
-                            title={activeTimerTask.name} 
-                            className="w-full aspect-video rounded-xl border-0" 
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                            allowFullScreen
-                          />
-                        ) : (
-                          <video 
-                            key={activeTimerTask.id}
-                            src={getApiUrl(activeTimerTask.mediaUrl)} 
-                            autoPlay 
-                            muted
-                            controls 
-                            playsInline
-                            loop
-                            preload="auto"
-                            className="w-full aspect-video object-contain rounded-xl" 
-                          />
-                        )}
+                    <div className="relative group w-full">
+                      {renderMediaElement(
+                        activeTimerTask.mediaUrl, 
+                        activeTimerTask.name, 
+                        activeTimerTask.id, 
+                        activeTimerTask.type,
+                        () => {
+                          if (activeTimerTask.link && activeTimerTask.link !== '#') {
+                            window.open(activeTimerTask.link, '_blank', 'noopener,noreferrer');
+                            handleAdClickMetric(activeTimerTask.id);
+                          }
+                        }
+                      )}
+                      {activeTimerTask.type === 'video' && (
                         <div 
                           onClick={() => {
                             if (activeTimerTask.link && activeTimerTask.link !== '#') {
@@ -358,33 +514,12 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                               handleAdClickMetric(activeTimerTask.id);
                             }
                           }}
-                          className="absolute top-2 right-2 bg-black/60 hover:bg-black/90 text-white text-[9px] font-black px-2.5 py-1 rounded-lg cursor-pointer transition-all uppercase border border-white/10"
+                          className="absolute top-2 right-2 bg-black/60 hover:bg-black/90 text-white text-[9px] font-black px-2.5 py-1 rounded-lg cursor-pointer transition-all uppercase border border-white/10 z-10"
                         >
                           Visit Sponsor
                         </div>
-                      </div>
-                    ) : (
-                      <div 
-                        onClick={() => {
-                          if (activeTimerTask.link && activeTimerTask.link !== '#') {
-                            window.open(activeTimerTask.link, '_blank', 'noopener,noreferrer');
-                            handleAdClickMetric(activeTimerTask.id);
-                          }
-                        }}
-                        className="cursor-pointer hover:opacity-90 transition-all relative group"
-                        title="Click to visit partner website"
-                      >
-                        <img 
-                          src={getApiUrl(activeTimerTask.mediaUrl)} 
-                          alt={activeTimerTask.name} 
-                          className="w-full max-h-48 object-contain rounded-2xl p-2 mx-auto transition-transform group-hover:scale-[1.02]"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
-                          <span className="text-white text-xs font-black uppercase tracking-wider bg-slate-900/90 px-4 py-2 rounded-xl border border-white/10">Visit Partner Website</span>
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
                 {!activeTimerTask.isCustom && vastAd && (

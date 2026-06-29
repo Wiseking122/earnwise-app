@@ -11,6 +11,37 @@ const isYouTubeUrl = (url: string) => {
   return url.includes('youtube.com') || url.includes('youtu.be');
 };
 
+const isFacebookUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.gg');
+};
+
+const isTikTokUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('tiktok.com');
+};
+
+const isInstagramUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('instagram.com');
+};
+
+const isTwitterUrl = (url: string) => {
+  if (!url) return false;
+  return url.includes('twitter.com') || url.includes('x.com');
+};
+
+const isVideoFileUrl = (url: string) => {
+  if (!url) return false;
+  if (url.startsWith('/uploads/') || url.includes('/uploads/')) return true;
+  const cleanUrl = url.split(/[?#]/)[0].toLowerCase();
+  return cleanUrl.endsWith('.mp4') || 
+         cleanUrl.endsWith('.webm') || 
+         cleanUrl.endsWith('.ogg') || 
+         cleanUrl.endsWith('.mov') || 
+         cleanUrl.endsWith('.m4v');
+};
+
 const getYouTubeEmbedUrl = (url: string) => {
   try {
     let videoId = '';
@@ -18,6 +49,8 @@ const getYouTubeEmbedUrl = (url: string) => {
       videoId = url.split('youtu.be/')[1].split(/[?#]/)[0];
     } else if (url.includes('embed/')) {
       videoId = url.split('embed/')[1].split(/[?#]/)[0];
+    } else if (url.includes('shorts/')) {
+      videoId = url.split('shorts/')[1].split(/[?#]/)[0];
     } else {
       const match = url.match(/[?&]v=([^&#]*)/);
       if (match) {
@@ -27,6 +60,127 @@ const getYouTubeEmbedUrl = (url: string) => {
     return `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=1`;
   } catch (e) {
     return url;
+  }
+};
+
+const getFacebookEmbedUrl = (url: string) => {
+  return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560&autoplay=0&mute=1`;
+};
+
+const getTikTokEmbedUrl = (url: string) => {
+  const match = url.match(/\/video\/(\d+)/);
+  if (match && match[1]) {
+    return `https://www.tiktok.com/embed/v2/${match[1]}`;
+  }
+  return `https://www.tiktok.com/embed/v2/`;
+};
+
+const getInstagramEmbedUrl = (url: string) => {
+  try {
+    let cleanUrl = url.split(/[?#]/)[0];
+    if (cleanUrl.endsWith('/')) {
+      cleanUrl = cleanUrl.slice(0, -1);
+    }
+    return `${cleanUrl}/embed/`;
+  } catch (e) {
+    return url;
+  }
+};
+
+const getTwitterEmbedUrl = (url: string) => {
+  const match = url.match(/status\/(\d+)/);
+  if (match && match[1]) {
+    return `https://platform.twitter.com/embed/Tweet.html?id=${match[1]}&theme=dark`;
+  }
+  return url;
+};
+
+const renderMediaElement = (mediaUrl: string, title: string, id: string, type: string) => {
+  if (!mediaUrl) return null;
+
+  const resolvedUrl = getApiUrl(mediaUrl);
+
+  if (type === 'video') {
+    if (isYouTubeUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getYouTubeEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full h-full border-0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen
+        />
+      );
+    } else if (isFacebookUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getFacebookEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full h-full border-0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen
+        />
+      );
+    } else if (isTikTokUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getTikTokEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full h-full border-0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen
+        />
+      );
+    } else if (isInstagramUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getInstagramEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full h-full border-0" 
+          allowFullScreen
+        />
+      );
+    } else if (isTwitterUrl(mediaUrl)) {
+      return (
+        <iframe 
+          src={getTwitterEmbedUrl(mediaUrl)} 
+          title={title} 
+          className="w-full h-full border-0 bg-black" 
+          allowFullScreen
+        />
+      );
+    } else if (isVideoFileUrl(mediaUrl)) {
+      return (
+        <video 
+          key={id}
+          src={resolvedUrl} 
+          className="w-full h-full object-contain" 
+          muted 
+          playsInline
+          controls
+          preload="metadata"
+        />
+      );
+    } else {
+      return (
+        <iframe 
+          src={mediaUrl} 
+          title={title} 
+          className="w-full h-full border-0" 
+          allowFullScreen
+        />
+      );
+    }
+  } else {
+    // Banner / image ad
+    return (
+      <img 
+        src={resolvedUrl} 
+        alt={title} 
+        className="w-full h-full object-contain" 
+        referrerPolicy="no-referrer"
+      />
+    );
   }
 };
 
@@ -238,33 +392,7 @@ export default function AdminAds() {
 
                 {ad.mediaUrl && (
                   <div className="w-full h-32 rounded-2xl bg-slate-950 border border-slate-100 overflow-hidden relative flex items-center justify-center">
-                    {ad.type === 'video' ? (
-                      isYouTubeUrl(ad.mediaUrl) ? (
-                        <iframe 
-                          src={getYouTubeEmbedUrl(ad.mediaUrl)} 
-                          title={ad.title} 
-                          className="w-full h-full border-0" 
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                          allowFullScreen
-                        />
-                      ) : (
-                        <video 
-                          src={getApiUrl(ad.mediaUrl)} 
-                          className="w-full h-full object-contain" 
-                          muted 
-                          playsInline
-                          controls
-                          preload="metadata"
-                        />
-                      )
-                    ) : (
-                      <img 
-                        src={getApiUrl(ad.mediaUrl)} 
-                        alt={ad.title} 
-                        className="w-full h-full object-contain" 
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
+                    {renderMediaElement(ad.mediaUrl, ad.title, ad.id, ad.type)}
                     <span className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-[9px] font-mono text-white px-2 py-0.5 rounded-md uppercase">
                       {ad.type}
                     </span>
