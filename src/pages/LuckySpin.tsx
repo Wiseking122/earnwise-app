@@ -21,6 +21,7 @@ import { PLANS } from '../constants/plans';
 import { playRewardSound } from './sounds';
 import Confetti from '../components/Confetti';
 import VideoAd from '../components/VideoAd';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 type SpinResult = {
   id: number;
@@ -51,6 +52,7 @@ export default function LuckySpin() {
   const [globalHistory, setGlobalHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [activeTab, setActiveTab] = useState<'my' | 'global'>('global');
+  const [showRestriction, setShowRestriction] = useState(false);
 
   const planDetails = PLANS.find(p => p.id === (profile?.plan || 'free'));
   const multiplier = planDetails?.multiplier || 1.0;
@@ -116,6 +118,11 @@ export default function LuckySpin() {
   };
 
   const handleWatchAd = () => {
+    if (!profile) return;
+    if (profile.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (adLoading) return;
     
     // Open required ad link
@@ -144,6 +151,10 @@ export default function LuckySpin() {
 
   const spin = async () => {
     if (!user || spinning || mustWatchAd) return;
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
 
     setSpinning(true);
     setResult(null);
@@ -449,6 +460,11 @@ export default function LuckySpin() {
             </div>
         </div>
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="participate in lucky spins" 
+      />
     </Layout>
   );
 }

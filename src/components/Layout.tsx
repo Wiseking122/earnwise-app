@@ -192,8 +192,8 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
           newReceiptToPop = {
             id: txId,
             amount: data.amount,
-            fee: data.receiptDetails?.fee || (data.amount * 0.05),
-            netPayout: data.receiptDetails?.netPayout || (data.amount * 0.95),
+            fee: data.receiptDetails?.fee ?? (data.amount * 0.05),
+            netPayout: data.receiptDetails?.netPayout ?? (data.amount * 0.95),
             processedAt: data.createdAt?.toDate?.() || new Date(),
             bankName: data.receiptDetails?.bankName || 'N/A',
             accountName: data.receiptDetails?.accountName || 'N/A'

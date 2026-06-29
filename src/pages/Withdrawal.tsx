@@ -581,8 +581,12 @@ export default function Withdrawal() {
                   />
                 </div>
                 {parseFloat(amount) >= 1000 && (
-                  <p className="text-[9px] font-black text-blue-600 uppercase tracking-wider px-4">
-                    A 5% processing fee applies. You receive: ₦{(parseFloat(amount) * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  <p className={`text-[9px] font-black uppercase tracking-wider px-4 ${withdrawalType === 'task' ? 'text-blue-600' : 'text-emerald-600'}`}>
+                    {withdrawalType === 'task' ? (
+                      `A 5% processing fee applies. You receive: ₦${(parseFloat(amount) * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                    ) : (
+                      `Referral withdrawals are 100% free of charge! You receive: ₦${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                    )}
                   </p>
                 )}
               </div>

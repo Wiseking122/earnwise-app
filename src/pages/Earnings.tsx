@@ -47,8 +47,8 @@ export default function Earnings() {
         setSelectedReceipt({
           id: t.id,
           amount: t.amount,
-          fee: t.receiptDetails.fee || 0,
-          netPayout: t.receiptDetails.netPayout || t.amount,
+          fee: t.receiptDetails.fee ?? 0,
+          netPayout: t.receiptDetails.netPayout ?? t.amount,
           processedAt: t.createdAt?.toDate() || new Date(),
           bankName: t.receiptDetails.bankName,
           accountName: t.receiptDetails.accountName
@@ -255,8 +255,8 @@ export default function Earnings() {
                           setSelectedReceipt({
                             id: t.id,
                             amount: t.amount,
-                            fee: t.receiptDetails.fee || 0,
-                            netPayout: t.receiptDetails.netPayout || t.amount,
+                            fee: t.receiptDetails.fee ?? 0,
+                            netPayout: t.receiptDetails.netPayout ?? t.amount,
                             processedAt: t.createdAt?.toDate() || new Date(),
                             bankName: t.receiptDetails.bankName,
                             accountName: t.receiptDetails.accountName

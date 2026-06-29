@@ -19,6 +19,7 @@ import {
   Upload
 } from 'lucide-react';
 import { playRewardSound } from './sounds';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -38,6 +39,7 @@ export default function TaskDetail() {
   const [isPreTimerActive, setIsPreTimerActive] = useState(true);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [showRestriction, setShowRestriction] = useState(false);
 
   const isCampaignTask = !!(task?.advertiserId && task?.advertiserId !== 'internal_platform' && task?.advertiserId !== 'admin');
 
@@ -94,6 +96,10 @@ export default function TaskDetail() {
   };
 
   const handleCampaignSubmit = async () => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (!task || !user || alreadyCompleted || submitted) return;
     if (!screenshot) {
       setError('Please upload a screenshot of your completed task as proof.');
@@ -307,6 +313,10 @@ export default function TaskDetail() {
   const [wiseAiMessage, setWiseAiMessage] = useState<string>('');
 
   const handleProofSubmit = async () => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (!task || !user || alreadyCompleted || submitted || !proof) return;
     setSubmitting(true);
     setError('');
@@ -378,6 +388,10 @@ export default function TaskDetail() {
   };
 
   const startTask = () => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (task?.link) {
       window.open(task.link, '_blank');
     }
@@ -741,6 +755,11 @@ export default function TaskDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="start or complete tasks" 
+      />
     </Layout>
   );
 }

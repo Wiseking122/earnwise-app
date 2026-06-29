@@ -2986,8 +2986,9 @@ Please verify if the submission is a plausible and honest completion of a social
         // Trigger Automated Withdrawal Email to User
         if (userData.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
           try {
-            const netPayout = amount * 0.95;
-            const fee = amount * 0.05;
+            const isReferral = withdrawalType === 'referral';
+            const netPayout = isReferral ? amount : amount * 0.95;
+            const fee = isReferral ? 0 : amount * 0.05;
             const name = userData.displayName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || "Earner";
             await transporter.sendMail({
               from: `"Earnwise Payouts" <${process.env.EMAIL_USER}>`,
@@ -3005,7 +3006,7 @@ Please verify if the submission is a plausible and honest completion of a social
                     <h3 style="margin-top: 0; color: #065f46; font-size: 14px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 5px;">Net Credit Amount</h3>
                     <h2 style="color: #047857; font-size: 32px; font-weight: 900; margin: 0;">₦${Number(netPayout).toLocaleString()}</h2>
                   </div>
-
+ 
                   <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
                     <h4 style="margin-top: 0; color: #1e293b; font-size: 13px; text-transform: uppercase; font-weight: 800; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">Transaction Details</h4>
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
@@ -3026,8 +3027,8 @@ Please verify if the submission is a plausible and honest completion of a social
                         <td style="color: #1e293b; font-weight: 700; text-align: right;">₦${Number(amount).toLocaleString()}</td>
                       </tr>
                       <tr style="height: 30px;">
-                        <td style="color: #64748b; font-weight: 500;">Processing Fee (5%)</td>
-                        <td style="color: #e11d48; font-weight: 700; text-align: right;">-₦${Number(fee).toLocaleString()}</td>
+                        <td style="color: #64748b; font-weight: 500;">Processing Fee (${isReferral ? 'Free' : '5%'})</td>
+                        <td style="${isReferral ? 'color: #10b981;' : 'color: #e11d48;'} font-weight: 700; text-align: right;">${isReferral ? 'Free (₦0)' : `-₦${Number(fee).toLocaleString()}`}</td>
                       </tr>
                     </table>
                   </div>

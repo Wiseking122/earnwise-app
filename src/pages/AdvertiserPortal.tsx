@@ -15,6 +15,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Task } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { 
   Megaphone, 
   Plus, 
@@ -85,6 +86,7 @@ export default function AdvertiserPortal() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showRestriction, setShowRestriction] = useState(false);
 
   // Form states
   const [campaignName, setCampaignName] = useState('');
@@ -151,9 +153,21 @@ export default function AdvertiserPortal() {
   const totalAmount = isAdmin ? 0 : subtotal - campaignDiscount;
   const isBalanceLow = (profile?.withdrawableBalance || 0) < totalAmount && !isAdmin;
 
+  const handleCreateClick = () => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
+    setView('create');
+  };
+
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     setValidationError('');
 
     if (quantity < 50) {
@@ -263,6 +277,10 @@ export default function AdvertiserPortal() {
   };
 
   const handleDeleteCampaign = async (task: Task) => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (!window.confirm(`Are you sure you want to cancel the campaign "${task.title}"? Your remaining budget will be refunded.`)) return;
     
     try {
@@ -687,7 +705,7 @@ export default function AdvertiserPortal() {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Boost your social presence and business</p>
           </div>
           <button 
-            onClick={() => setView('create')}
+            onClick={handleCreateClick}
             className="px-5 py-3 bg-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center gap-1.5 shadow-lg hover:bg-blue-600 transition-all active:scale-95"
             id="create-new-ad-top"
           >
@@ -739,7 +757,7 @@ export default function AdvertiserPortal() {
             </p>
 
             <button 
-              onClick={() => setView('create')}
+              onClick={handleCreateClick}
               className="bg-white/90 hover:bg-white text-blue-600 text-[10px] font-black uppercase tracking-widest py-2.5 px-4 rounded-xl border border-blue-100 shadow-sm transition-colors"
               id="growth-tip-launch-button"
             >
@@ -824,6 +842,11 @@ export default function AdvertiserPortal() {
         </div>
 
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="create advertising campaigns" 
+      />
     </Layout>
   );
 }

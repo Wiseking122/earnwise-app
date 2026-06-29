@@ -32,6 +32,7 @@ import { getApiUrl } from '../lib/config';
 import { COURSES } from '../data/courses';
 import { getEnrichedStep } from '../data/courseEnrichment';
 import axios from 'axios';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 export default function CoursePlayer() {
   const { id } = useParams();
@@ -48,6 +49,7 @@ export default function CoursePlayer() {
   const [aiLoading, setAiLoading] = useState(false);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
   const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>({});
+  const [showRestriction, setShowRestriction] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const course = COURSES.find(c => c.id === id);
@@ -107,6 +109,11 @@ export default function CoursePlayer() {
   };
 
   const handlePurchase = async () => {
+    if (!profile) return;
+    if (profile.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (!user || !course) return;
 
     if (!hasFreeCredit && (profile?.depositBalance || 0) < 7000) {
@@ -164,6 +171,10 @@ export default function CoursePlayer() {
   };
 
   const handleDownload = () => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (!course) return;
 
     const content = `
@@ -240,6 +251,10 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
   };
 
   const askTutor = async () => {
+    if (profile?.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
     if (!question.trim() || aiLoading || !user || !course) return;
     
     const userMsg = question.trim();
@@ -839,6 +854,11 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
           )}
         </AnimatePresence>
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="access Revenue Academy courses" 
+      />
     </Layout>
   );
 }

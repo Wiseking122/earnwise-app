@@ -19,6 +19,7 @@ import { doc, updateDoc, increment, serverTimestamp, setDoc, collection } from '
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import Confetti from './Confetti';
+import { PlanRestrictionModal } from './PlanRestrictionModal';
 
 // Daily Rewards configuration mapping to 7-day cycle
 const DAILY_REWARDS = [
@@ -39,6 +40,7 @@ export const DailyCheckIn: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showRuleModal, setShowRuleModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'grid' | 'rewards'>('grid');
+  const [showRestriction, setShowRestriction] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -73,7 +75,12 @@ export const DailyCheckIn: React.FC = () => {
   const currentReward = DAILY_REWARDS[cycleIndex] || DAILY_REWARDS[0];
 
   const handleCheckIn = async () => {
-    if (!profile || !canCheckIn || loading) return;
+    if (!profile) return;
+    if (profile.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
+    if (!canCheckIn || loading) return;
     
     setLoading(true);
     const rewardAmount = currentReward.amount;
@@ -480,6 +487,12 @@ export const DailyCheckIn: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="claim daily check-in rewards" 
+      />
     </>
   );
 };

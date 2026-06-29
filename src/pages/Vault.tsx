@@ -30,6 +30,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import AnimatedNumber from '../components/AnimatedNumber';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 export default function Vault() {
   const { user, profile } = useAuth();
@@ -37,6 +38,7 @@ export default function Vault() {
   const [stakeAmount, setStakeAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [showRestriction, setShowRestriction] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -65,7 +67,12 @@ export default function Vault() {
   }, [user]);
 
   const handleStake = async () => {
-    if (!profile || !user || !stakeAmount || isNaN(Number(stakeAmount))) return;
+    if (!profile || !user) return;
+    if (profile.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
+    if (!stakeAmount || isNaN(Number(stakeAmount))) return;
     const amount = Number(stakeAmount);
     
     if (amount <= 0) return;
@@ -128,7 +135,12 @@ export default function Vault() {
   };
 
   const handleClaim = async (entry: VaultEntry) => {
-    if (!user || entry.status !== 'locked') return;
+    if (!profile || !user) return;
+    if (profile.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
+    if (entry.status !== 'locked') return;
     
     const now = new Date();
     const unlockTime = entry.unlocksAt?.toDate?.() || entry.unlocksAt;
@@ -365,6 +377,11 @@ export default function Vault() {
             </div>
         </section>
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="utilize the Capital Vault" 
+      />
     </Layout>
   );
 }

@@ -201,8 +201,8 @@ export default function AdminPayments() {
             description: `Withdrawal request #${request.id.slice(0,6)}`,
             createdAt: serverTimestamp(),
             receiptDetails: {
-              fee: request.amount * 0.05,
-              netPayout: request.amount * 0.95,
+              fee: isReferral ? 0 : request.amount * 0.05,
+              netPayout: isReferral ? request.amount : request.amount * 0.95,
               bankName: request.bankDetails?.bankName || '',
               accountName: request.bankDetails?.accountName || '',
               accountNumber: request.bankDetails?.accountNumber || ''
@@ -229,8 +229,8 @@ export default function AdminPayments() {
                 email: uData.email,
                 name: uData.displayName || `${uData.firstName || ''} ${uData.lastName || ''}`.trim() || "Earner",
                 amount: request.amount,
-                netPayout: request.amount * 0.95,
-                fee: request.amount * 0.05,
+                netPayout: isReferral ? request.amount : request.amount * 0.95,
+                fee: isReferral ? 0 : request.amount * 0.05,
                 withdrawalId: request.id,
                 bankName: request.bankDetails?.bankName,
                 accountName: request.bankDetails?.accountName,
@@ -247,8 +247,8 @@ export default function AdminPayments() {
               user_email: uData.email,
               user_name: uData.displayName || "Valued earner",
               amount: request.amount,
-              net_payout: request.amount * 0.95,
-              fee: request.amount * 0.05,
+              net_payout: isReferral ? request.amount : request.amount * 0.95,
+              fee: isReferral ? 0 : request.amount * 0.05,
               withdrawal_id: request.id,
               account_name: request.bankDetails?.accountName,
               bank_name: request.bankDetails?.bankName,
@@ -501,14 +501,27 @@ export default function AdminPayments() {
                                 <h4 className="text-2xl font-black text-slate-900">₦{req.amount.toLocaleString()}</h4>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">5% Fee Deducted</p>
-                                <p className="text-sm font-bold text-red-600">-₦{(req.amount * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                {req.withdrawalType === 'referral' ? (
+                                  <>
+                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-wider">Processing Fee</p>
+                                    <p className="text-sm font-bold text-emerald-600">Free (0%)</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">5% Fee Deducted</p>
+                                    <p className="text-sm font-bold text-red-600">-₦{(req.amount * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                  </>
+                                )}
                               </div>
                             </div>
 
-                            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                              <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest">Actual Transfer Payout (95% Net)</p>
-                              <h3 className="text-xl font-black text-emerald-950">₦{(req.amount * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                            <div className={`${req.withdrawalType === 'referral' ? 'bg-emerald-600/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-4 border`}>
+                              <p className={`text-[9px] font-black uppercase tracking-widest ${req.withdrawalType === 'referral' ? 'text-emerald-700' : 'text-emerald-800'}`}>
+                                {req.withdrawalType === 'referral' ? "Actual Transfer Payout (100% Net)" : "Actual Transfer Payout (95% Net)"}
+                              </p>
+                              <h3 className={`text-xl font-black ${req.withdrawalType === 'referral' ? 'text-emerald-700' : 'text-emerald-950'}`}>
+                                ₦{(req.withdrawalType === 'referral' ? req.amount : req.amount * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </h3>
                             </div>
 
                             {/* User Audit Stats section */}
@@ -563,7 +576,8 @@ export default function AdminPayments() {
                               {/* Copy Account Details payload compiler */}
                               <button
                                 onClick={() => {
-                                  const payload = `[${req.bankDetails?.bankName || 'N/A'}] - [${req.bankDetails?.accountNumber || 'N/A'}] - [${req.bankDetails?.accountName || 'N/A'}] - [₦${(req.amount * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}]`;
+                                  const netPayoutVal = req.withdrawalType === 'referral' ? req.amount : req.amount * 0.95;
+                                  const payload = `[${req.bankDetails?.bankName || 'N/A'}] - [${req.bankDetails?.accountNumber || 'N/A'}] - [${req.bankDetails?.accountName || 'N/A'}] - [₦${netPayoutVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}]`;
                                   navigator.clipboard.writeText(payload);
                                   setCopiedId(req.id);
                                   setTimeout(() => setCopiedId(null), 2000);

@@ -16,13 +16,20 @@ import {
 } from 'lucide-react';
 import { doc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 export default function Achievements() {
   const { profile } = useAuth();
   const [claiming, setClaiming] = useState<string | null>(null);
+  const [showRestriction, setShowRestriction] = useState(false);
 
   const handleClaim = async (ach: Achievement) => {
-    if (!profile || claiming) return;
+    if (!profile) return;
+    if (profile.plan === 'free') {
+      setShowRestriction(true);
+      return;
+    }
+    if (claiming) return;
     
     setClaiming(ach.id);
     try {
@@ -140,6 +147,11 @@ export default function Achievements() {
             })}
         </div>
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="claim achievement rewards" 
+      />
     </Layout>
   );
 }
