@@ -12,11 +12,15 @@ const isDevPreview = typeof window !== 'undefined' && (
 
 export const API_BASE_URL = isDevPreview 
   ? '' 
-  : (isRenderUrl(rawApiUrl) ? '' : rawApiUrl);
+  : (rawApiUrl && !isRenderUrl(rawApiUrl) 
+      ? rawApiUrl 
+      : 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app');
 
-export const WS_BASE_URL = isDevPreview || isRenderUrl(rawWsUrl) || !rawWsUrl
+export const WS_BASE_URL = isDevPreview
   ? (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/api/ws'
-  : rawWsUrl;
+  : (rawWsUrl && !isRenderUrl(rawWsUrl)
+      ? rawWsUrl
+      : 'wss://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app/api/ws');
 
 // Helper to get absolute URL if needed, or relative if no base is set
 export const getApiUrl = (path: string) => {
