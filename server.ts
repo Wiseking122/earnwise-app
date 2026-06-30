@@ -1107,7 +1107,114 @@ async function startServer() {
    * Verifies signature and credits user balance on successful completion.
    */
   app.all("/api/postbacks/wannads", async (req, res) => {
-    // ... logic remains same as before ...
+    // Wannads can send data via GET or POST depending on your setup
+    const data = { ...req.query, ...req.body };
+    const { subId, transId, reward, signature, status } = data;
+
+    console.log(`[WEBHOOK-WANNADS] Received callback: User: ${subId}, Trans: ${transId}, Reward: ${reward}, Status: ${status}`);
+
+    if (!subId || !transId || !reward || !signature) {
+      console.warn("[WEBHOOK-WANNADS] Missing required parameters.");
+      return res.status(400).send("Missing parameters");
+    }
+
+    // Verify Signature: md5(subId + transId + reward + WANNADS_POSTBACK_SECRET)
+    const secret = process.env.WANNADS_POSTBACK_SECRET;
+    if (!secret) {
+      console.error("[WEBHOOK-WANNADS] WANNADS_POSTBACK_SECRET is missing.");
+      return res.status(500).send("Configuration error");
+    }
+
+    const calculatedSignature = crypto.createHash('md5')
+      .update(`${subId}${transId}${reward}${secret}`)
+      .digest('hex');
+
+    if (signature !== calculatedSignature) {
+      console.warn(`[WEBHOOK-WANNADS] Signature mismatch. Received: ${signature}, Expected: ${calculatedSignature}`);
+      return res.status(403).send("Invalid signature");
+    }
+
+    try {
+      // Status 1 = Success/Approved, Status 2 = Chargeback/Reversal
+      if (status === '1' || status === 1) {
+        if (isDbAdminCapable) {
+          const userRef = dbAdmin.collection('users').doc(subId as string);
+          const userDoc = await userRef.get();
+          
+          if (!userDoc.exists) {
+            console.warn(`[WEBHOOK-WANNADS] User ${subId} not found in database.`);
+            return res.status(200).send("OK"); // Still return OK to avoid retries if signature is valid
+          }
+
+          const rewardNum = Number(reward);
+
+          await dbAdmin.runTransaction(async (transaction) => {
+            transaction.update(userRef, {
+              balance: admin.firestore.FieldValue.increment(rewardNum),
+              withdrawableBalance: admin.firestore.FieldValue.increment(rewardNum),
+              taskBalance: admin.firestore.FieldValue.increment(rewardNum),
+              totalOfferwallEarnings: admin.firestore.FieldValue.increment(rewardNum),
+              taskEarnings: admin.firestore.FieldValue.increment(rewardNum),
+              totalEarnings: admin.firestore.FieldValue.increment(rewardNum),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Record Transaction
+            const transRef = dbAdmin.collection('transactions').doc();
+            transaction.set(transRef, {
+              userId: subId,
+              amount: rewardNum,
+              type: 'earning',
+              description: `Wannads Reward - TID: ${transId}`,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Add notification
+            const notifRef = dbAdmin.collection('notifications').doc();
+            transaction.set(notifRef, {
+              userId: subId,
+              title: "🎁 Wannads Reward Credited!",
+              message: `You earned ₦${rewardNum} from Wannads tasks/surveys.`,
+              type: 'reward',
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              readBy: []
+            });
+          });
+          
+          console.log(`[WEBHOOK-WANNADS] SUCCESS: Credited User ${subId} with ₦${rewardNum}`);
+        }
+      } else if (status === '2' || status === 2) {
+        console.log(`[WEBHOOK-WANNADS] CHARGEBACK: Revoking ${reward} for User ${subId}`);
+        if (isDbAdminCapable) {
+          const userRef = dbAdmin.collection('users').doc(subId as string);
+          const rewardNum = Number(reward);
+
+          await dbAdmin.runTransaction(async (transaction) => {
+            transaction.update(userRef, {
+              balance: admin.firestore.FieldValue.increment(-rewardNum),
+              withdrawableBalance: admin.firestore.FieldValue.increment(-rewardNum),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            const transRef = dbAdmin.collection('transactions').doc();
+            transaction.set(transRef, {
+              userId: subId,
+              amount: -rewardNum,
+              type: 'earning',
+              description: `Wannads Chargeback - TID: ${transId}`,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          });
+        }
+      }
+      
+      // Wannads expects a "1" or "OK" to stop retrying
+      return res.status(200).send("1");
+    } catch (err: any) {
+      console.error("[WEBHOOK-WANNADS] Processing error:", err.message);
+      return res.status(500).send("Internal error");
+    }
   });
 
   /**
