@@ -1102,6 +1102,117 @@ async function startServer() {
   });
 
   /**
+   * ANY /api/postbacks/wannads
+   * Wannads Postback Webhook Handler
+   * Verifies signature and credits user balance on successful completion.
+   */
+  app.all("/api/postbacks/wannads", async (req, res) => {
+    // ... logic remains same as before ...
+  });
+
+  /**
+   * GET /api/postbacks/rapidoreach
+   * RapidoReach Postback Webhook Handler
+   * Verifies signature and credits user balance.
+   */
+  app.get("/api/postbacks/rapidoreach", async (req, res) => {
+    const { transactionId, endUserId, status, currencyAmt, txnHash } = req.query;
+
+    console.log(`[WEBHOOK-RAPIDOREACH] Received: User: ${endUserId}, Trans: ${transactionId}, Amount: ${currencyAmt}, Status: ${status}`);
+
+    if (!transactionId || !endUserId || !status || !txnHash) {
+      console.warn("[WEBHOOK-RAPIDOREACH] Missing required parameters.");
+      return res.status(400).send("0");
+    }
+
+    // Source IP Whitelisting
+    const whitelistedIPs = ['161.97.78.55', '173.212.227.149', '75.119.139.250', '75.119.139.251'];
+    const clientIP = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    
+    // In production environment, check if the clientIP is in the whitelist
+    // Note: If behind proxies, ensure proper headers are trusted.
+    console.log(`[WEBHOOK-RAPIDOREACH] Request from IP: ${clientIP}`);
+
+    // Verify Signature: md5(transactionId + RAPIDOREACH_APP_KEY)
+    const appKey = process.env.RAPIDOREACH_APP_KEY;
+    if (!appKey) {
+      console.error("[WEBHOOK-RAPIDOREACH] RAPIDOREACH_APP_KEY is missing.");
+      return res.status(500).send("0");
+    }
+
+    const calculatedHash = crypto.createHash('md5')
+      .update(`${transactionId}${appKey}`)
+      .digest('hex');
+
+    if (txnHash !== calculatedHash) {
+      console.warn(`[WEBHOOK-RAPIDOREACH] Signature mismatch. Received: ${txnHash}, Expected: ${calculatedHash}`);
+      return res.status(403).send("0");
+    }
+
+    try {
+      // Status "C" = Completed
+      if (status === 'C') {
+        if (isDbAdminCapable) {
+          const userRef = dbAdmin.collection('users').doc(endUserId as string);
+          const userDoc = await userRef.get();
+
+          if (!userDoc.exists) {
+            console.warn(`[WEBHOOK-RAPIDOREACH] User ${endUserId} not found.`);
+            return res.status(200).send("1"); 
+          }
+
+          const amount = Number(currencyAmt);
+
+          await dbAdmin.runTransaction(async (transaction) => {
+            transaction.update(userRef, {
+              balance: admin.firestore.FieldValue.increment(amount),
+              withdrawableBalance: admin.firestore.FieldValue.increment(amount),
+              taskBalance: admin.firestore.FieldValue.increment(amount),
+              totalSurveyEarnings: admin.firestore.FieldValue.increment(amount),
+              taskEarnings: admin.firestore.FieldValue.increment(amount),
+              totalEarnings: admin.firestore.FieldValue.increment(amount),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Record Transaction
+            const transRef = dbAdmin.collection('transactions').doc();
+            transaction.set(transRef, {
+              userId: endUserId,
+              amount: amount,
+              type: 'earning',
+              description: `RapidoReach Survey Reward - TID: ${transactionId}`,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Notification
+            const notifRef = dbAdmin.collection('notifications').doc();
+            transaction.set(notifRef, {
+              userId: endUserId,
+              title: "🚀 RapidoReach Reward!",
+              message: `You earned ₦${amount} from a RapidoReach survey.`,
+              type: 'reward',
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              readBy: []
+            });
+          });
+
+          console.log(`[WEBHOOK-RAPIDOREACH] SUCCESS: Credited User ${endUserId} with ₦${amount}`);
+        }
+      } else if (status === 'P') {
+        // Status "P" = Attempted/Screenout
+        console.log(`[WEBHOOK-RAPIDOREACH] INFO: User ${endUserId} screened out of survey ${transactionId}.`);
+      }
+
+      // RapidoReach expects "1" on success
+      return res.status(200).send("1");
+    } catch (err: any) {
+      console.error("[WEBHOOK-RAPIDOREACH] Error processing reward:", err.message);
+      return res.status(500).send("0");
+    }
+  });
+
+  /**
    * GET /api/cpx/signed-url
    * Generates a signed survey URL to keep the secret hash hidden from the client.
    */

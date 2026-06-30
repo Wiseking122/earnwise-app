@@ -15,6 +15,10 @@ export const AdsterraBanner: React.FC<AdsterraBannerProps> = ({ type }) => {
     if (currentRef.children.length > 0) return;
 
     const script = document.createElement('script');
+    script.async = true;
+    script.onerror = () => {
+      console.warn(`Failed to load Adsterra ${type} ad. This might be due to an ad blocker.`);
+    };
     
     if (type === 'native') {
       // Config for Code 1: Native Container

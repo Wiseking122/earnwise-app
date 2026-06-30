@@ -23,6 +23,8 @@ import {
 import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
 import { AdsterraBanner } from '../components/AdsterraBanner';
+import { WannadsWalls } from '../components/WannadsWalls';
+import { RapidoReachWall } from '../components/RapidoReachWall';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
 import VideoAdsSection from '../components/VideoAdsSection';
@@ -42,12 +44,19 @@ export default function TaskList() {
   const category = searchParams.get('category');
 
   useEffect(() => {
+    let script: HTMLScriptElement | null = null;
     if (category === 'ad') {
-      const script = document.createElement('script');
+      script = document.createElement('script');
       script.dataset.zone = '11109247';
       script.src = 'https://n6wxm.com/vignette.min.js';
+      script.async = true;
       document.body.appendChild(script);
     }
+    return () => {
+      if (script) {
+        script.remove();
+      }
+    };
   }, [category]);
   
   const initialCategory = (category as TaskType | 'all') || 'all';
@@ -199,16 +208,19 @@ export default function TaskList() {
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
           {activeCategory === 'video' && <VideoAdsSection />}
           {activeCategory === 'survey' && user && (
-            <div className="space-y-4">
+            <div className="space-y-6">
+               <WannadsWalls />
+               <RapidoReachWall />
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
             </div>
           )}
 
           {activeCategory === 'referral' && (
             <div className="space-y-6">
+              {/* Adsterra Banners */}
               <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-6">
                 <div className="text-center space-y-2">
-                  <h3 className="font-display font-black text-xl text-slate-900 uppercase italic tracking-tight">Sponsor Banner 01</h3>
+                  <h3 className="font-display font-black text-xl text-slate-900 uppercase italic tracking-tight">Adsterra Display 01</h3>
                   <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Premium Native Display Ad</p>
                 </div>
                 <AdsterraBanner type="native" />
@@ -216,7 +228,7 @@ export default function TaskList() {
 
               <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-6">
                 <div className="text-center space-y-2">
-                  <h3 className="font-display font-black text-xl text-slate-900 uppercase italic tracking-tight">Sponsor Banner 02</h3>
+                  <h3 className="font-display font-black text-xl text-slate-900 uppercase italic tracking-tight">Adsterra Display 02</h3>
                   <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Premium Sidebar Display Ad</p>
                 </div>
                 <div className="flex justify-center">

@@ -36,6 +36,8 @@ export interface UserProfile {
   withdrawableBalance: number;
   depositBalance?: number;
   taskEarnings?: number;
+  totalSurveyEarnings?: number;
+  totalOfferwallEarnings?: number;
   referralEarnings?: number;
   bonusEarnings?: number;
   totalEarnings?: number;
