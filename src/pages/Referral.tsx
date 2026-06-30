@@ -38,10 +38,19 @@ export default function Referral() {
       try {
         setLoadingReferrals(true);
 
+        const variants = Array.from(new Set([
+          profile.referralCode,
+          profile.referralCode.toLowerCase(),
+          profile.referralCode.toUpperCase(),
+          profile.username,
+          profile.username?.toLowerCase(),
+          profile.username?.toUpperCase()
+        ].filter(Boolean) as string[]));
+
         // 1. Fetch total count of referred users for self-healing
         const totalReferralsQuery = query(
           collection(db, 'users'),
-          where('referredBy', '==', profile.referralCode)
+          where('referredBy', 'in', variants)
         );
         const countSnap = await getCountFromServer(totalReferralsQuery);
         const actualCount = countSnap.data().count;
@@ -62,7 +71,7 @@ export default function Referral() {
         // 2. Fetch recent referrals to display in "My Team"
         const referralsQuery = query(
           collection(db, 'users'),
-          where('referredBy', '==', profile.referralCode),
+          where('referredBy', 'in', variants),
           limit(50)
         );
         
@@ -313,8 +322,8 @@ export default function Referral() {
                 <Gift size={24} />
               </div>
               <div>
-                <h4 className="font-black text-green-900 text-sm">20% Upgrade Commission</h4>
-                <p className="text-xs text-green-700 font-medium">Earn 20% instantly when your friend successfully activates a plan.</p>
+                <h4 className="font-black text-green-900 text-sm">30% Upgrade Commission</h4>
+                <p className="text-xs text-green-700 font-medium">Earn 30% instantly when your friend successfully activates a plan.</p>
               </div>
             </div>
           </div>

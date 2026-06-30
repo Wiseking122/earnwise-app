@@ -113,7 +113,8 @@ service cloud.firestore {
         isAdmin() ||
         (request.auth.uid == userId && (
           !incoming().diff(existing()).affectedKeys().hasAny(['role'])
-        ))
+        )) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'referralBalance', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt']))
       );
     }
 

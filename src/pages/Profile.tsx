@@ -687,7 +687,7 @@ export default function Profile() {
                         topicId: 'earn_higher',
                         headline: "The Compound Earning Framework",
                         quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
-                        tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 20% cash bonus on all their plan activation reserves!"
+                        tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 30% cash bonus on all their plan activation reserves!"
                       },
                       { 
                         stepIndex: 1, 

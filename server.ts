@@ -303,9 +303,9 @@ async function startServer() {
         const referrerDoc = await findReferrerDoc(userData.referredBy);
         
         if (referrerDoc) {
-          // Calculate 20% of plan cost
+          // Calculate 30% of plan cost
           const planCost = PLAN_COSTS[planId] || 0;
-          const bonusAmount = Math.floor(planCost * 0.2);
+          const bonusAmount = Math.floor(planCost * 0.3);
           
           if (bonusAmount <= 0) return; // No bonus for free or zero cost plans
 
@@ -329,14 +329,14 @@ async function startServer() {
             transaction.set(notifRef, {
               userId: referrerDoc.id,
               title: '🎁 Referral Upgrade Commission!',
-              message: `Your friend upgraded to ${planId}! You have received a 20% commission of ₦${bonusAmount}.`,
+              message: `Your friend upgraded to ${planId}! You have received a 30% commission of ₦${bonusAmount}.`,
               type: 'reward',
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               readBy: []
             });
           });
           
-          console.log(`[REFERRAL] Awarded ₦${bonusAmount} (20% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
+          console.log(`[REFERRAL] Awarded ₦${bonusAmount} (30% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
         }
       }
     } catch (err) {
@@ -503,7 +503,7 @@ async function startServer() {
       });
 
       bot.command('refer', (ctx) => {
-        ctx.reply("👥 *Refer & Earn 20% Commission*\n\nInvite your friends and earn:\n1. 20% Upgrade Commission when they activate any plan\n\nGet your unique link in the app!", {
+        ctx.reply("👥 *Refer & Earn 30% Commission*\n\nInvite your friends and earn:\n1. 30% Upgrade Commission when they activate any plan\n\nGet your unique link in the app!", {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
@@ -1336,7 +1336,7 @@ async function startServer() {
       return `To complete a task on Earnwise and credit your balance:\n1. Choose an active task from your Task list.\n2. Click 'Start Task' to open the social media target link (follow, like, or comment as requested).\n3. Take a screenshot or grab your profile handle to serve as completion proof.\n4. Upload or enter this proof in the Task Detail page and click 'Submit Proof'.\nOur automated 'Wise AI' engine will review your submission and automatically credit your wallet upon instant verification. Keep your streak alive to gain daily multipliers!`;
     }
     if (p.includes('refer') || p.includes('recruit') || p.includes('invite') || p.includes('commission') || p.includes('affiliate')) {
-      return `Earnwise offers a highly lucrative, unlimited 20% referral commission structure. Share your unique referral link from your Profile tab with friends and digital earners. Every time your direct referrals purchase plans or activate tiers, you instantly receive a 20% commission credited directly to your withdrawable wallet balance!`;
+      return `Earnwise offers a highly lucrative, unlimited 30% referral commission structure. Share your unique referral link from your Profile tab with friends and digital earners. Every time your direct referrals purchase plans or activate tiers, you instantly receive a 30% commission credited directly to your withdrawable wallet balance!`;
     }
     if (p.includes('vault') || p.includes('stake') || p.includes('growth')) {
       return `Our premium 'Vault' feature allows you to stake or lock a portion of your digital balance for fixed-term growth bonuses of up to 40% per annum. Select a fixed term, deposit the minimum requirement, and watch your capital compound passively with guaranteed safety. Interest and capital are automatically returned to your withdrawable wallet at the conclusion of the term.`;
@@ -1347,7 +1347,7 @@ async function startServer() {
     if (p.includes('who is the owner') || p.includes('ceo') || p.includes('founder') || p.includes('sterling')) {
       return `The official founder, owner, and CEO of EarnWise is Johnathan Sterling. Under his core guidance, EarnWise has grown to become Nigeria's #1 digital task-based rewards platform of choice.`;
     }
-    return `Welcome! I am Wise AI, your digital earning coach at Earnwise. You can earn daily cash rewards in Nigerian Naira by completing simple social media tasks, interacting with high-yielding sponsored ads, completing courses in the Academy, entering the daily Lucky Spin, and leveraging our 20% team referral commissions. Tell me, how can I help you maximize your income streams today?`;
+    return `Welcome! I am Wise AI, your digital earning coach at Earnwise. You can earn daily cash rewards in Nigerian Naira by completing simple social media tasks, interacting with high-yielding sponsored ads, completing courses in the Academy, entering the daily Lucky Spin, and leveraging our 30% team referral commissions. Tell me, how can I help you maximize your income streams today?`;
   };
 
   /**
@@ -2599,6 +2599,86 @@ Please verify if the submission is a plausible and honest completion of a social
       console.error("[PAYMENT] Verification Error:", paystackError);
       res.status(500).json({ status: "failed", message: `Verification failed: ${paystackError}` });
     }
+  });
+
+  // Anti-fraud registration constraints
+  app.post("/api/auth/register-check", async (req, res) => {
+    const { deviceFingerprint, telegramId } = req.body;
+
+    try {
+      if (telegramId) {
+        const tgSnap = await dbAdmin.collection('users')
+          .where('telegramId', '==', String(telegramId))
+          .limit(1)
+          .get();
+        if (!tgSnap.empty) {
+          return res.status(400).json({
+            error: "This Telegram account is already linked to an existing Earnwise profile."
+          });
+        }
+      }
+
+      if (deviceFingerprint) {
+        const fpSnap = await dbAdmin.collection('users')
+          .where('deviceFingerprint', '==', String(deviceFingerprint))
+          .limit(1)
+          .get();
+        if (!fpSnap.empty) {
+          return res.status(400).json({
+            error: "Registration limit reached. Only one Earnwise account can be registered per device."
+          });
+        }
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("[AUTH_CHECK] Error in registration validation:", err);
+      return res.status(500).json({ error: "Internal validation error. Please try again." });
+    }
+  });
+
+  app.post("/api/auth/register", async (req, res) => {
+    const { deviceFingerprint, telegramId } = req.body;
+
+    try {
+      if (telegramId) {
+        const tgSnap = await dbAdmin.collection('users')
+          .where('telegramId', '==', String(telegramId))
+          .limit(1)
+          .get();
+        if (!tgSnap.empty) {
+          return res.status(400).json({
+            error: "This Telegram account is already linked to an existing Earnwise profile."
+          });
+        }
+      }
+
+      if (deviceFingerprint) {
+        const fpSnap = await dbAdmin.collection('users')
+          .where('deviceFingerprint', '==', String(deviceFingerprint))
+          .limit(1)
+          .get();
+        if (!fpSnap.empty) {
+          return res.status(400).json({
+            error: "Registration limit reached. Only one Earnwise account can be registered per device."
+          });
+        }
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("[AUTH_REGISTER] Error in registration logic:", err);
+      return res.status(500).json({ error: "Internal validation error. Please try again." });
+    }
+  });
+
+  // Login endpoint - completely unrestricted by device tracking
+  app.post("/api/auth/login", async (req, res) => {
+    // Unrestricted by device tracking or fingerprint checks as requested
+    return res.status(200).json({ 
+      success: true, 
+      message: "Login tracking bypass initialized. Device fingerprint unrestricted." 
+    });
   });
 
   // Send Welcome Email

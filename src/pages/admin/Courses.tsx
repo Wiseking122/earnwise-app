@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { COURSES } from '../../data/courses';
@@ -30,6 +30,64 @@ export default function AdminCourses() {
   const [isDragging, setIsDragging] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [imageOverrides, setImageOverrides] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState<'courses' | 'purchases'>('courses');
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(true);
+  const [userCache, setUserCache] = useState<Record<string, any>>({});
+
+  // Listen to Course purchases in real-time
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'coursePurchases'));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => {
+        const timeA = a.purchasedAt?.toMillis?.() || a.purchasedAt?.seconds * 1000 || 0;
+        const timeB = b.purchasedAt?.toMillis?.() || b.purchasedAt?.seconds * 1000 || 0;
+        return timeB - timeA;
+      });
+      setPurchases(list);
+      setPurchasesLoading(false);
+    }, (err) => {
+      console.error("Failed to fetch course purchases:", err);
+      setPurchasesLoading(false);
+    });
+    return unsub;
+  }, [user]);
+
+  // Dynamically resolve missing user profiles
+  useEffect(() => {
+    if (purchases.length === 0) return;
+
+    const fetchMissingUsers = async () => {
+      const uidsToFetch = Array.from(new Set(
+        purchases.map(p => p.userId).filter(uid => uid && !userCache[uid])
+      ));
+
+      if (uidsToFetch.length === 0) return;
+
+      const fetchedData: Record<string, any> = {};
+      await Promise.all(uidsToFetch.map(async (uid) => {
+        try {
+          const uDoc = await getDoc(doc(db, 'users', uid));
+          if (uDoc.exists()) {
+            fetchedData[uid] = uDoc.data();
+          } else {
+            fetchedData[uid] = { displayName: 'Unknown User', email: 'N/A' };
+          }
+        } catch (e) {
+          fetchedData[uid] = { displayName: 'Unknown User', email: 'N/A' };
+        }
+      }));
+
+      setUserCache(prev => ({
+        ...prev,
+        ...fetchedData
+      }));
+    };
+
+    fetchMissingUsers();
+  }, [purchases]);
 
   // Listen to Firestore overrides in real-time
   useEffect(() => {
@@ -218,64 +276,166 @@ export default function AdminCourses() {
           )}
         </AnimatePresence>
 
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text"
-            placeholder="Search academy courses..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
-          />
+        {/* Navigation Tabs */}
+        <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
+          <button 
+            onClick={() => setActiveTab('courses')}
+            className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+              activeTab === 'courses' 
+                ? 'bg-white text-slate-950 shadow-xs border border-slate-200/50' 
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Manage Courses
+          </button>
+          <button 
+            onClick={() => setActiveTab('purchases')}
+            className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+              activeTab === 'purchases' 
+                ? 'bg-white text-slate-950 shadow-xs border border-slate-200/50' 
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Course Purchases ({purchases.length})
+          </button>
         </div>
 
-        {/* Courses Matrix */}
-        <div className="grid grid-cols-1 gap-4">
-          {filteredCourses.map((course) => {
-            const hasOverride = !!imageOverrides[course.id];
-            const currentImg = imageOverrides[course.id] || course.image;
+        {activeTab === 'courses' && (
+          <>
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input 
+                type="text"
+                placeholder="Search academy courses..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
+              />
+            </div>
 
-            return (
-              <div 
-                key={course.id}
-                className="bg-white border border-slate-100 rounded-3xl p-4 flex gap-4 items-center shadow-xs hover:shadow-md transition-all"
-              >
-                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
-                  <img src={currentImg} alt={course.title} className="w-full h-full object-cover" />
-                </div>
+            {/* Courses Matrix */}
+            <div className="grid grid-cols-1 gap-4">
+              {filteredCourses.map((course) => {
+                const hasOverride = !!imageOverrides[course.id];
+                const currentImg = imageOverrides[course.id] || course.image;
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      {course.category}
-                    </span>
-                    {hasOverride && (
-                      <span className="bg-emerald-50 text-emerald-700 font-bold text-[7px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-emerald-100">
-                        Custom Cover Active
-                      </span>
-                    )}
+                return (
+                  <div 
+                    key={course.id}
+                    className="bg-white border border-slate-100 rounded-3xl p-4 flex gap-4 items-center shadow-xs hover:shadow-md transition-all"
+                  >
+                    <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                      <img src={currentImg} alt={course.title} className="w-full h-full object-cover" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          {course.category}
+                        </span>
+                        {hasOverride && (
+                          <span className="bg-emerald-50 text-emerald-700 font-bold text-[7px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-emerald-100">
+                            Custom Cover Active
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-black text-slate-800 text-sm truncate">{course.title}</h4>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">{course.incomePotential}</p>
+                      
+                      {hasOverride && (
+                        <p className="text-[9px] font-mono text-blue-500 truncate mt-1">
+                          {imageOverrides[course.id]}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handleSelectCourse(course.id)}
+                      className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition-colors border border-slate-100"
+                    >
+                      <Edit2 size={16} />
+                    </button>
                   </div>
-                  <h4 className="font-black text-slate-800 text-sm truncate">{course.title}</h4>
-                  <p className="text-[10px] text-slate-400 truncate mt-0.5">{course.incomePotential}</p>
-                  
-                  {hasOverride && (
-                    <p className="text-[9px] font-mono text-blue-500 truncate mt-1">
-                      {imageOverrides[course.id]}
-                    </p>
-                  )}
-                </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
-                <button
-                  onClick={() => handleSelectCourse(course.id)}
-                  className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition-colors border border-slate-100"
-                >
-                  <Edit2 size={16} />
-                </button>
+        {activeTab === 'purchases' && (
+          <div className="space-y-4">
+            <h4 className="font-black text-slate-900 text-base uppercase italic">Course Purchase Log</h4>
+            {purchasesLoading ? (
+              <div className="p-8 text-center text-slate-400 font-bold">Loading purchase records...</div>
+            ) : purchases.length === 0 ? (
+              <div className="p-8 bg-white border border-slate-100 rounded-3xl text-center text-slate-400 font-bold">
+                No course purchases logged yet.
               </div>
-            );
-          })}
-        </div>
+            ) : (
+              <div className="space-y-3">
+                {purchases.map((purchase) => {
+                  const course = COURSES.find(c => c.id === purchase.courseId);
+                  const userProfile = userCache[purchase.userId];
+                  const formattedDate = purchase.purchasedAt 
+                    ? new Date(purchase.purchasedAt?.toMillis?.() || purchase.purchasedAt?.seconds * 1000 || purchase.purchasedAt).toLocaleString() 
+                    : 'N/A';
+                  
+                  return (
+                    <div 
+                      key={purchase.id || purchase.purchaseId}
+                      className="bg-white border border-slate-100 rounded-3xl p-5 shadow-xs space-y-3"
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Course:</span>
+                          <h4 className="font-black text-slate-900 text-sm leading-snug">
+                            {course ? course.title : `Unknown Course (${purchase.courseId})`}
+                          </h4>
+                          {course && (
+                            <p className="text-[10px] text-indigo-600 font-bold mt-0.5">{course.incomePotential}</p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="bg-emerald-50 text-emerald-700 font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-100">
+                            {purchase.isFree ? 'Unlocked via Credit' : `₦${(purchase.amount || 7000).toLocaleString()}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-50 flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                        <div>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block">Purchased By:</span>
+                          <span className="font-bold text-slate-800">
+                            {userProfile?.displayName || userProfile?.username || 'Fetching info...'}
+                          </span>
+                          <span className="text-slate-400 font-medium block text-[10px]">
+                            {userProfile?.email || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block">UID & Code:</span>
+                          <span className="font-mono text-[10px] text-slate-600 block">
+                            UID: {purchase.userId?.slice(0, 10)}...
+                          </span>
+                          {userProfile?.referralCode && (
+                            <span className="font-mono text-[10px] text-blue-600 block">
+                              Ref Code: {userProfile.referralCode}
+                            </span>
+                          )}
+                        </div>
+                        <div className="ml-auto text-right">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block">Enrolled On:</span>
+                          <span className="text-[11px] font-medium text-slate-500">{formattedDate}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Course Editing Modal / Overlay Form */}
         <AnimatePresence>

@@ -84,15 +84,28 @@ export const CpxOfferwall: React.FC<CpxOfferwallProps> = ({ userId, userName, us
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Synchronizing Earning Tunnels...</p>
               </div>
             ) : signedUrl ? (
-              <div className="mt-8 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-800 bg-white shadow-inner">
-                <iframe 
-                  width="100%" 
-                  frameBorder="0" 
-                  height="2000px"  
-                  src={signedUrl}
-                  title="CPX Research Surveys"
-                  className="w-full rounded-2xl sm:rounded-3xl"
-                />
+              <div className="space-y-4">
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-left space-y-2 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl" />
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <Info size={14} className="shrink-0" />
+                    <span>Survey Instruction & Reward Policy</span>
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed font-medium">
+                    You MUST stay on the page and completely finish the survey until the final thank-you/success screen. Do not close the window, click back, or navigate away early, otherwise the partner network will not report your completion, and you will receive <span className="text-amber-400 font-bold">₦0 rewards</span>. Double check your answers for honesty to qualify for continuous high-paying payouts.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-800 bg-white shadow-inner">
+                  <iframe 
+                    width="100%" 
+                    frameBorder="0" 
+                    height="2000px"  
+                    src={signedUrl}
+                    title="CPX Research Surveys"
+                    className="w-full rounded-2xl sm:rounded-3xl"
+                  />
+                </div>
               </div>
             ) : (
               <div className="py-12">

@@ -46,6 +46,7 @@ export default function AdminTasks() {
   
   // New Task Form
   const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [newType, setNewType] = useState<TaskType>('ad');
   const [newTotalBudget, setNewTotalBudget] = useState('');
   const [newCpa, setNewCpa] = useState('');
@@ -145,6 +146,7 @@ export default function AdminTasks() {
 
       const taskRef = await addDoc(collection(db, 'tasks'), {
         title: newTitle,
+        description: newDescription || null,
         advertiserId: newAdvertiserId,
         totalBudget: budget,
         remainingBudget: budget,
@@ -178,6 +180,7 @@ export default function AdminTasks() {
 
       setIsAdding(false);
       setNewTitle('');
+      setNewDescription('');
       setNewTotalBudget('');
       setNewCpa('');
       setNewTag('');
@@ -443,6 +446,11 @@ export default function AdminTasks() {
                   className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
                   value={newTitle} onChange={e => setNewTitle(e.target.value)}
                 />
+                <textarea 
+                  placeholder="Task Instructions / Description (Explain what users must do, e.g., Watch for 2 minutes, like, subscribe, and upload proof.)"
+                  className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-medium h-24 resize-none"
+                  value={newDescription} onChange={e => setNewDescription(e.target.value)}
+                />
                 
                 <div className="grid grid-cols-2 gap-4">
                    <select 
@@ -547,6 +555,11 @@ export default function AdminTasks() {
                   <div key={task.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
                       <h4 className="font-bold text-gray-900">{task.title}</h4>
+                      {task.description && (
+                        <p className="text-xs text-slate-500 max-w-lg mt-1 italic leading-relaxed">
+                          Instructions: {task.description}
+                        </p>
+                      )}
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
                         Creator: {task.advertiserId === 'internal_platform' || !task.advertiserId ? '🛡️ Admin' : `👤 User Advertiser (${task.advertiserId.slice(0, 8)})`}
                       </p>

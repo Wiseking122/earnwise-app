@@ -154,7 +154,7 @@ export default function AdvertiserPortal() {
   const isBalanceLow = (profile?.withdrawableBalance || 0) < totalAmount && !isAdmin;
 
   const handleCreateClick = () => {
-    if (profile?.plan === 'free') {
+    if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -164,7 +164,7 @@ export default function AdvertiserPortal() {
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (profile?.plan === 'free') {
+    if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -277,7 +277,7 @@ export default function AdvertiserPortal() {
   };
 
   const handleDeleteCampaign = async (task: Task) => {
-    if (profile?.plan === 'free') {
+    if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }

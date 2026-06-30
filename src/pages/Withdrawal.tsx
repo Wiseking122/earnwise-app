@@ -30,7 +30,7 @@ import DepositTab from '../components/DepositTab';
 import WithdrawalTimeline from '../components/WithdrawalTimeline';
 
 export default function Withdrawal() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'withdraw' | 'deposit'>('withdraw');
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -309,7 +309,7 @@ export default function Withdrawal() {
 
     // Check Plan Cap Limit for Window
     const plan = profile.plan || 'free';
-    const isAdmin = profile.role === 'admin';
+    const isAdmin = profile.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
     const cap = isAdmin ? 1000000000 : getPlanWithdrawalCap(plan);
     
     if (!isAdmin && (plan === 'free' || cap === 0)) {
@@ -406,7 +406,7 @@ export default function Withdrawal() {
     }
   };
 
-  const isAdminUser = profile?.role === 'admin';
+  const isAdminUser = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
   const planCap = isAdminUser ? 1000000000 : getPlanWithdrawalCap(profile?.plan || 'free');
   const currentWindowRequestsTotal = getCumulativeWithdrawalsInWindow();
 

@@ -164,7 +164,8 @@ export default function Academy() {
         <div className="grid grid-cols-1 gap-3">
           <AnimatePresence mode="popLayout">
             {filteredCourses.map((course, index) => {
-              const isOwned = purchasedCourses.includes(course.id) || profile?.role === 'admin';
+              const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
+              const isOwned = purchasedCourses.includes(course.id) || isAdmin;
               return (
                 <motion.div
                   layout
@@ -185,7 +186,7 @@ export default function Academy() {
                           ? 'bg-emerald-500/20 text-emerald-100 border-emerald-500/30' 
                           : 'bg-white/20 text-white border-white/30'
                       }`}>
-                        {profile?.role === 'admin' ? 'Admin Access' : (isOwned ? 'Enrolled' : course.category)}
+                        {isAdmin ? 'Admin Access' : (isOwned ? 'Enrolled' : course.category)}
                       </div>
                     </div>
                     <div className="absolute bottom-3 left-3 right-3">

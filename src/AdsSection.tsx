@@ -237,6 +237,7 @@ interface AdTask {
   link?: string;
   mediaUrl?: string;
   isCustom?: boolean;
+  instructions?: string;
 }
 
 interface AdsSectionProps {
@@ -346,7 +347,8 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     icon: ad.type === 'video' ? Video : ImageIcon,
     link: ad.url || '#',
     mediaUrl: ad.mediaUrl || '',
-    isCustom: true
+    isCustom: true,
+    instructions: ad.instructions || ''
   }));
 
   const monetagTasks: AdTask[] = MONETAG_LINKS.map((link, idx) => ({
@@ -495,6 +497,12 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                 <p className="text-slate-400 text-xs">
                   Please stay on the opened partner page for 30 seconds to authenticate your visit & claim reward.
                 </p>
+                {activeTimerTask.instructions && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-left text-xs text-amber-200 mt-4 max-h-24 overflow-y-auto">
+                    <p className="font-black text-amber-400 uppercase tracking-wider text-[9px] mb-1">Ad Instructions:</p>
+                    <p className="font-medium leading-relaxed">{activeTimerTask.instructions}</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col items-center justify-center py-6 w-full space-y-4">

@@ -40,6 +40,8 @@ export default function Vault() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [showRestriction, setShowRestriction] = useState(false);
 
+  const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
+
   useEffect(() => {
     if (!user) return;
 
@@ -68,7 +70,7 @@ export default function Vault() {
 
   const handleStake = async () => {
     if (!profile || !user) return;
-    if (profile.plan === 'free') {
+    if (profile.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -136,7 +138,7 @@ export default function Vault() {
 
   const handleClaim = async (entry: VaultEntry) => {
     if (!profile || !user) return;
-    if (profile.plan === 'free') {
+    if (profile.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }

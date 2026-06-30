@@ -56,14 +56,15 @@ export default function CoursePlayer() {
 
   const maxFreeCredits = profile?.plan === 'golden' ? 5 : (profile?.plan === 'platinum' ? 2 : 0);
   const freeCreditsLeft = maxFreeCredits - (profile?.freeCoursesUsed || 0);
-  const hasFreeCredit = freeCreditsLeft > 0 || profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
+  const hasFreeCredit = freeCreditsLeft > 0 || isAdmin;
 
   useEffect(() => {
     if (!user || !id) return;
 
     const checkOwnership = async () => {
       try {
-        if (profile?.role === 'admin') {
+        if (isAdmin) {
           setIsOwned(true);
           setLoading(false);
           return;
@@ -110,7 +111,7 @@ export default function CoursePlayer() {
 
   const handlePurchase = async () => {
     if (!profile) return;
-    if (profile.plan === 'free') {
+    if (profile.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -171,7 +172,7 @@ export default function CoursePlayer() {
   };
 
   const handleDownload = () => {
-    if (profile?.plan === 'free') {
+    if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -251,7 +252,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
   };
 
   const askTutor = async () => {
-    if (profile?.plan === 'free') {
+    if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -443,7 +444,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
                  <h3 className="text-3xl font-display font-black text-white italic uppercase tracking-tight">Strategy Locked</h3>
                  <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-sm mx-auto">
                    {hasFreeCredit 
-                     ? (profile?.role === 'admin' ? "Admin protocol active. Full strategy credentials decrypted." : `Credential allocation active. You have ${freeCreditsLeft} free strategy unlocks remaining in your tier.`)
+                     ? (isAdmin ? "Admin protocol active. Full strategy credentials decrypted." : `Credential allocation active. You have ${freeCreditsLeft} free strategy unlocks remaining in your tier.`)
                      : "This high-yield elite strategy requires a standard digital allocation to decrypt and download."}
                  </p>
                </div>

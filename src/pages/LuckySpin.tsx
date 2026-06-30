@@ -12,7 +12,10 @@ import {
   Coins,
   History,
   Timer,
-  Gift
+  Gift,
+  CheckCircle2,
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
@@ -44,7 +47,6 @@ const WHEEL_RESULTS: SpinResult[] = [
 export default function LuckySpin() {
   const { user, profile } = useAuth();
   const [spinning, setSpinning] = useState(false);
-  const [mustWatchAd, setMustWatchAd] = useState(true);
   const [adLoading, setAdLoading] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<SpinResult | null>(null);
@@ -54,10 +56,32 @@ export default function LuckySpin() {
   const [activeTab, setActiveTab] = useState<'my' | 'global'>('global');
   const [showRestriction, setShowRestriction] = useState(false);
 
-  const planDetails = PLANS.find(p => p.id === (profile?.plan || 'free'));
+  // Verification timer states (resilient to browser throttling in background tabs)
+  const [verificationTimeLeft, setVerificationTimeLeft] = useState(15);
+  const [startTime, setStartTime] = useState<number | null>(null);
+
+  const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
+  const planDetails = PLANS.find(p => p.id === (isAdmin ? 'golden' : (profile?.plan || 'free')));
   const multiplier = planDetails?.multiplier || 1.0;
 
   const userHasSpunToday = () => {
+    if (history.length === 0) return false;
+    const todayStr = new Date().toISOString().split('T')[0];
+    return history.some((item: any) => {
+      const date = item.submittedAt?.toMillis 
+        ? new Date(item.submittedAt.toMillis()).toISOString().split('T')[0]
+        : item.submittedAt?.seconds
+          ? new Date(item.submittedAt.seconds * 1000).toISOString().split('T')[0]
+          : item.submittedAt 
+            ? new Date(item.submittedAt).toISOString().split('T')[0]
+            : '';
+      return date === todayStr;
+    });
+  };
+
+  const hasSpunToday = userHasSpunToday();
+
+  const hasWatchedAdToday = () => {
     if (!profile?.completedAds) return false;
     const today = new Date().toISOString().split('T')[0];
     return profile.completedAds.some((ad: any) => 
@@ -65,12 +89,29 @@ export default function LuckySpin() {
     );
   };
 
-  const hasSpunToday = userHasSpunToday();
+  const mustWatchAd = !hasSpunToday && !hasWatchedAdToday();
 
   useEffect(() => {
     fetchHistory();
     fetchGlobalHistory();
   }, [user]);
+
+  // Handle active verification timer (checking against real-world timestamp)
+  useEffect(() => {
+    if (!adLoading || !startTime) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, 15 - elapsed);
+      setVerificationTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [adLoading, startTime]);
 
   const fetchHistory = async () => {
     if (!user) return;
@@ -119,15 +160,17 @@ export default function LuckySpin() {
 
   const handleWatchAd = () => {
     if (!profile) return;
-    if (profile.plan === 'free') {
+    if (profile.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
     if (adLoading) return;
     
     // Open required ad link
-    window.open('https://omg10.com/4/11110033', '_blank');
+    window.open('https://sturgeonvelocity.com/gmwga3b9?key=2031dcef33edfdd4a6b69f69af6183ab', '_blank', 'noopener,noreferrer');
 
+    setVerificationTimeLeft(15);
+    setStartTime(Date.now());
     setAdLoading(true);
   };
 
@@ -141,17 +184,18 @@ export default function LuckySpin() {
           reward: 0
         })
       });
-      setMustWatchAd(false);
       setAdLoading(false);
+      setStartTime(null);
     } catch (err) {
       console.error("Error recording ad completion:", err);
       setAdLoading(false);
+      setStartTime(null);
     }
   };
 
   const spin = async () => {
     if (!user || spinning || mustWatchAd) return;
-    if (profile?.plan === 'free') {
+    if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }
@@ -181,7 +225,6 @@ export default function LuckySpin() {
       
       setResult({ ...actualResult, value: finalReward / multiplier }); // Store adjusted value for display if needed
       setSpinning(false);
-      setMustWatchAd(true); // Reset ad wall for next spin
 
       try {
         await updateDoc(doc(db, 'users', user.uid), {
@@ -270,15 +313,112 @@ export default function LuckySpin() {
           <div className="mt-12 w-full space-y-4">
             <AnimatePresence mode="wait">
               {adLoading && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                  <div className="max-w-sm w-full">
-                    <VideoAd 
-                      onAdEnded={handleAdFinished} 
-                      onAdStarted={() => {}} 
-                      rewardAmount={0} 
-                    />
-                  </div>
-                </div>
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex items-center justify-center p-6"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.95, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.95, y: 20 }}
+                    className="bg-slate-900 border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 text-center space-y-6 relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+                    
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
+                        Sponsor Ad Verification
+                      </span>
+                      <h3 className="font-display font-black text-xl text-white uppercase italic tracking-tight mt-3">
+                        Verifying Sponsor Visit
+                      </h3>
+                      <p className="text-slate-400 text-xs">
+                        Please stay on the opened partner page for 15 seconds to authenticate your visit & claim reward.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center py-6 w-full space-y-4">
+                      <div className="relative w-36 h-36 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                          <circle 
+                            cx="50" 
+                            cy="50" 
+                            r="42" 
+                            className="stroke-white/5 fill-none" 
+                            strokeWidth="6" 
+                          />
+                          <motion.circle 
+                            cx="50" 
+                            cy="50" 
+                            r="42" 
+                            className="stroke-blue-500 fill-none" 
+                            strokeWidth="6" 
+                            strokeDasharray="263"
+                            animate={{ strokeDashoffset: (1 - verificationTimeLeft / 15) * 263 }}
+                            transition={{ duration: 0.3 }}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1">
+                          {verificationTimeLeft > 0 ? (
+                            <>
+                              <span className="font-mono text-4xl font-black text-white tracking-widest">
+                                {verificationTimeLeft}s
+                              </span>
+                              <span className="text-[9px] font-black uppercase text-blue-400 tracking-wider">
+                                WAITING
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 size={36} className="text-emerald-400 animate-bounce" />
+                              <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">
+                                COMPLETE
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {verificationTimeLeft > 0 ? (
+                        <div className="space-y-3">
+                          <button
+                            onClick={() => {
+                              window.open('https://sturgeonvelocity.com/gmwga3b9?key=2031dcef33edfdd4a6b69f69af6183ab', '_blank', 'noopener,noreferrer');
+                            }}
+                            className="w-full py-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl font-black text-xs uppercase tracking-wider transition-all text-center border border-white/10 flex items-center justify-center gap-2"
+                          >
+                            <ExternalLink size={14} />
+                            Ad closed? Click to open again
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              if (window.confirm("Cancelling now will forfeit your spin. Are you sure?")) {
+                                setAdLoading(false);
+                                setStartTime(null);
+                              }
+                            }}
+                            className="w-full py-3 text-slate-500 hover:text-slate-400 font-bold text-xs uppercase tracking-wider transition-all text-center"
+                          >
+                            Cancel visit
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleAdFinished}
+                          className="w-full py-5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 active:scale-95 transition-all text-center"
+                        >
+                          Verify Visit & Spin!
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                </motion.div>
               )}
 
               {hasSpunToday ? (
@@ -325,7 +465,7 @@ export default function LuckySpin() {
                     >
                       {adLoading ? (
                         <div className="flex items-center gap-3">
-                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                           <Loader2 className="w-4 h-4 animate-spin text-white" />
                            <span>Loading Ad Experience...</span>
                         </div>
                       ) : (

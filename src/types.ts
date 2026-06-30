@@ -43,6 +43,7 @@ export interface UserProfile {
   taskBalance: number;
   referralBalance: number;
   telegramId?: string | null;
+  deviceFingerprint?: string | null;
   wiseCoins: number;
   rank: RankType;
   vaultBalance?: number;

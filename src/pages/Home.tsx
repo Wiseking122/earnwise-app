@@ -134,7 +134,9 @@ export default function Home() {
   const currentXp = profile?.xp || 0;
   const progress = Math.min((currentXp / nextLevelXp) * 100, 100);
 
-  const multiplier = PLANS.find(p => p.id === (profile?.plan || 'free'))?.multiplier || 1.0;
+  const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
+  const userPlan = isAdmin ? 'golden' : (profile?.plan || 'free');
+  const multiplier = PLANS.find(p => p.id === userPlan)?.multiplier || 1.0;
 
   useEffect(() => {
     async function fetchData() {
@@ -228,7 +230,7 @@ export default function Home() {
         insights: [
           { title: "High-Yield Survey", description: "Complete the ₦850 Premium Market Research survey available in your tasks tab.", type: "quick_win" },
           { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete 1 more task today to maintain your 1.5x earnings multiplier!`, type: "strategy" },
-          { title: "VIP Multiplier Tip", description: profile?.plan === 'free' ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant ₦2,500 bonus per verified invite.", type: "upgrade" }
+          { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant ₦2,500 bonus per verified invite.", type: "upgrade" }
         ]
       });
     } finally {
@@ -364,20 +366,26 @@ export default function Home() {
 
           {/* Plan Status Banner */}
           <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6">
-            {profile?.plan !== 'free' ? (
+            {profile?.plan !== 'free' || isAdmin ? (
               <div className="bg-linear-to-r from-amber-400 to-orange-500 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between shadow-md border border-orange-400/20">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center border border-white/20">
                     <Crown size={20} className="fill-white" />
                   </div>
                   <div>
-                    <h4 className="font-display font-black text-sm sm:text-base leading-tight uppercase tracking-tighter">{profile?.plan} Plan Active</h4>
-                    <p className="text-white/80 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest">Multiplier: {multiplier}x Reward Boost</p>
+                    <h4 className="font-display font-black text-sm sm:text-base leading-tight uppercase tracking-tighter">
+                      {isAdmin ? 'Admin Elite' : `${profile?.plan} Plan`} Active
+                    </h4>
+                    <p className="text-white/80 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest">
+                      Multiplier: {isAdmin ? '10.0' : multiplier}x Reward Boost {isAdmin && '(Free Admin Access)'}
+                    </p>
                   </div>
                 </div>
-                <Link to="/upgrade" className="bg-white text-orange-600 px-4 py-2 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
-                  Upgrade
-                </Link>
+                {!isAdmin && (
+                  <Link to="/upgrade" className="bg-white text-orange-600 px-4 py-2 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
+                    Upgrade
+                  </Link>
+                )}
               </div>
             ) : (
               <Link to="/upgrade" className="bg-blue-600 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between shadow-md border border-blue-500 group">
@@ -442,7 +450,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Refer & Earn (20% Team Program) Widget */}
+        {/* Refer & Earn (30% Team Program) Widget */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
@@ -463,13 +471,13 @@ export default function Home() {
               <div className="space-y-2 text-center lg:text-left flex-1 min-w-0">
                 <div className="flex items-center justify-center lg:justify-start gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full w-fit mx-auto lg:mx-0">
                   <Gift size={12} className="text-indigo-400" />
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Instant 20% Rewards</span>
+                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Instant 30% Rewards</span>
                 </div>
                 <h4 className="font-display font-black text-base sm:text-lg leading-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-white to-blue-200">
                   Invite Friends & Earn Commission
                 </h4>
                 <p className="text-slate-400 text-[11px] sm:text-xs font-medium max-w-sm leading-relaxed mx-auto lg:mx-0">
-                  Earn 20% commission instantly on all plan upgrades. Grow your team and earn dynamic direct commissions.
+                  Earn 30% commission instantly on all plan upgrades. Grow your team and earn dynamic direct commissions.
                 </p>
                 
                 {/* Micro Stats inside home widget */}

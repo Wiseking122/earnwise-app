@@ -19,13 +19,15 @@ import { db } from '../lib/firebase';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 export default function Achievements() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [claiming, setClaiming] = useState<string | null>(null);
   const [showRestriction, setShowRestriction] = useState(false);
 
+  const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
+
   const handleClaim = async (ach: Achievement) => {
     if (!profile) return;
-    if (profile.plan === 'free') {
+    if (profile.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
     }

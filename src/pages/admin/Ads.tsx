@@ -193,7 +193,7 @@ const renderMediaElement = (mediaUrl: string, title: string, id: string, type: s
 
 export default function AdminAds() {
   const [ads, setAds] = useState<any[]>([]);
-  const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0 });
+  const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '' });
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -337,7 +337,7 @@ export default function AdminAds() {
           console.error("Failed to broadcast new ad notification to users:", notifErr);
         }
 
-        setNewAd({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0 });
+        setNewAd({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '' });
         setFile(null);
         showStatus("Ad created successfully!", 'success');
     } catch (error: any) {
@@ -398,6 +398,7 @@ export default function AdminAds() {
                 )}
             </div>
             <input type="number" placeholder="Reward (Points)" className="p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 transition" value={newAd.reward} onChange={e => setNewAd({...newAd, reward: Number(e.target.value)})} />
+            <textarea placeholder="Ad Instructions (Optional: Tell users what to look for, or special rules to follow before they earn rewards)" className="p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 transition md:col-span-2 h-24 resize-none" value={newAd.instructions} onChange={e => setNewAd({...newAd, instructions: e.target.value})} />
           </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 space-y-1">
@@ -470,6 +471,12 @@ export default function AdminAds() {
                     <span className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-[9px] font-mono text-white px-2 py-0.5 rounded-md uppercase">
                       {ad.type}
                     </span>
+                  </div>
+                )}
+                {ad.instructions && (
+                  <div className="bg-slate-100 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 mt-2">
+                    <span className="font-bold text-[9px] uppercase tracking-wider text-slate-500 block mb-1">Instructions:</span>
+                    <p className="line-clamp-2" title={ad.instructions}>{ad.instructions}</p>
                   </div>
                 )}
               </div>

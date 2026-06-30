@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { PLANS, PlanDetails } from '../constants/plans';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { getApiUrl } from '../lib/config';
-import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit, addDoc } from 'firebase/firestore';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -22,12 +22,14 @@ import {
 import DepositTab from '../components/DepositTab';
 
 export default function Upgrade() {
-  const { profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'plans' | 'deposit'>('plans');
+
+  const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
 
   const paystackPublicKey = (import.meta as any).env.VITE_PAYSTACK_PUBLIC_KEY;
 
@@ -68,6 +70,52 @@ export default function Upgrade() {
             withdrawableBalance: increment(-plan.cost),
             updatedAt: serverTimestamp()
           });
+
+          // Award referral bonus immediately in client-side fallback
+          if (profile.referredBy && !profile.hasReceivedReferralBonus) {
+            const bonusAmount = Math.floor(plan.cost * 0.3);
+            if (bonusAmount > 0) {
+              try {
+                const refVariants = Array.from(new Set([
+                  profile.referredBy,
+                  profile.referredBy.toLowerCase(),
+                  profile.referredBy.toUpperCase()
+                ].filter(Boolean) as string[]));
+                
+                let referrerSnap = await getDocs(query(collection(db, 'users'), where('referralCode', 'in', refVariants), limit(1)));
+                if (referrerSnap.empty) {
+                  referrerSnap = await getDocs(query(collection(db, 'users'), where('username', 'in', refVariants), limit(1)));
+                }
+
+                if (!referrerSnap.empty) {
+                  const referrerDoc = referrerSnap.docs[0];
+                  await updateDoc(referrerDoc.ref, {
+                    balance: increment(bonusAmount),
+                    referralBalance: increment(bonusAmount),
+                    withdrawableBalance: increment(bonusAmount),
+                    referralEarnings: increment(bonusAmount),
+                    updatedAt: serverTimestamp()
+                  });
+
+                  await addDoc(collection(db, 'notifications'), {
+                    userId: referrerDoc.id,
+                    title: '🎁 Referral Upgrade Commission!',
+                    message: `Your friend (${profile.displayName || profile.username || 'Someone'}) upgraded to ${plan.id}! You have received a 30% commission of ₦${bonusAmount}.`,
+                    type: 'reward',
+                    createdAt: serverTimestamp(),
+                    readBy: []
+                  });
+
+                  // Update the local document to prevent duplicate bonuses
+                  await updateDoc(userRef, {
+                    hasReceivedReferralBonus: true
+                  });
+                }
+              } catch (refErr) {
+                console.error("[REFERRAL_FALLBACK] Failed to award referral bonus:", refErr);
+              }
+            }
+          }
 
           // Log the transaction document
           const transactionId = `WALLET_TX_${Date.now()}`;
@@ -259,10 +307,12 @@ export default function Upgrade() {
                 <div className="space-y-1">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Account Ranking</p>
                   <h2 className="text-2xl font-display font-black capitalize italic flex items-center gap-2">
-                    {profile?.plan} Tier
-                    {profile?.plan !== 'free' && <ShieldCheck className="text-blue-500" size={24} />}
+                    {isAdmin ? "Admin Elite" : `${profile?.plan} Tier`}
+                    {(profile?.plan !== 'free' || isAdmin) && <ShieldCheck className="text-blue-500" size={24} />}
                   </h2>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Global Payout Efficiency: {PLANS.find(p => p.id === profile?.plan)?.multiplier || 1.0}x</p>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                    Global Payout Efficiency: {isAdmin ? "10.0" : (PLANS.find(p => p.id === profile?.plan)?.multiplier || 1.0)}x {isAdmin && "(Free Admin Access)"}
+                  </p>
                 </div>
                 
                 <div className="p-3 bg-white/10 border border-white/10 rounded-2xl shrink-0">
@@ -393,17 +443,17 @@ export default function Upgrade() {
 
                   <button
                     onClick={() => handleUpgradeWithBalance(plan)}
-                    disabled={!!loading || profile?.plan === plan.id}
+                    disabled={!!loading || profile?.plan === plan.id || isAdmin}
                     className={`w-full mt-6 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all relative overflow-hidden ${
-                      profile?.plan === plan.id
+                      profile?.plan === plan.id || isAdmin
                         ? 'bg-slate-50 text-slate-400 cursor-default border border-slate-100'
                         : 'bg-slate-950 text-white hover:bg-blue-600 active:scale-[0.98] shadow-lg shadow-slate-900/10'
                     }`}
                   >
                     {loading === plan.id ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : profile?.plan === plan.id ? (
-                      'Current Level'
+                    ) : (profile?.plan === plan.id || isAdmin) ? (
+                      'Unlocked (Admin)'
                     ) : (
                       <>
                         <span>Activate Now</span>

@@ -23,13 +23,13 @@ import { PlanRestrictionModal } from './PlanRestrictionModal';
 
 // Daily Rewards configuration mapping to 7-day cycle
 const DAILY_REWARDS = [
-  { day: 1, amount: 15, xp: 20, description: "Day 1 Bonus" },
-  { day: 2, amount: 18, xp: 25, description: "Day 2 Boost" },
-  { day: 3, amount: 22, xp: 30, description: "Day 3 Boost" },
-  { day: 4, amount: 28, xp: 40, description: "Day 4 Multiplier" },
-  { day: 5, amount: 36, xp: 50, description: "Day 5 Mega Bonus" },
-  { day: 6, amount: 46, xp: 60, description: "Day 6 Ultra Reward" },
-  { day: 7, amount: 75, xp: 120, description: "Day 7 Legendary Chest", isChest: true }
+  { day: 1, amount: 15, xp: 20, description: "Day 1 Bonus", link: "https://sturgeonvelocity.com/a7gbcdbyy?key=80bf12cfa4ca2c7c22e598ee09d258ef" },
+  { day: 2, amount: 18, xp: 25, description: "Day 2 Boost", link: "https://sturgeonvelocity.com/r6jntjqds?key=c7121e9cf3f96b845f5b4a48335dd597" },
+  { day: 3, amount: 22, xp: 30, description: "Day 3 Boost", link: "https://sturgeonvelocity.com/nz179ju7h7?key=2aca4e3ac4bc450e62b1f2a48187f63b" },
+  { day: 4, amount: 28, xp: 40, description: "Day 4 Multiplier", link: "https://sturgeonvelocity.com/bxfwi3acv?key=986aa010f2e136ba08a30e17ce8c5da9" },
+  { day: 5, amount: 36, xp: 50, description: "Day 5 Mega Bonus", link: "https://sturgeonvelocity.com/q46trwhb54?key=6ca2957902753234c562c9b2e2a0fe75" },
+  { day: 6, amount: 46, xp: 60, description: "Day 6 Ultra Reward", link: "https://sturgeonvelocity.com/g5zbtjxs6?key=b81682a90b1562b13c9a6b8876242bae" },
+  { day: 7, amount: 75, xp: 120, description: "Day 7 Legendary Chest", isChest: true, link: "https://sturgeonvelocity.com/zjumjgafze?key=c8dfead0d37ec817bad231d47b2ef669" }
 ];
 
 export const DailyCheckIn: React.FC = () => {
@@ -76,11 +76,16 @@ export const DailyCheckIn: React.FC = () => {
 
   const handleCheckIn = async () => {
     if (!profile) return;
-    if (profile.plan === 'free') {
+    if (profile.plan === 'free' && profile.role !== 'admin') {
       setShowRestriction(true);
       return;
     }
     if (!canCheckIn || loading) return;
+
+    // Open current day's link in a new tab
+    if (currentReward.link) {
+      window.open(currentReward.link, '_blank', 'noopener,noreferrer');
+    }
     
     setLoading(true);
     const rewardAmount = currentReward.amount;
@@ -221,7 +226,14 @@ export const DailyCheckIn: React.FC = () => {
                   <motion.div
                     key={item.day}
                     whileHover={!isLocked ? { scale: 1.02 } : {}}
+                    onClick={() => {
+                      if (!isLocked && item.link) {
+                        window.open(item.link, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
                     className={`relative p-1.5 sm:p-2.5 rounded-xl border transition-all flex flex-col items-center text-center justify-between min-h-[68px] sm:min-h-[86px] ${
+                      !isLocked ? 'cursor-pointer' : ''
+                    } ${
                       isToday 
                         ? 'bg-amber-500/10 border-amber-400 shadow shadow-amber-400/5 ring-1 ring-amber-400' 
                         : isClaimed 
