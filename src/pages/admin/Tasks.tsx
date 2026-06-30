@@ -498,7 +498,7 @@ export default function AdminTasks() {
 
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <input 
-                    type="url" placeholder="Affiliate Link (Optional)" 
+                    type="url" placeholder="Banner Ads Link (Optional)" 
                     className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-medium"
                     value={newLink} onChange={e => setNewLink(e.target.value)}
                   />

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
+import { AdsterraBanner } from '../components/AdsterraBanner';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
 import VideoAdsSection from '../components/VideoAdsSection';
@@ -32,7 +33,7 @@ const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: strin
   { id: 'survey', label: 'Surveys', icon: Search, color: 'bg-orange-500' },
   { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500' },
   { id: 'video', label: 'WATCH VIDEOS', icon: Video, color: 'bg-blue-500', subtext: 'WATCH & EARN' },
-  { id: 'referral', label: 'Affiliate', icon: ShieldCheck, color: 'bg-purple-500' },
+  { id: 'referral', label: 'Banner Ads', icon: ShieldCheck, color: 'bg-purple-500' },
 ];
 
 export default function TaskList() {
@@ -202,6 +203,28 @@ export default function TaskList() {
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
             </div>
           )}
+
+          {activeCategory === 'referral' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-6">
+                <div className="text-center space-y-2">
+                  <h3 className="font-display font-black text-xl text-slate-900 uppercase italic tracking-tight">Sponsor Banner 01</h3>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Premium Native Display Ad</p>
+                </div>
+                <AdsterraBanner type="native" />
+              </div>
+
+              <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-6">
+                <div className="text-center space-y-2">
+                  <h3 className="font-display font-black text-xl text-slate-900 uppercase italic tracking-tight">Sponsor Banner 02</h3>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Premium Sidebar Display Ad</p>
+                </div>
+                <div className="flex justify-center">
+                  <AdsterraBanner type="iframe" />
+                </div>
+              </div>
+            </div>
+          )}
           
           {loading ? (
             [1, 2, 3].map(i => <div key={`skeleton-${i}`} className="h-28 bg-white rounded-2xl animate-pulse border border-slate-100 shadow-sm" />)
@@ -290,7 +313,7 @@ export default function TaskList() {
                 );
               })}
             </motion.div>
-          ) : (activeCategory === 'ad' || activeCategory === 'survey' || activeCategory === 'video') ? null : (
+          ) : (activeCategory === 'ad' || activeCategory === 'survey' || activeCategory === 'video' || activeCategory === 'referral') ? null : (
             <div className="text-center py-24 bg-white border border-slate-100 rounded-[3rem] shadow-sm relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,0,0,0.02),transparent)]" />
               <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-slate-100 shadow-sm relative z-10">

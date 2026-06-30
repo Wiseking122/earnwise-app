@@ -467,7 +467,7 @@ export default function TaskDetail() {
           >
             <div className="flex items-center justify-between">
                <div className="text-left">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1">Affiliate Partner</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1">Banner Ads Partner</p>
                   <h4 className="text-lg font-black leading-tight">Visit & Start Earning</h4>
                </div>
                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
