@@ -176,6 +176,22 @@
         }
       });
 
+      window.addEventListener('error', function(e) {
+        // Suppress browser-masked cross-origin "Script error." from ad scripts
+        const isScriptError = e.message === 'Script error.';
+        const isAdUrl = e.filename && (
+          e.filename.includes('vignette') || 
+          e.filename.includes('n6wxm') || 
+          e.filename.includes('adsterra') || 
+          e.filename.includes('monetag')
+        );
+        if (isScriptError || isAdUrl) {
+          console.warn('Suppressed third-party/ad network script error:', e.message, e.filename);
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           const sw_version_flag = 'sw_force_clean_v6';

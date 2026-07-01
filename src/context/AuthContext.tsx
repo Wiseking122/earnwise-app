@@ -178,8 +178,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
             return;
           }
-        } catch (serverErr) {
-          console.error("Failed to verify profile existence on Firestore server:", serverErr);
+        } catch (serverErr: any) {
+          const errMsg = serverErr?.message || String(serverErr);
+          if (errMsg.toLowerCase().includes('offline') || errMsg.toLowerCase().includes('could not reach') || errMsg.toLowerCase().includes('network')) {
+            console.warn("[AUTH] Firestore client is offline. Guarding user balance and suspending profile initialization until connection is restored:", errMsg);
+          } else {
+            console.warn("[AUTH] Server verification check suspended during connectivity shift:", errMsg);
+          }
           // CRITICAL: If we are offline or unable to reach the server, do NOT proceed to write a fallback profile.
           // Doing so would overwrite the real server document with a blank profile (clearing user balance to 0).
           // We abort and wait for the connection to recover.
@@ -278,7 +283,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     }, (error) => {
-      console.error("Profile listen error:", error);
+      const errMsg = error?.message || String(error);
+      if (errMsg.toLowerCase().includes('offline') || errMsg.toLowerCase().includes('could not reach') || errMsg.toLowerCase().includes('network')) {
+        console.warn("[AUTH] Profile snapshot listener operating in offline mode:", errMsg);
+      } else {
+        console.warn("[AUTH] Profile listen notice:", errMsg);
+      }
       setLoading(false);
     });
 

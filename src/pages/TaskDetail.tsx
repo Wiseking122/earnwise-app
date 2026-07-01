@@ -201,6 +201,113 @@ export default function TaskDetail() {
     return () => clearTimeout(timer);
   }, [countdown, task]);
 
+  useEffect(() => {
+    const isCountingDown = countdown !== null && countdown > 0;
+
+    // Capture initial children of body and documentElement to find any newly appended elements (overlays, iframes, etc.)
+    const initialBodyChildren = Array.from(document.body.children);
+    const initialHtmlChildren = Array.from(document.documentElement.children);
+
+    const cleanupMonetag = () => {
+      // 1. Clear target ad container
+      const container = document.getElementById('adsterra-timer-banner');
+      if (container) {
+        container.innerHTML = '';
+      }
+
+      // 2. Remove script elements from DOM entirely
+      const scriptSelectors = [
+        'script[src*="vignette.min.js"]',
+        'script[src*="invoke.js"]',
+        'script[src*="sturgeonvelocity.com"]'
+      ];
+      scriptSelectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(s => s.remove());
+      });
+
+      // 3. Wreak total destruction on any elements injected during countdown
+      const currentBodyChildren = Array.from(document.body.children);
+      currentBodyChildren.forEach(child => {
+        if (!initialBodyChildren.includes(child)) {
+          try {
+            child.remove();
+          } catch (e) {
+            console.error("Error removing body child during Monetag/Adsterra cleanup:", e);
+          }
+        }
+      });
+
+      const currentHtmlChildren = Array.from(document.documentElement.children);
+      currentHtmlChildren.forEach(child => {
+        if (!initialHtmlChildren.includes(child)) {
+          try {
+            child.remove();
+          } catch (e) {
+            console.error("Error removing html child during Monetag/Adsterra cleanup:", e);
+          }
+        }
+      });
+
+      // 4. Fallback search for any known vignette or adsterra classes, frames, or overlays to destroy them from memory
+      const querySelectors = [
+        '[class*="vignette"]', '[id*="vignette"]',
+        '[class*="adsterra"]', '[id*="adsterra"]',
+        'iframe[src*="vignette"]', 'iframe[src*="adsterra"]',
+        'iframe[src*="sturgeonvelocity.com"]',
+        'div[style*="z-index"][style*="position: fixed"]' // common pattern for overlay ads
+      ];
+      querySelectors.forEach(selector => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(el => el.remove());
+        } catch (e) {
+          // ignore selector syntax errors
+        }
+      });
+
+      // Clean up global options
+      try {
+        delete (window as any).atOptions;
+      } catch (e) {}
+    };
+
+    if (!isCountingDown) {
+      cleanupMonetag();
+      return;
+    }
+
+    const adContainer = document.getElementById('adsterra-timer-banner');
+    if (adContainer) {
+      adContainer.innerHTML = '';
+
+      // 1. Configure and load Adsterra banner
+      (window as any).atOptions = {
+        'key' : '676b0b6eb3c82b512b4b9ca2349ac3e7',
+        'format' : 'iframe',
+        'height' : 50,
+        'width' : 320,
+        'params' : {}
+      };
+
+      const adsterraScript = document.createElement('script');
+      adsterraScript.type = 'text/javascript';
+      adsterraScript.src = 'https://sturgeonvelocity.com/676b0b6eb3c82b512b4b9ca2349ac3e7/invoke.js';
+
+      // 2. Configure and load Monetag vignette
+      const monetagScript = document.createElement('script');
+      monetagScript.dataset.zone = '11223633';
+      monetagScript.src = 'https://n6wxm.com/vignette.min.js';
+
+      // Append both scripts to the dedicated adsterra-timer-banner container
+      adContainer.appendChild(monetagScript);
+      adContainer.appendChild(adsterraScript);
+    }
+
+    return () => {
+      cleanupMonetag();
+    };
+  }, [countdown]);
+
   const handleAutoSubmit = async () => {
     const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
     if (isUserFree) {
@@ -580,6 +687,10 @@ export default function TaskDetail() {
              <div className="space-y-4">
                {countdown !== null && countdown > 0 ? (
                  <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2.5rem] text-center">
+                    <div 
+                      id="adsterra-timer-banner" 
+                      className="w-full flex items-center justify-center min-h-[50px] bg-black/95 rounded-2xl overflow-hidden shadow-inner p-2 mb-6 border border-white/5" 
+                    />
                     <div className="relative w-20 h-20 mx-auto mb-4">
                       <svg className="w-full h-full transform -rotate-90">
                         <circle

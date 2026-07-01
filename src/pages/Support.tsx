@@ -148,10 +148,26 @@ export default function Support() {
         <div className="space-y-4">
           <h3 className="text-lg font-black text-slate-900 pl-2">Common Questions</h3>
           {[
-            { q: "How do I upgrade my plan?", a: "To upgrade, fund your wallet via the 'Deposit' tab on the Membership page using Paystack. Once your balance is updated, switch to the 'Plans' tab and click 'Activate Now' on your chosen tier. We do NOT use coupon codes or manual vendors." },
-            { q: "How long does withdrawal take?", a: "Most withdrawals are processed instantly through Paystack. Some banks may take up to 30 minutes to reflect the funds." },
-            { q: "Why was my task rejected?", a: "Tasks are usually rejected if the proof provided is insufficient or doesn't match the task requirements. You can re-attempt most tasks." },
-            { q: "Can I use multiple accounts?", a: "No, Earnwise has a strict one-account-per-person policy. Multiple accounts will lead to permanent suspension." }
+            { 
+              q: "How do I upgrade my plan?", 
+              a: "To upgrade, fund your wallet via the 'Deposit' tab on the Membership page using Paystack. Once your balance is updated, switch to the 'Plans' tab and click 'Activate Now' on your chosen tier. We do NOT use coupon codes or manual vendors." 
+            },
+            { 
+              q: "What is the dual-wallet payout schedule and what are the fees?", 
+              a: "Earnwise operates two separate wallets: (1) Referral Wallet payouts are processed on Saturdays (8:00 AM - 6:00 PM) with 0% (Free) processing fees. (2) Video Tasks Wallet payouts are processed on the 30th of every month with a 10% processing fee deducted automatically." 
+            },
+            { 
+              q: "What are the daily earnings limits and total plan caps?", 
+              a: "Each subscription tier comes with a fixed daily earning limit and a total package life cycle cap. Once your package's total earnings limit is reached, you must renew or upgrade your plan to continue unlocking daily video tasks." 
+            },
+            { 
+              q: "Why was my video task proof rejected?", 
+              a: "Tasks are usually rejected if the proof screenshot uploaded is duplicate, blur, incorrect, or doesn't verify completion. Ensure you watch the video and upload high-quality proof." 
+            },
+            { 
+              q: "Can I use multiple accounts or proxies?", 
+              a: "No, Earnwise enforces a strict one-account-per-individual policy. Using virtual machines, multiple devices with the same payment account, or duplicate profile signups is prohibited and results in permanent suspension." 
+            }
           ].map((faq, i) => (
             <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
               <h4 className="font-black text-slate-900 text-sm mb-2">{faq.q}</h4>

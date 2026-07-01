@@ -255,6 +255,7 @@ export default function Profile() {
     { label: 'Deposit Funds', icon: Zap, path: '/deposit' },
     { label: 'Vault & Staking', icon: Lock, path: '/vault' },
     { label: 'Achievement Rewards', icon: Trophy, path: '/achievements' },
+    { label: 'Hall of Fame (Leaderboard)', icon: Award, path: '/leaderboard' },
     { label: 'Post Ads (Advertiser)', icon: Megaphone, path: '/advertiser' },
     { label: 'Transaction History', icon: History, path: '/transactions' },
     { label: 'Upgrade Membership', icon: Crown, path: '/upgrade' },

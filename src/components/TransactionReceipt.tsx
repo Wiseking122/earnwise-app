@@ -13,6 +13,7 @@ interface TransactionReceiptProps {
     processedAt: Date;
     accountName?: string;
     bankName?: string;
+    withdrawalType?: string;
   };
   onClose: () => void;
 }
@@ -598,6 +599,12 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                 </span>
               </div>
               <div className="flex justify-between items-center gap-1.5">
+                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payout Type</span>
+                <span className={`font-extrabold text-[8px] sm:text-[9px] text-right uppercase ${receipt.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                  {receipt.withdrawalType === 'referral' ? 'Referral Payout' : 'Video Task Payout'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-1.5">
                 <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Recipient Bank</span>
                 <span className="font-extrabold text-[8px] sm:text-[9px] text-right" style={{ color: '#0f172a' }}>{receipt.bankName || 'N/A'}</span>
               </div>
@@ -626,8 +633,12 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                 <span className="font-black" style={{ color: '#334155' }}>₦{receipt.amount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span style={{ color: '#64748b' }} className="font-bold">Fee (5%)</span>
-                <span className="font-black" style={{ color: '#ef4444' }}>-₦{receipt.fee.toLocaleString()}</span>
+                <span style={{ color: '#64748b' }} className="font-bold">
+                  {receipt.withdrawalType === 'referral' ? 'Processing Fee (Free)' : 'Processing Fee (10%)'}
+                </span>
+                <span className="font-black" style={{ color: receipt.fee > 0 ? '#ef4444' : '#10b981' }}>
+                  {receipt.fee > 0 ? `-₦${receipt.fee.toLocaleString()}` : 'Free'}
+                </span>
               </div>
               <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '2px', marginBottom: '2px' }} />
               <div className="flex justify-between items-center pt-0.5">

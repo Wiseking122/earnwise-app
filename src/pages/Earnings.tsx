@@ -51,7 +51,8 @@ export default function Earnings() {
           netPayout: t.receiptDetails.netPayout ?? t.amount,
           processedAt: t.createdAt?.toDate() || new Date(),
           bankName: t.receiptDetails.bankName,
-          accountName: t.receiptDetails.accountName
+          accountName: t.receiptDetails.accountName,
+          withdrawalType: t.receiptDetails.withdrawalType || 'task'
         });
         // Clear the URL param to prevent re-triggering
         setSearchParams(prev => {
@@ -259,7 +260,8 @@ export default function Earnings() {
                             netPayout: t.receiptDetails.netPayout ?? t.amount,
                             processedAt: t.createdAt?.toDate() || new Date(),
                             bankName: t.receiptDetails.bankName,
-                            accountName: t.receiptDetails.accountName
+                            accountName: t.receiptDetails.accountName,
+                            withdrawalType: t.receiptDetails.withdrawalType || 'task'
                           });
                         }
                       }}

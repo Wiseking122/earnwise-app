@@ -410,6 +410,49 @@ export default function Home() {
         {/* Daily Tasks Goal Progression */}
         <DailyGoal />
 
+        {/* Weekly Leaderboard (Hall of Fame) Promo Card */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
+              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Hall of Fame</h3>
+            </div>
+            <Link to="/leaderboard" className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-yellow-400 transition-colors">
+              Weekly Prizes
+            </Link>
+          </div>
+
+          <Link 
+            to="/leaderboard"
+            className="block bg-gradient-to-br from-yellow-950/40 to-slate-900 border border-yellow-500/30 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 text-white relative overflow-hidden shadow-2xl hover:border-yellow-400/50 transition-all active:scale-[0.98] group"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" style={{ background: 'radial-gradient(circle, rgba(234, 179, 8, 0.3) 0%, transparent 70%)' }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
+            
+            <div className="relative z-10 flex items-center gap-3.5">
+              <div className="w-11 h-11 bg-yellow-500/20 border border-yellow-500/40 rounded-xl flex items-center justify-center text-yellow-400 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-transform shrink-0">
+                <Trophy size={24} className="drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h4 className="font-display font-black text-base leading-tight uppercase italic text-white group-hover:text-yellow-200 transition-colors">
+                    Weekly Cash Prizes
+                  </h4>
+                  <div className="bg-yellow-500/20 px-2 py-0.5 rounded-full border border-yellow-500/30">
+                    <span className="text-[7px] font-black text-yellow-300 uppercase tracking-widest">₦15,000 Max</span>
+                  </div>
+                </div>
+                <p className="text-slate-400 text-[10px] sm:text-xs font-medium leading-tight max-w-sm sm:max-w-md">
+                  Complete tasks, invite active members and earn XP. Top 10 earners get cash bonuses every Sunday at 11:59 PM!
+                </p>
+              </div>
+              <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-yellow-500 transition-colors shrink-0">
+                <ArrowRight size={16} className="text-white group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+        </section>
+
         {/* Wise AI Assistant Section */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">

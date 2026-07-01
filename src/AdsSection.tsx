@@ -301,6 +301,36 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     }
   }, [timerSecondsLeft, activeTimerTask]);
 
+  useEffect(() => {
+    const isTimerRunning = activeTimerTask !== null && timerSecondsLeft > 0;
+    const adContainer = document.getElementById('adsterra-timer-banner');
+
+    if (!isTimerRunning || !adContainer) {
+      if (adContainer) {
+        adContainer.innerHTML = '';
+      }
+      return;
+    }
+
+    // Clear existing contents
+    adContainer.innerHTML = '';
+
+    // Create a new script element
+    const script = document.createElement('script');
+    script.dataset.zone = '11223633';
+    script.src = 'https://n6wxm.com/vignette.min.js';
+
+    // Append to the target container
+    adContainer.appendChild(script);
+
+    return () => {
+      const containerOnCleanup = document.getElementById('adsterra-timer-banner');
+      if (containerOnCleanup) {
+        containerOnCleanup.innerHTML = '';
+      }
+    };
+  }, [activeTimerTask, timerSecondsLeft]);
+
   const isAdCompletedToday = (adId: string) => {
     if (profile?.role === 'admin') return false;
     if (!profile?.completedAds) return false;
@@ -611,6 +641,10 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                 {!activeTimerTask.isCustom && vastAd && (
                   <VastVideoPlayer vastUrl={vastAd} onAdEnded={() => {}} />
                 )}
+                <div 
+                  id="adsterra-timer-banner" 
+                  className="w-full flex items-center justify-center min-h-[50px] bg-black/40 rounded-2xl overflow-hidden shadow-inner p-2 my-2 border border-white/5" 
+                />
                 <div className="relative w-36 h-36 flex items-center justify-center">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                     <circle 

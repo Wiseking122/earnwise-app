@@ -167,10 +167,22 @@ const PLAN_COSTS: Record<string, number> = {
   starter: 2000,
   pro: 3000,
   bronze: 5000,
-  diamond: 7000,
-  silver: 10000,
-  platinum: 15000,
-  golden: 25000
+  diamond: 10000,
+  silver: 20000,
+  platinum: 30000,
+  golden: 50000
+};
+
+const PLAN_LIMITS: Record<string, { cap: number; daily: number }> = {
+  free: { cap: 0, daily: 0 },
+  elite: { cap: 7000, daily: 235 },
+  starter: { cap: 14000, daily: 470 },
+  pro: { cap: 22000, daily: 735 },
+  bronze: { cap: 35000, daily: 1170 },
+  diamond: { cap: 45000, daily: 1500 },
+  silver: { cap: 140000, daily: 2500 },
+  platinum: { cap: 210000, daily: 3000 },
+  golden: { cap: 350000, daily: 4000 }
 };
 
 // --- CONFIGURATION: Advertiser CPA Chart ---
@@ -1435,8 +1447,8 @@ async function startServer() {
                     <td style="color: #1e293b; font-weight: 700; text-align: right;">₦${Number(amount).toLocaleString()}</td>
                   </tr>
                   <tr style="height: 30px;">
-                    <td style="color: #64748b; font-weight: 500;">Processing Fee (5%)</td>
-                    <td style="color: #e11d48; font-weight: 700; text-align: right;">-₦${Number(fee).toLocaleString()}</td>
+                    <td style="color: #64748b; font-weight: 500;">Processing Fee (${Number(fee) === 0 ? 'Free' : '10%'})</td>
+                    <td style="${Number(fee) === 0 ? 'color: #10b981;' : 'color: #e11d48;'} font-weight: 700; text-align: right;">${Number(fee) === 0 ? 'Free (₦0)' : `-₦${Number(fee).toLocaleString()}`}</td>
                   </tr>
                 </table>
               </div>
@@ -2182,8 +2194,21 @@ Please verify if the submission is a plausible and honest completion of a social
         const userData = userDoc.data()!;
         const taskData = taskDoc.data()!;
 
+        // Check 30-Day Plan Expiration
+        let currentPlan = userData.plan || 'free';
+        const planEndDate = userData.planEndDate ? (userData.planEndDate.toDate ? userData.planEndDate.toDate() : new Date(userData.planEndDate)) : null;
+        if (planEndDate && new Date() > planEndDate) {
+          currentPlan = 'free';
+          // Update DB atomically as expired
+          transaction.update(userRef, {
+            plan: 'free',
+            subscriptionTier: 'free',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+
         // Restriction: Free plans are locked
-        if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
+        if (currentPlan === 'free' && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
            throw new Error("Upgrade your plan to start earning from tasks.");
         }
 
@@ -2192,8 +2217,47 @@ Please verify if the submission is a plausible and honest completion of a social
         if (taskData.remainingBudget <= 0) throw new Error("Task allocation exhausted");
 
         // Calculate dynamic reward based on tier multiplier
-        const multiplier = TIER_MULTIPLIERS[userData.plan || 'free'] || 1.0;
+        const multiplier = TIER_MULTIPLIERS[currentPlan] || 1.0;
         const finalPayout = taskData.userPayout * multiplier;
+
+        // Enforce Limits for Non-Admins
+        const isAdmin = userData.role === 'admin' || userData.email === 'wiseking7890@gmail.com';
+        if (!isAdmin) {
+          const planLimit = PLAN_LIMITS[currentPlan] || { cap: 0, daily: 0 };
+
+          // 1. Total Task Cap Check
+          const activePlanTaskEarnings = userData.activePlanTaskEarnings || 0;
+          if (activePlanTaskEarnings + finalPayout > planLimit.cap) {
+            throw new Error(`Total plan task earning cap reached (₦${planLimit.cap.toLocaleString()}). Upgrade your plan to continue earning.`);
+          }
+
+          // 2. Daily Earning Limit Check
+          const lagosParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Africa/Lagos',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric'
+          }).formatToParts(new Date());
+          const lYear = lagosParts.find(p => p.type === 'year')?.value || '';
+          const lMonth = lagosParts.find(p => p.type === 'month')?.value || '';
+          const lDay = lagosParts.find(p => p.type === 'day')?.value || '';
+          const todayStr = `${lYear}-${lMonth.padStart(2, '0')}-${lDay.padStart(2, '0')}`;
+
+          const dailyTracking = userData.dailyTaskEarningsTracking || {};
+          const dailyEarnedToday = dailyTracking.date === todayStr ? (dailyTracking.amount || 0) : 0;
+          if (dailyEarnedToday + finalPayout > planLimit.daily) {
+            throw new Error(`Daily task earning limit reached for your plan (₦${planLimit.daily.toLocaleString()}). Come back tomorrow!`);
+          }
+
+          // Update Limits Tracking fields
+          transaction.update(userRef, {
+            activePlanTaskEarnings: admin.firestore.FieldValue.increment(finalPayout),
+            dailyTaskEarningsTracking: {
+              date: todayStr,
+              amount: dailyEarnedToday + finalPayout
+            }
+          });
+        }
 
         // Atomic multi-variable update - Immediate Payout (Restored to yesterday's behavior)
         transaction.update(userRef, {
@@ -2712,8 +2776,15 @@ Please verify if the submission is a plausible and honest completion of a social
         }
 
         await dbAdmin.runTransaction(async (transaction) => {
+          const nowTime = new Date();
+          const planEndDate = new Date(nowTime.getTime() + 30 * 24 * 60 * 60 * 1000);
+          
           transaction.update(userRef, {
             plan: planId,
+            subscriptionTier: 'premium',
+            activePlanTaskEarnings: 0,
+            planStartDate: admin.firestore.FieldValue.serverTimestamp(),
+            planEndDate: planEndDate,
             balance: admin.firestore.FieldValue.increment(-requiredAmount),
             withdrawableBalance: admin.firestore.FieldValue.increment(-requiredAmount),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -2741,9 +2812,14 @@ Please verify if the submission is a plausible and honest completion of a social
       if (!PAYSTACK_SECRET || (reference && reference.startsWith('SIM_PAY_'))) {
         console.warn("[PAYMENT] PAYSTACK_SECRET not configured or simulated reference used. Simulating upgrade success.");
         
+        const nowTime = new Date();
+        const planEndDate = new Date(nowTime.getTime() + 30 * 24 * 60 * 60 * 1000);
         await userRef.update({
           plan: planId,
           subscriptionTier: 'premium',
+          activePlanTaskEarnings: 0,
+          planStartDate: admin.firestore.FieldValue.serverTimestamp(),
+          planEndDate: planEndDate,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
@@ -2822,9 +2898,14 @@ Please verify if the submission is a plausible and honest completion of a social
           return res.status(404).json({ status: "failed", message: "User account not found" });
         }
 
+        const nowTime = new Date();
+        const planEndDate = new Date(nowTime.getTime() + 30 * 24 * 60 * 60 * 1000);
         await userRef.update({
           plan: planId,
           subscriptionTier: 'premium',
+          activePlanTaskEarnings: 0,
+          planStartDate: admin.firestore.FieldValue.serverTimestamp(),
+          planEndDate: planEndDate,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
@@ -3247,50 +3328,83 @@ Please verify if the submission is a plausible and honest completion of a social
     const { userId, amount, withdrawalType = 'task', bankDetails } = req.body;
     if (!PAYSTACK_SECRET) return res.status(500).json({ error: "Paystack secret not configured" });
 
-    // TIME WINDOW CHECK (Nigerian Time - Africa/Lagos)
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Africa/Lagos',
-      hour: 'numeric',
-      minute: 'numeric',
-      day: 'numeric',
-      hour12: false
-    });
-    const parts = formatter.formatToParts(now);
-    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-    const day = parseInt(parts.find(p => p.type === 'day')?.value || '0');
-
-    // Rule: Open 17:00 (5 PM) to 18:00 (6 PM)
-    const isWithinTimeWindow = hour === 17;
-
-    if (withdrawalType === 'referral') {
-      if (!isWithinTimeWindow) {
-        return res.status(400).json({ 
-          error: "Referral withdrawals are ONLY open daily from 5:00 PM to 6:00 PM Nigerian Time." 
-        });
-      }
-    } else {
-      // Task withdrawal: 30th of every month, 17:00 - 18:00
-      if (day !== 30 || !isWithinTimeWindow) {
-        return res.status(400).json({ 
-          error: "Task withdrawals are ONLY open on the 30th of every month from 5:00 PM to 6:00 PM Nigerian Time." 
-        });
-      }
-    }
-
     try {
       const userRef = dbAdmin.collection('users').doc(userId);
       const userDoc = await userRef.get();
       
       if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
-      const userData = userDoc.data();
-      if (!userData || userData.balance < amount) {
+      const userData = userDoc.data() || {};
+      
+      if (userData.balance < amount) {
         return res.status(400).json({ error: "Insufficient balance" });
       }
-      const isAdmin = userData.role === 'admin';
+
+      const isAdmin = userData.role === 'admin' || userData.email === 'wiseking7890@gmail.com';
       if (!isAdmin && (!userData.plan || userData.plan === 'free')) {
         return res.status(400).json({ error: "Upgrade your plan to start withdrawing." });
       }
+
+      // --- ADVANCED DUAL-WALLET CALENDAR & WITHDRAWAL LOGIC ---
+      let isWindowOpen = false;
+      let windowMessage = "";
+
+      const payoutsDoc = await dbAdmin.collection('system_settings').doc('payouts').get();
+      const payoutsData = payoutsDoc.exists ? payoutsDoc.data() : null;
+      const now = new Date();
+
+      if (isAdmin) {
+        isWindowOpen = true;
+      } else if (payoutsData && payoutsData.payoutsForceClosed) {
+        isWindowOpen = false;
+        windowMessage = "Withdrawal gateway is temporarily locked by administrative override for security audits.";
+      } else {
+        const isTaskOverride = payoutsData ? !!payoutsData.taskOverrideOpen : false;
+        const isReferralOverride = payoutsData ? !!payoutsData.referralOverrideOpen : false;
+
+        let isCustomScheduleActive = false;
+        if (payoutsData && payoutsData.payoutStartDate && payoutsData.payoutEndDate) {
+          const start = new Date(payoutsData.payoutStartDate);
+          const end = new Date(payoutsData.payoutEndDate);
+          if (now >= start && now <= end) {
+            isCustomScheduleActive = true;
+          }
+        }
+
+        if (withdrawalType === 'task') {
+          const lagosDay = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Lagos', day: 'numeric' }).format(now));
+          if (isTaskOverride || isCustomScheduleActive) {
+            isWindowOpen = true;
+          } else if (lagosDay === 30) {
+            isWindowOpen = true;
+          } else {
+            isWindowOpen = false;
+            windowMessage = "📺 Video Task portal opens monthly on the 30th.";
+          }
+        } else if (withdrawalType === 'referral') {
+          const lagosHour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Lagos', hour: 'numeric', hour12: false }).format(now));
+          const lagosWeekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Lagos', weekday: 'long' }).format(now);
+          const isLagosSaturday = lagosWeekday === 'Saturday';
+          const isOpenHours = lagosHour >= 8 && lagosHour < 18;
+
+          if (isReferralOverride || isCustomScheduleActive) {
+            isWindowOpen = true;
+          } else if (isLagosSaturday && isOpenHours) {
+            isWindowOpen = true;
+          } else {
+            isWindowOpen = false;
+            windowMessage = "🗓️ Referral portal opens Saturdays 8:00 AM – 6:00 PM.";
+          }
+        }
+      }
+
+      if (!isWindowOpen) {
+        return res.status(400).json({ error: windowMessage || "Payout Gateway Closed. Processing windows are strictly scheduled by Administration." });
+      }
+
+      // --- DYNAMIC FEE CALCULATION (0% Referral, 10% Task) ---
+      const isReferral = withdrawalType === 'referral';
+      const netPayout = isReferral ? amount : amount * 0.90;
+      const fee = isReferral ? 0 : amount * 0.10;
 
       // Create Transfer Recipient
       const recipientResponse = await axios.post("https://api.paystack.co/transferrecipient", {
@@ -3308,7 +3422,7 @@ Please verify if the submission is a plausible and honest completion of a social
       // Initiate Transfer
       const transferResponse = await axios.post("https://api.paystack.co/transfer", {
         source: "balance",
-        amount: Math.round(amount * 100),
+        amount: Math.round(netPayout * 100),
         recipient: recipientCode,
         reason: "Earnwise Withdrawal"
       }, {
@@ -3328,7 +3442,10 @@ Please verify if the submission is a plausible and honest completion of a social
           userId,
           amount,
           status: 'completed',
+          withdrawalType,
           bankDetails,
+          fee,
+          netPayout,
           paystackTransferId: transferResponse.data.data.id,
           requestedAt: admin.firestore.FieldValue.serverTimestamp(),
           processedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -3339,14 +3456,22 @@ Please verify if the submission is a plausible and honest completion of a social
           amount: -amount,
           type: 'withdrawal',
           description: `Automated Withdrawal via Paystack`,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          receiptDetails: {
+            withdrawalType,
+            fee,
+            netPayout,
+            bankName: bankDetails.bankName || '',
+            accountName: bankDetails.accountName || '',
+            accountNumber: bankDetails.accountNumber || ''
+          }
         });
 
         // Send Notification
         await dbAdmin.collection('notifications').add({
           userId,
           title: '💸 Payment Processed!',
-          message: `Your withdrawal of ₦${amount.toLocaleString()} was successful and sent to your bank.`,
+          message: `Your withdrawal of ₦${amount.toLocaleString()} was successful (Net: ₦${netPayout.toLocaleString()}, Fee: ₦${fee.toLocaleString()}) and sent to your bank.`,
           type: 'success',
           read: false,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -3357,8 +3482,8 @@ Please verify if the submission is a plausible and honest completion of a social
         if (userData.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
           try {
             const isReferral = withdrawalType === 'referral';
-            const netPayout = isReferral ? amount : amount * 0.95;
-            const fee = isReferral ? 0 : amount * 0.05;
+            const netPayout = isReferral ? amount : amount * 0.90;
+            const fee = isReferral ? 0 : amount * 0.10;
             const name = userData.displayName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || "Earner";
             await transporter.sendMail({
               from: `"Earnwise Payouts" <${process.env.EMAIL_USER}>`,
@@ -3397,7 +3522,7 @@ Please verify if the submission is a plausible and honest completion of a social
                         <td style="color: #1e293b; font-weight: 700; text-align: right;">₦${Number(amount).toLocaleString()}</td>
                       </tr>
                       <tr style="height: 30px;">
-                        <td style="color: #64748b; font-weight: 500;">Processing Fee (${isReferral ? 'Free' : '5%'})</td>
+                        <td style="color: #64748b; font-weight: 500;">Processing Fee (${isReferral ? 'Free' : '10%'})</td>
                         <td style="${isReferral ? 'color: #10b981;' : 'color: #e11d48;'} font-weight: 700; text-align: right;">${isReferral ? 'Free (₦0)' : `-₦${Number(fee).toLocaleString()}`}</td>
                       </tr>
                     </table>

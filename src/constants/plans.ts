@@ -53,7 +53,7 @@ export const PLANS: PlanDetails[] = [
   {
     id: 'diamond',
     name: 'Diamond',
-    cost: 7000,
+    cost: 10000,
     multiplier: 3.5,
     perks: ['3.5x Earnings Multiplier', 'Diamond Exclusive Tasks', 'VIP Support'],
     color: 'bg-cyan-500'
@@ -61,7 +61,7 @@ export const PLANS: PlanDetails[] = [
   {
     id: 'silver',
     name: 'Silver',
-    cost: 10000,
+    cost: 20000,
     multiplier: 5.0,
     perks: ['5.0x Earnings Multiplier', 'Silver VIP Support', 'Increased Limits'],
     color: 'bg-slate-400'
@@ -69,7 +69,7 @@ export const PLANS: PlanDetails[] = [
   {
     id: 'platinum',
     name: 'Platinum',
-    cost: 15000,
+    cost: 30000,
     multiplier: 7.5,
     perks: [
       '7.5x Earnings Multiplier',
@@ -83,7 +83,7 @@ export const PLANS: PlanDetails[] = [
   {
     id: 'golden',
     name: 'Golden',
-    cost: 25000,
+    cost: 50000,
     multiplier: 10.0,
     perks: [
       '10.0x Earnings Multiplier',

@@ -11,7 +11,10 @@ import {
   updateDoc, 
   setDoc,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  increment,
+  getDocs,
+  limit
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { getApiUrl } from '../../lib/config';
@@ -28,7 +31,9 @@ import {
   History,
   Check,
   X,
-  Copy
+  Copy,
+  Award,
+  Trophy
 } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 
@@ -38,7 +43,12 @@ export default function AdminPayments() {
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [userMap, setUserMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'withdrawals' | 'escrow'>((searchParams.get('tab') as any) || 'withdrawals');
+  const [activeTab, setActiveTab] = useState<'withdrawals' | 'escrow' | 'leaderboard'>((searchParams.get('tab') as any) || 'withdrawals');
+  const [topUsers, setTopUsers] = useState<any[]>([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [payingUserId, setPayingUserId] = useState<string | null>(null);
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
   const [withdrawalSubTab, setWithdrawalSubTab] = useState<'referrals' | 'tasks'>('referrals');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [controls, setControls] = useState({
@@ -101,7 +111,7 @@ export default function AdminPayments() {
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'escrow' || tabParam === 'withdrawals') {
+    if (tabParam === 'escrow' || tabParam === 'withdrawals' || tabParam === 'leaderboard') {
       setActiveTab(tabParam as any);
     }
   }, [searchParams]);
@@ -155,6 +165,112 @@ export default function AdminPayments() {
     };
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'leaderboard') {
+      setLoadingLeaderboard(true);
+      const q = query(
+        collection(db, 'users'),
+        orderBy('xp', 'desc'),
+        limit(10)
+      );
+      getDocs(q).then((snap) => {
+        setTopUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
+        setLoadingLeaderboard(false);
+        setLoading(false);
+      }).catch(err => {
+        console.error("Error fetching admin leaderboard top users:", err);
+        setLoadingLeaderboard(false);
+        setLoading(false);
+      });
+    }
+  }, [activeTab]);
+
+  const handlePayLeaderboardWinner = async (user: any, rank: number, paymentMethod: 'bank_transfer' | 'wallet_credit') => {
+    const defaultAmt = rank === 1 ? 15000 : rank === 2 ? 8000 : rank === 3 ? 4000 : 1000;
+    const amountStr = customAmounts[user.uid];
+    const amount = amountStr !== undefined ? parseFloat(amountStr) : defaultAmt;
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please specify a valid numeric prize amount.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to reward ${user.displayName || 'Anonymous'} (Rank ${rank}) with ₦${amount.toLocaleString()} via ${paymentMethod === 'bank_transfer' ? 'Manual Bank Transfer' : 'Wallet Balance Credit'}?`)) {
+      return;
+    }
+
+    setPayingUserId(user.uid);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error("User document not found");
+        
+        const uData = userSnap.data();
+
+        if (paymentMethod === 'wallet_credit') {
+          transaction.update(userRef, {
+            balance: increment(amount),
+            withdrawableBalance: increment(amount),
+            bonusEarnings: increment(amount),
+            updatedAt: serverTimestamp()
+          });
+        }
+
+        // Create completed transaction log
+        const transRef = doc(collection(db, 'transactions'));
+        transaction.set(transRef, {
+          userId: user.uid,
+          amount: amount,
+          type: 'bonus',
+          status: 'completed',
+          description: `🏆 Weekly Leaderboard Rank ${rank} Cash Prize (${paymentMethod === 'bank_transfer' ? 'Paid via Bank' : 'Credited to Wallet'})`,
+          createdAt: serverTimestamp(),
+          receiptDetails: {
+            withdrawalType: 'leaderboard_prize',
+            fee: 0,
+            netPayout: amount,
+            bankName: user.bankDetails?.bankName || 'N/A',
+            accountName: user.bankDetails?.accountName || 'N/A',
+            accountNumber: user.bankDetails?.accountNumber || 'N/A'
+          }
+        });
+
+        // Add system notification for user
+        const notifRef = doc(collection(db, 'notifications'));
+        const titleText = paymentMethod === 'bank_transfer' ? '🏆 Leaderboard Prize Sent!' : '🏆 Leaderboard Prize Credited!';
+        const msgText = paymentMethod === 'bank_transfer'
+          ? `Congratulations! Your Rank ${rank} weekly leaderboard cash prize of ₦${amount.toLocaleString()} has been sent directly to your bank account!`
+          : `Congratulations! Your Rank ${rank} weekly leaderboard cash prize of ₦${amount.toLocaleString()} has been added to your withdrawable wallet balance!`;
+
+        transaction.set(notifRef, {
+          userId: user.uid,
+          title: titleText,
+          message: msgText,
+          read: false,
+          createdAt: serverTimestamp(),
+          actionUrl: '/earnings'
+        });
+      });
+
+      alert(`Successfully processed Rank ${rank} leaderboard prize for ${user.displayName || 'User'}!`);
+      
+      // Refresh list
+      const q = query(
+        collection(db, 'users'),
+        orderBy('xp', 'desc'),
+        limit(10)
+      );
+      const snap = await getDocs(q);
+      setTopUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error processing leaderboard prize payment: ${err.message}`);
+    } finally {
+      setPayingUserId(null);
+    }
+  };
+
   const handleAction = async (request: WithdrawalRequest, action: 'approved' | 'rejected' | 'completed') => {
     try {
       const wasDeducted = (request as any).deductedAtRequest || false;
@@ -201,8 +317,9 @@ export default function AdminPayments() {
             description: `Withdrawal request #${request.id.slice(0,6)}`,
             createdAt: serverTimestamp(),
             receiptDetails: {
-              fee: isReferral ? 0 : request.amount * 0.05,
-              netPayout: isReferral ? request.amount : request.amount * 0.95,
+              withdrawalType: request.withdrawalType || (isReferral ? 'referral' : 'task'),
+              fee: isReferral ? 0 : request.amount * 0.10,
+              netPayout: isReferral ? request.amount : request.amount * 0.90,
               bankName: request.bankDetails?.bankName || '',
               accountName: request.bankDetails?.accountName || '',
               accountNumber: request.bankDetails?.accountNumber || ''
@@ -229,8 +346,8 @@ export default function AdminPayments() {
                 email: uData.email,
                 name: uData.displayName || `${uData.firstName || ''} ${uData.lastName || ''}`.trim() || "Earner",
                 amount: request.amount,
-                netPayout: isReferral ? request.amount : request.amount * 0.95,
-                fee: isReferral ? 0 : request.amount * 0.05,
+                netPayout: isReferral ? request.amount : request.amount * 0.90,
+                fee: isReferral ? 0 : request.amount * 0.10,
                 withdrawalId: request.id,
                 bankName: request.bankDetails?.bankName,
                 accountName: request.bankDetails?.accountName,
@@ -247,8 +364,8 @@ export default function AdminPayments() {
               user_email: uData.email,
               user_name: uData.displayName || "Valued earner",
               amount: request.amount,
-              net_payout: isReferral ? request.amount : request.amount * 0.95,
-              fee: isReferral ? 0 : request.amount * 0.05,
+              net_payout: isReferral ? request.amount : request.amount * 0.90,
+              fee: isReferral ? 0 : request.amount * 0.10,
               withdrawal_id: request.id,
               account_name: request.bankDetails?.accountName,
               bank_name: request.bankDetails?.bankName,
@@ -437,19 +554,27 @@ export default function AdminPayments() {
         <div className="flex bg-gray-100 p-1 rounded-2xl">
           <button 
             onClick={() => { setActiveTab('withdrawals'); setLoading(true); }}
-            className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'withdrawals' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+            className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'withdrawals' ? 'bg-white text-blue-600 shadow-sm font-black' : 'text-gray-500'
             }`}
           >
             Withdrawals ({withdrawals.length})
           </button>
           <button 
             onClick={() => { setActiveTab('escrow'); setLoading(true); }}
-            className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'escrow' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+            className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'escrow' ? 'bg-white text-blue-600 shadow-sm font-black' : 'text-gray-500'
             }`}
           >
-            Pending Funds ({pendingTransactions.length})
+            Escrow ({pendingTransactions.length})
+          </button>
+          <button 
+            onClick={() => { setActiveTab('leaderboard'); setLoading(true); }}
+            className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'leaderboard' ? 'bg-white text-blue-600 shadow-sm font-black' : 'text-gray-500'
+            }`}
+          >
+            🏆 Leaderboard
           </button>
         </div>
 
@@ -508,8 +633,8 @@ export default function AdminPayments() {
                                   </>
                                 ) : (
                                   <>
-                                    <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">5% Fee Deducted</p>
-                                    <p className="text-sm font-bold text-red-600">-₦{(req.amount * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                    <p className="text-[10px] font-black text-red-500 uppercase tracking-wider">10% Fee Deducted</p>
+                                    <p className="text-sm font-bold text-red-600">-₦{(req.amount * 0.10).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                   </>
                                 )}
                               </div>
@@ -517,10 +642,10 @@ export default function AdminPayments() {
 
                             <div className={`${req.withdrawalType === 'referral' ? 'bg-emerald-600/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-4 border`}>
                               <p className={`text-[9px] font-black uppercase tracking-widest ${req.withdrawalType === 'referral' ? 'text-emerald-700' : 'text-emerald-800'}`}>
-                                {req.withdrawalType === 'referral' ? "Actual Transfer Payout (100% Net)" : "Actual Transfer Payout (95% Net)"}
+                                {req.withdrawalType === 'referral' ? "Actual Transfer Payout (100% Net)" : "Actual Transfer Payout (90% Net)"}
                               </p>
                               <h3 className={`text-xl font-black ${req.withdrawalType === 'referral' ? 'text-emerald-700' : 'text-emerald-950'}`}>
-                                ₦{(req.withdrawalType === 'referral' ? req.amount : req.amount * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                ₦{(req.withdrawalType === 'referral' ? req.amount : req.amount * 0.90).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </h3>
                             </div>
 
@@ -576,7 +701,7 @@ export default function AdminPayments() {
                               {/* Copy Account Details payload compiler */}
                               <button
                                 onClick={() => {
-                                  const netPayoutVal = req.withdrawalType === 'referral' ? req.amount : req.amount * 0.95;
+                                  const netPayoutVal = req.withdrawalType === 'referral' ? req.amount : req.amount * 0.90;
                                   const payload = `[${req.bankDetails?.bankName || 'N/A'}] - [${req.bankDetails?.accountNumber || 'N/A'}] - [${req.bankDetails?.accountName || 'N/A'}] - [₦${netPayoutVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}]`;
                                   navigator.clipboard.writeText(payload);
                                   setCopiedId(req.id);
@@ -615,7 +740,7 @@ export default function AdminPayments() {
                 </div>
               );
             })()
-          ) : (
+          ) : activeTab === 'escrow' ? (
             // Escrow Funds View
             pendingTransactions.length > 0 ? (
               pendingTransactions.map((trans) => (
@@ -666,6 +791,221 @@ export default function AdminPayments() {
                 <p className="text-gray-400 font-bold">No funds in escrow</p>
               </div>
             )
+          ) : (
+            // Leaderboard Prizes View
+            <div className="space-y-6">
+              <div className="bg-slate-900 rounded-[2.2rem] p-6 text-white text-left space-y-2 border border-slate-800 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl" />
+                <div className="relative z-10 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-yellow-400/20 text-yellow-400 flex items-center justify-center">
+                    <Trophy size={28} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight uppercase">Leaderboard Cash Prizes</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      Verify & Payout Top 3 Earners of the Week
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {loadingLeaderboard ? (
+                [1,2,3].map(i => <div key={i} className="h-64 bg-gray-100 rounded-[2rem] animate-pulse" />)
+              ) : topUsers.length > 0 ? (
+                <div className="space-y-6">
+                  {/* Top 3 Focus Cards */}
+                  {topUsers.slice(0, 3).map((user, index) => {
+                    const rank = index + 1;
+                    const standardPrize = rank === 1 ? 15000 : rank === 2 ? 8000 : rank === 3 ? 4000 : 1000;
+                    const userPrizeStr = customAmounts[user.uid];
+                    const currentPrizeVal = userPrizeStr !== undefined ? parseFloat(userPrizeStr) : standardPrize;
+
+                    const isGold = rank === 1;
+                    const isSilver = rank === 2;
+                    const isBronze = rank === 3;
+
+                    return (
+                      <div 
+                        key={user.uid} 
+                        className={`bg-white rounded-[2.2rem] border-2 shadow-sm text-left overflow-hidden transition-all duration-300 ${
+                          isGold ? 'border-yellow-400 shadow-yellow-50/50' : 
+                          isSilver ? 'border-slate-300' : 
+                          'border-amber-500/60'
+                        }`}
+                      >
+                        {/* Header Banner */}
+                        <div className={`p-4 flex items-center justify-between border-b ${
+                          isGold ? 'bg-yellow-50/60 border-yellow-100' : 
+                          isSilver ? 'bg-slate-50 border-slate-100' : 
+                          'bg-amber-50/40 border-amber-100/60'
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm ${
+                              isGold ? 'bg-yellow-400 text-yellow-950' :
+                              isSilver ? 'bg-slate-300 text-slate-800' :
+                              'bg-amber-600 text-white'
+                            }`}>
+                              {rank}
+                            </div>
+                            <div>
+                              <h4 className="font-black text-slate-900 uppercase tracking-tight">
+                                {isGold ? "🏆 Gold Medalist (1st Place)" :
+                                 isSilver ? "🥈 Silver Medalist (2nd Place)" :
+                                 "🥉 Bronze Medalist (3rd Place)"}
+                              </h4>
+                              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                                Recommended Reward: ₦{standardPrize.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-6 space-y-5">
+                          {/* User Summary info */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-black text-slate-900">{user.displayName || 'Anonymous User'}</h3>
+                              <p className="text-xs font-bold text-slate-400">{user.email || 'No email registered'}</p>
+                              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wide mt-1">
+                                Telegram ID: {user.telegramId || 'None Captured'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-black text-slate-900">{user.xp?.toLocaleString() || 0}</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">XP Points</p>
+                            </div>
+                          </div>
+
+                          {/* Bank details widget */}
+                          {user.bankDetails?.accountNumber ? (
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Bank Details</span>
+                                <span className="bg-emerald-100 text-emerald-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase font-sans">Verified</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm pt-1">
+                                <div>
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase">Bank Name</p>
+                                  <p className="font-black text-slate-800 text-xs truncate">{user.bankDetails.bankName}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase">Account Number</p>
+                                  <p className="font-black text-slate-800 text-xs">{user.bankDetails.accountNumber}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase">Account Name</p>
+                                  <p className="font-black text-slate-800 text-xs truncate">{user.bankDetails.accountName}</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const payload = `[${user.bankDetails?.bankName || 'N/A'}] - [${user.bankDetails?.accountNumber || 'N/A'}] - [${user.bankDetails?.accountName || 'N/A'}] - [₦${currentPrizeVal.toLocaleString()}]`;
+                                  navigator.clipboard.writeText(payload);
+                                  setCopiedUserId(user.uid);
+                                  setTimeout(() => setCopiedUserId(null), 2000);
+                                }}
+                                className="w-full mt-2 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-colors text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center justify-center gap-1.5"
+                              >
+                                {copiedUserId === user.uid ? "Payee Bank Info Copied!" : "📋 Copy Payee Bank Info"}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl text-rose-800 text-xs font-bold leading-relaxed">
+                              ⚠️ User has not set bank details on their profile. You can still credit their wallet balance directly below!
+                            </div>
+                          )}
+
+                          {/* Action Forms */}
+                          <div className="space-y-3 pt-1">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                Reward Amount (₦)
+                              </label>
+                              <input
+                                type="number"
+                                placeholder={`Enter reward amount (e.g. ${standardPrize})`}
+                                value={userPrizeStr !== undefined ? userPrizeStr : standardPrize}
+                                onChange={(e) => setCustomAmounts({ ...customAmounts, [user.uid]: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                              {/* Option A: Bank Transfer */}
+                              <button
+                                onClick={() => handlePayLeaderboardWinner(user, rank, 'bank_transfer')}
+                                disabled={payingUserId !== null}
+                                className="flex-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-black py-4 px-3 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
+                              >
+                                {payingUserId === user.uid ? (
+                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  "💰 Paid via Bank"
+                                )}
+                              </button>
+
+                              {/* Option B: Wallet Credit */}
+                              <button
+                                onClick={() => handlePayLeaderboardWinner(user, rank, 'wallet_credit')}
+                                disabled={payingUserId !== null}
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-black py-4 px-3 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md shadow-blue-100"
+                              >
+                                {payingUserId === user.uid ? (
+                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  "💳 Credit to Wallet"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Consolation Prizes Read Only Section */}
+                  {topUsers.length > 3 && (
+                    <div className="bg-white rounded-[2.2rem] border border-gray-100 p-6 shadow-sm text-left space-y-4">
+                      <div>
+                        <h4 className="font-black text-slate-900 uppercase tracking-tight">Consolation Placements (Positions 4-10)</h4>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                          Recommended reward is ₦1,000 for top 10 finishers
+                        </p>
+                      </div>
+
+                      <div className="divide-y divide-slate-100">
+                        {topUsers.slice(3, 10).map((user, index) => {
+                          const rank = index + 4;
+                          return (
+                            <div key={user.uid} className="py-3 flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-3">
+                                <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center font-black text-xs">
+                                  {rank}
+                                </span>
+                                <div>
+                                  <p className="font-bold text-slate-800">{user.displayName || 'Anonymous User'}</p>
+                                  <p className="text-[10px] text-slate-400 font-medium">{user.email || 'No email'}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs font-black text-slate-900 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
+                                  {user.xp?.toLocaleString() || 0} XP
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <Trophy size={48} className="text-gray-200 mx-auto mb-4" />
+                  <p className="text-gray-400 font-bold uppercase text-xs tracking-wider">No users found on leaderboard</p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

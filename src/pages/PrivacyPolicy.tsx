@@ -23,7 +23,7 @@ export default function PrivacyPolicy() {
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center">
             <Shield size={32} />
           </div>
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Last updated: May 2026</p>
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Last updated: July 1, 2026</p>
         </div>
 
         <section className="space-y-4">
@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
         <section className="space-y-4">
           <h2 className="text-2xl font-black text-slate-900">2. How We Use Your Information</h2>
           <p className="text-slate-600 leading-relaxed font-medium">
-            We use the information we collect to provide, maintain, and improve our services, including processing transactions, providing customer support, and sending you technical notices and security alerts.
+            We use the information we collect to provide, maintain, and improve our services, including processing transactions, providing customer support, verifying user submissions, and sending you technical notices and security alerts.
           </p>
         </section>
 
@@ -50,12 +50,19 @@ export default function PrivacyPolicy() {
         <section className="space-y-4">
           <h2 className="text-2xl font-black text-slate-900">4. Sharing of Information</h2>
           <p className="text-slate-600 leading-relaxed font-medium">
-            We do not share your personal information with third parties except as described in this policy, such as with your consent or for legal purposes.
-          </p>Section
+            We do not share your personal information with third parties except as described in this policy, such as with your consent, to process your payouts via authorized payment partners like Paystack, or for legal purposes.
+          </p>
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-black text-slate-900">5. Contact Us</h2>
+          <h2 className="text-2xl font-black text-slate-900">5. Financial Disclosures & Payout Policy</h2>
+          <p className="text-slate-600 leading-relaxed font-medium">
+            Earnwise operates a sustainable dual-wallet system separating earnings into Referral Payouts and Video Task Payouts. Referral payouts are processed weekly on Saturdays between 8:00 AM and 6:00 PM with a 0% processing fee. Video Task payouts are processed monthly on the 30th with a 10% processing fee. Daily limits and total package caps apply per subscription tier.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-slate-900">6. Contact Us</h2>
           <p className="text-slate-600 leading-relaxed font-medium">
             If you have any questions about this Privacy Policy, please contact us at earnwise29@gmail.com.
           </p>
