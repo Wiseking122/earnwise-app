@@ -1569,6 +1569,41 @@ async function startServer() {
   };
 
   /**
+   * POST /api/ai/insights
+   * Generates custom Wise AI daily earning strategies & insights.
+   */
+  app.post("/api/ai/insights", async (req, res) => {
+    try {
+      const { userId, balance, level, streak, plan } = req.body;
+      const estimatedEarning = Number(balance || 0) + (plan === 'golden' ? 15000 : plan === 'platinum' ? 7500 : 2500);
+      
+      return res.json({
+        prediction: `₦${estimatedEarning.toLocaleString()} daily earning potential based on your ${plan || 'free'} tier`,
+        insights: [
+          { 
+            title: "🔥 Wise AI Direct Strategy", 
+            description: "Complete the SingingFiles high-yield survey or web verification offer in your Ads Center for an instant ₦20.00 credit. Make sure to complete all required steps to the very last screen to verify your reward.", 
+            type: "quick_win" 
+          },
+          { 
+            title: "Streak Boost Active", 
+            description: `You have a ${streak || 1} day active streak. Complete at least one ad task from the Ads Center daily to maintain your 1.5x earnings multiplier!`, 
+            type: "strategy" 
+          },
+          { 
+            title: "VIP Multiplier Tip", 
+            description: plan === 'free' ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant ₦2,500 bonus per verified invite.", 
+            type: "upgrade" 
+          }
+        ]
+      });
+    } catch (err: any) {
+      console.error("[AI-INSIGHTS] Error generating insights:", err.message);
+      return res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  /**
    * POST /api/ai/assistant
    * Centralized AI Assistant for Earnwise
    */

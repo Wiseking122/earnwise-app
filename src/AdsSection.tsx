@@ -341,7 +341,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     id: ad.id,
     name: ad.title || 'Premium Sponsor Offer',
     provider: 'Featured Sponsor',
-    reward: Number(ad.reward) || 25.00,
+    reward: Math.min(Number(ad.reward) || 20.00, 20.00),
     type: ad.type === 'video' ? 'video' : 'click',
     color: ad.type === 'video' ? 'bg-amber-600' : 'bg-pink-600',
     icon: ad.type === 'video' ? Video : ImageIcon,
@@ -351,11 +351,111 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     instructions: ad.instructions || ''
   }));
 
+  const resolveUrl = (url?: string) => {
+    if (!url) return '#';
+    const sourceId = user?.uid || 'guest';
+    const clickId = Date.now().toString();
+    return url
+      .replace('{SOURCE_ID}', sourceId)
+      .replace('{CLICK_ID}', clickId);
+  };
+
+  const premiumPartnerTasks: AdTask[] = [
+    {
+      id: 'partner-singing-1',
+      name: '🔥 Premium Survey Task - Channel 1',
+      provider: 'SingingFiles Premium',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-orange-600',
+      icon: ExternalLink,
+      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=70075',
+      instructions: 'Click the link, complete all fields of the short survey/offer honestly, and finish the last step to verify your reward.'
+    },
+    {
+      id: 'partner-singing-2',
+      name: '💎 VIP Verification - Channel 2',
+      provider: 'SingingFiles VIP',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-pink-600',
+      icon: ExternalLink,
+      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=63319',
+      instructions: 'Open the premium verification page, complete the quick questionnaire, and perform the final task to successfully claim your reward.'
+    },
+    {
+      id: 'partner-singing-3',
+      name: '⚡ High-Yield Reward - Channel 3',
+      provider: 'SingingFiles High-Yield',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-rose-600',
+      icon: ExternalLink,
+      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=56776',
+      instructions: 'Complete the easy verification steps to unlock this special offer. Make sure to complete the last page to earn your cash bounty.'
+    },
+    {
+      id: 'partner-singing-4',
+      name: '🎁 Instant Cash Task - Channel 4',
+      provider: 'SingingFiles Instant',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-purple-600',
+      icon: ExternalLink,
+      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=36519',
+      instructions: 'Unlock your rewards by completing the quick file verification task. Stay active and finish all steps to guarantee manual verification.'
+    },
+    {
+      id: 'partner-smart-1',
+      name: '🚀 Nya5 Smart Stream - Channel 5',
+      provider: 'Nya5 Smart',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-emerald-600',
+      icon: ExternalLink,
+      link: 'https://nya5.com/link?z=11109391&var={SOURCE_ID}&ymid={CLICK_ID}',
+      instructions: 'Access the smart monetization portal, follow the prompt instructions, and complete the quick check-in to credit your balance.'
+    },
+    {
+      id: 'partner-smart-2',
+      name: '🛡️ Secure Web Verification - Channel 6',
+      provider: '1Buv Secure',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-sky-600',
+      icon: ExternalLink,
+      link: 'https://1buv.com/link?z=11223536&var={SOURCE_ID}&ymid={CLICK_ID}',
+      instructions: 'Validate your session by following the on-screen steps. Be sure to reach the final confirmation screen to unlock your automatic cash payout.'
+    },
+    {
+      id: 'partner-smart-3',
+      name: '💎 Exclusive Partner Offer - Channel 7',
+      provider: '1Buv Premium',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-blue-600',
+      icon: ExternalLink,
+      link: 'https://1buv.com/link?z=11223540&var={SOURCE_ID}&ymid={CLICK_ID}',
+      instructions: 'Complete the designated offer on our partner\'s portal. All steps must be fully finished to process your balance update.'
+    },
+    {
+      id: 'partner-smart-4',
+      name: '🔥 3Vetz Daily Bonus - Channel 8',
+      provider: '3Vetz Network',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-teal-600',
+      icon: ExternalLink,
+      link: 'https://3vetz.com/link?z=11178535&var={SOURCE_ID}&ymid={CLICK_ID}',
+      instructions: 'Participate in the sponsor campaign. You must complete the requirements on the destination page completely to verify eligibility.'
+    }
+  ];
+
   const monetagTasks: AdTask[] = MONETAG_LINKS.map((link, idx) => ({
     id: link.id,
     name: `Premium Sponsor Ad Stream - Channel ${idx + 1}`,
     provider: 'Monetag Smart',
-    reward: 25.00,
+    reward: 20.00,
     type: 'click',
     color: 'bg-indigo-600',
     icon: ExternalLink,
@@ -364,36 +464,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
 
   const adTasks: AdTask[] = [
     ...mappedDbTasks,
-    {
-      id: 'video_1',
-      name: 'Understanding Ads Center',
-      provider: 'Earnwise',
-      reward: 35.00,
-      type: 'video',
-      color: 'bg-blue-600',
-      icon: Play,
-      link: '/player'
-    },
-    {
-      id: 'video_2',
-      name: 'Premium Insight Ad',
-      provider: 'Earnwise',
-      reward: 45.00,
-      type: 'video',
-      color: 'bg-indigo-600',
-      icon: Play,
-      link: '/player'
-    },
-    {
-      id: 'click_1',
-      name: 'Quick Verification Task',
-      provider: 'Earnwise',
-      reward: 20.00,
-      type: 'click',
-      color: 'bg-emerald-600',
-      icon: ExternalLink,
-      link: '#'
-    },
+    ...premiumPartnerTasks,
     ...monetagTasks
   ];
 
@@ -423,7 +494,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       }
 
       if (task.link && task.link !== '#') {
-        window.open(task.link, '_blank', 'noopener,noreferrer');
+        window.open(resolveUrl(task.link), '_blank', 'noopener,noreferrer');
       }
       setActiveTimerTask(task);
       setTimerSecondsLeft(30);
@@ -431,7 +502,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       const videoType = task.id === 'video_2' ? 'premium' : 'standard';
       navigate(`/player?video=${videoType}&reward=${task.reward}`);
     } else if (task.link && task.link !== '#') {
-      window.open(task.link, '_blank', 'noopener,noreferrer');
+      window.open(resolveUrl(task.link), '_blank', 'noopener,noreferrer');
       setActiveTimerTask(task);
       setTimerSecondsLeft(30);
     } else if (task.type === 'click') {

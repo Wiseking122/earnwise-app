@@ -228,7 +228,7 @@ export default function Home() {
       setAiInsights({
         prediction: `₦${estimatedEarning.toLocaleString()} daily earning potential based on your ${profile?.plan || 'free'} tier`,
         insights: [
-          { title: "High-Yield Survey", description: "Complete the ₦850 Premium Market Research survey available in your tasks tab.", type: "quick_win" },
+          { title: "🔥 Wise AI Direct Strategy", description: "Complete the SingingFiles high-yield survey or web verification offer in your Ads Center for an instant ₦20.00 credit. Make sure to complete all required steps to the very last screen to verify your reward.", type: "quick_win" },
           { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete 1 more task today to maintain your 1.5x earnings multiplier!`, type: "strategy" },
           { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant ₦2,500 bonus per verified invite.", type: "upgrade" }
         ]
