@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs, updateDoc, setDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs, updateDoc, setDoc, increment, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Task, TaskCompletion, PlanType } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,32 @@ export default function TaskDetail() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
+  const [isRenewalRequired, setIsRenewalRequired] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.isRenewalRequired !== undefined) {
+          setIsRenewalRequired(!!data.isRenewalRequired);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isPlanExpired = useMemo(() => {
+    if (!profile?.planEndDate || profile?.plan === 'free' || profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com') return false;
+    const end = profile.planEndDate.toDate ? profile.planEndDate.toDate() : new Date(profile.planEndDate);
+    return new Date() > end;
+  }, [profile?.planEndDate, profile?.plan, profile?.role, user?.email]);
+
+  const isUserFree = useMemo(() => {
+    const baseFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (baseFree) return true;
+    if (isRenewalRequired && isPlanExpired) return true;
+    return false;
+  }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
 
   const isCampaignTask = !!(task?.advertiserId && task?.advertiserId !== 'internal_platform' && task?.advertiserId !== 'admin');
 
@@ -96,7 +122,6 @@ export default function TaskDetail() {
   };
 
   const handleCampaignSubmit = async () => {
-    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
     if (isUserFree) {
       setShowRestriction(true);
       return;
@@ -309,7 +334,6 @@ export default function TaskDetail() {
   }, [countdown]);
 
   const handleAutoSubmit = async () => {
-    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
     if (isUserFree) {
       setShowRestriction(true);
       return;
@@ -426,7 +450,6 @@ export default function TaskDetail() {
   const [wiseAiMessage, setWiseAiMessage] = useState<string>('');
 
   const handleProofSubmit = async () => {
-    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
     if (isUserFree) {
       setShowRestriction(true);
       return;
@@ -502,7 +525,6 @@ export default function TaskDetail() {
   };
 
   const startTask = () => {
-    const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
     if (isUserFree) {
       setShowRestriction(true);
       return;

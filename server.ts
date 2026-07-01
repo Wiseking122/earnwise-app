@@ -2183,10 +2183,12 @@ Please verify if the submission is a plausible and honest completion of a social
       await dbAdmin.runTransaction(async (transaction) => {
         const userRef = dbAdmin.collection('users').doc(userId);
         const taskRef = dbAdmin.collection('tasks').doc(taskId);
+        const payoutsRef = dbAdmin.collection('system_settings').doc('payouts');
         
-        const [userDoc, taskDoc] = await Promise.all([
+        const [userDoc, taskDoc, payoutsDoc] = await Promise.all([
           transaction.get(userRef),
-          transaction.get(taskRef)
+          transaction.get(taskRef),
+          transaction.get(payoutsRef)
         ]);
 
         if (!userDoc.exists || !taskDoc.exists) throw new Error("Verification target not found");
@@ -2196,15 +2198,20 @@ Please verify if the submission is a plausible and honest completion of a social
 
         // Check 30-Day Plan Expiration
         let currentPlan = userData.plan || 'free';
-        const planEndDate = userData.planEndDate ? (userData.planEndDate.toDate ? userData.planEndDate.toDate() : new Date(userData.planEndDate)) : null;
-        if (planEndDate && new Date() > planEndDate) {
-          currentPlan = 'free';
-          // Update DB atomically as expired
-          transaction.update(userRef, {
-            plan: 'free',
-            subscriptionTier: 'free',
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          });
+        const payoutsData = payoutsDoc.exists ? payoutsDoc.data() : null;
+        const isRenewalRequired = payoutsData && payoutsData.isRenewalRequired !== undefined ? !!payoutsData.isRenewalRequired : true;
+
+        if (isRenewalRequired) {
+          const planEndDate = userData.planEndDate ? (userData.planEndDate.toDate ? userData.planEndDate.toDate() : new Date(userData.planEndDate)) : null;
+          if (planEndDate && new Date() > planEndDate) {
+            currentPlan = 'free';
+            // Update DB atomically as expired
+            transaction.update(userRef, {
+              plan: 'free',
+              subscriptionTier: 'free',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
         }
 
         // Restriction: Free plans are locked

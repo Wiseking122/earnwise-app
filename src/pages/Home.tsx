@@ -55,6 +55,8 @@ export default function Home() {
 
   const [featuredTasks, setFeaturedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRenewalRequired, setIsRenewalRequired] = useState(true);
+  const [showRenewModal, setShowRenewModal] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpNumber, setLevelUpNumber] = useState<number | null>(null);
   const [aiInsights, setAiInsights] = useState<any>(null);
@@ -137,6 +139,39 @@ export default function Home() {
   const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
   const userPlan = isAdmin ? 'golden' : (profile?.plan || 'free');
   const multiplier = PLANS.find(p => p.id === userPlan)?.multiplier || 1.0;
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.isRenewalRequired !== undefined) {
+          setIsRenewalRequired(!!data.isRenewalRequired);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isPlanExpired = useMemo(() => {
+    if (!profile?.planEndDate || profile?.plan === 'free' || isAdmin) return false;
+    const end = profile.planEndDate.toDate ? profile.planEndDate.toDate() : new Date(profile.planEndDate);
+    return new Date() > end;
+  }, [profile?.planEndDate, profile?.plan, isAdmin]);
+
+  const daysLeft = useMemo(() => {
+    if (!profile?.planEndDate || profile?.plan === 'free' || isAdmin) return null;
+    const end = profile.planEndDate.toDate ? profile.planEndDate.toDate() : new Date(profile.planEndDate);
+    const diff = end.getTime() - new Date().getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [profile?.planEndDate, profile?.plan, isAdmin]);
+
+  useEffect(() => {
+    if (isPlanExpired && isRenewalRequired) {
+      setShowRenewModal(true);
+    } else {
+      setShowRenewModal(false);
+    }
+  }, [isPlanExpired, isRenewalRequired]);
 
   useEffect(() => {
     async function fetchData() {
@@ -376,9 +411,26 @@ export default function Home() {
                     <h4 className="font-display font-black text-sm sm:text-base leading-tight uppercase tracking-tighter">
                       {isAdmin ? 'Admin Elite' : `${profile?.plan} Plan`} Active
                     </h4>
-                    <p className="text-white/80 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest">
+                    <p className="text-white/80 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest mb-0.5">
                       Multiplier: {isAdmin ? '10.0' : multiplier}x Reward Boost {isAdmin && '(Free Admin Access)'}
                     </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {isRenewalRequired ? (
+                        <>
+                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                          <p className="text-white/90 text-[8.5px] sm:text-[10px] font-black uppercase tracking-widest">
+                            {daysLeft !== null ? (daysLeft <= 0 ? 'Expired' : `${daysLeft} Days Remaining`) : 'Active'}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-ping" />
+                          <p className="text-emerald-100 text-[8.5px] sm:text-[10px] font-black uppercase tracking-widest">
+                            Status: Earning Enabled (Account Active)
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {!isAdmin && (
@@ -980,6 +1032,48 @@ export default function Home() {
                   </motion.button>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Renew Plan Modal */}
+      <AnimatePresence>
+        {showRenewModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-slate-900 border border-red-500/30 rounded-[2.5rem] p-6 max-w-sm w-full text-center space-y-6 shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center text-red-500 mx-auto animate-bounce">
+                <Lock size={32} />
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="font-display font-black text-xl text-white uppercase tracking-tight">Plan Renewal Required</h3>
+                <p className="text-slate-400 text-xs font-semibold leading-relaxed">
+                  Your premium subscription cycle has expired. You must renew or upgrade your package to continue completing tasks and accessing your earnings.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowRenewModal(false);
+                  navigate('/upgrade');
+                }}
+                className="w-full bg-linear-to-r from-red-600 to-orange-500 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest shadow-lg hover:from-red-500 hover:to-orange-400 transition-all active:scale-95"
+              >
+                Renew Plan Now
+              </button>
             </motion.div>
           </div>
         )}

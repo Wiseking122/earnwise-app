@@ -78,6 +78,7 @@ export interface UserProfile {
     suspensionReason?: string;
   };
   plan: PlanType;
+  planEndDate?: any;
   googleTokens?: {
     accessToken?: string;
     refreshToken?: string;

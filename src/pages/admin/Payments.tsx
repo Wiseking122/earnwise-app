@@ -56,7 +56,8 @@ export default function AdminPayments() {
     payoutEndDate: '',
     payoutsForceClosed: false,
     taskOverrideOpen: false,
-    referralOverrideOpen: false
+    referralOverrideOpen: false,
+    isRenewalRequired: true
   });
 
   useEffect(() => {
@@ -68,7 +69,8 @@ export default function AdminPayments() {
           payoutEndDate: data.payoutEndDate || '',
           payoutsForceClosed: !!data.payoutsForceClosed,
           taskOverrideOpen: !!data.taskOverrideOpen,
-          referralOverrideOpen: !!data.referralOverrideOpen
+          referralOverrideOpen: !!data.referralOverrideOpen,
+          isRenewalRequired: data.isRenewalRequired !== undefined ? !!data.isRenewalRequired : true
         });
       }
     }, (error) => {
@@ -542,6 +544,38 @@ export default function AdminPayments() {
                 value={controls.payoutEndDate}
                 onChange={(e) => saveControls({ payoutEndDate: e.target.value })}
               />
+            </div>
+          </div>
+
+          {/* Cycle Transition & Renewal Controls */}
+          <div className="border-t border-slate-800/80 pt-4 space-y-4 text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-100">Cycle Transition & Renewal</h4>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Control 30-day plan expiration checks</p>
+              </div>
+              <button
+                onClick={() => saveControls({ isRenewalRequired: !controls.isRenewalRequired })}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  controls.isRenewalRequired 
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' 
+                    : 'bg-emerald-600 text-white shadow-md shadow-emerald-500/10'
+                }`}
+              >
+                {controls.isRenewalRequired ? 'Strict Mode: ACTIVE' : 'Safe Mode: ACTIVE'}
+              </button>
+            </div>
+
+            <div className={`p-3.5 rounded-xl border text-[10px] font-bold leading-relaxed transition-all ${
+              controls.isRenewalRequired
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+            }`}>
+              {controls.isRenewalRequired ? (
+                <span>⚠️ <strong>Strict Mode:</strong> 30-Day expiration is active (Use only after payouts are complete).</span>
+              ) : (
+                <span>🛡️ <strong>Safe Mode:</strong> Users can earn beyond expiration (Useful during payout delays).</span>
+              )}
             </div>
           </div>
 

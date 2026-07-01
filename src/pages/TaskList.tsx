@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Task, TaskType } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -68,6 +68,32 @@ export default function TaskList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isZeydooModalOpen, setZeydooModalOpen] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
+  const [isRenewalRequired, setIsRenewalRequired] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.isRenewalRequired !== undefined) {
+          setIsRenewalRequired(!!data.isRenewalRequired);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isPlanExpired = useMemo(() => {
+    if (!profile?.planEndDate || profile?.plan === 'free' || profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com') return false;
+    const end = profile.planEndDate.toDate ? profile.planEndDate.toDate() : new Date(profile.planEndDate);
+    return new Date() > end;
+  }, [profile?.planEndDate, profile?.plan, profile?.role, user?.email]);
+
+  const isUserFree = useMemo(() => {
+    const baseFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (baseFree) return true;
+    if (isRenewalRequired && isPlanExpired) return true;
+    return false;
+  }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
 
   const taskCounts = {
     survey: 'LIVE', 
@@ -84,16 +110,16 @@ export default function TaskList() {
     if (!user) return;
     const q = query(collection(db, 'tasks'), where('status', '==', 'active'));
     
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const taskList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-      setTasks(taskList);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'tasks');
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    getDocs(q)
+      .then((snap) => {
+        const taskList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+        setTasks(taskList);
+        setLoading(false);
+      })
+      .catch((error) => {
+        handleFirestoreError(error, OperationType.LIST, 'tasks');
+        setLoading(false);
+      });
   }, [user]);
 
   useEffect(() => {
@@ -148,7 +174,6 @@ export default function TaskList() {
               <button
                 key={cat.id}
                 onClick={() => {
-                  const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
                   if (isUserFree && cat.id !== 'all' && cat.id !== 'referral') {
                     setShowRestriction(true);
                     return;
@@ -251,7 +276,7 @@ export default function TaskList() {
               className="space-y-3.5"
             >
               {filteredTasks.map((task, index) => {
-                const isFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+                const isFree = isUserFree;
                 const cardContent = (
                   <div className="flex justify-between items-center relative z-10">
                     <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
