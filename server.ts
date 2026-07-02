@@ -3131,6 +3131,11 @@ Please verify if the submission is a plausible and honest completion of a social
   app.post("/api/auth/register-check", async (req, res) => {
     const { deviceFingerprint, telegramId } = req.body;
 
+    if (!isDbAdminCapable) {
+      console.warn("[AUTH_CHECK] Admin SDK is not capable. Bypassing registration check.");
+      return res.status(200).json({ success: true });
+    }
+
     try {
       if (telegramId) {
         const tgSnap = await dbAdmin.collection('users')
@@ -3166,6 +3171,11 @@ Please verify if the submission is a plausible and honest completion of a social
   app.post("/api/auth/login-check", async (req, res) => {
     const { email, deviceFingerprint, telegramId } = req.body;
 
+    if (!isDbAdminCapable) {
+      console.warn("[AUTH_LOGIN_CHECK] Admin SDK is not capable. Bypassing login check.");
+      return res.status(200).json({ success: true });
+    }
+
     try {
       if (!email) return res.status(400).json({ error: "Email is required" });
 
@@ -3194,6 +3204,11 @@ Please verify if the submission is a plausible and honest completion of a social
 
   app.post("/api/auth/register", async (req, res) => {
     const { deviceFingerprint, telegramId } = req.body;
+
+    if (!isDbAdminCapable) {
+      console.warn("[AUTH_REGISTER] Admin SDK is not capable. Bypassing check.");
+      return res.status(200).json({ success: true });
+    }
 
     try {
       if (telegramId) {
@@ -3231,6 +3246,14 @@ Please verify if the submission is a plausible and honest completion of a social
   app.post("/api/auth/login", async (req, res) => {
     const { email, deviceFingerprint, telegramId } = req.body;
     
+    if (!isDbAdminCapable) {
+      console.warn("[AUTH_LOGIN] Admin SDK is not capable. Bypassing device binding update.");
+      return res.status(200).json({ 
+        success: true, 
+        message: "Session authenticated (Admin SDK offline fallback)." 
+      });
+    }
+
     try {
       if (email && deviceFingerprint) {
         const userSnap = await dbAdmin.collection('users').where('email', '==', email).limit(1).get();
