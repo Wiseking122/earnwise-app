@@ -427,6 +427,11 @@ export default function Upgrade() {
                         <span className="text-blue-600 font-display font-black text-2xl tracking-tighter">₦{plan.cost.toLocaleString()}</span>
                         <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">/ Lifetime</span>
                       </div>
+                      {plan.description && (
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-2 text-left bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                          {plan.description}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2 pt-1 border-t border-slate-100">

@@ -28,6 +28,7 @@ import {
 import { getApiUrl } from '../lib/config';
 import DepositTab from '../components/DepositTab';
 import WithdrawalTimeline from '../components/WithdrawalTimeline';
+import { PayoutReceipt } from '../components/PayoutReceipt';
 
 export default function Withdrawal() {
   const { user, profile } = useAuth();
@@ -45,6 +46,8 @@ export default function Withdrawal() {
   const [withdrawalType, setWithdrawalType] = useState<'task' | 'referral'>('task');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [lastWithdrawal, setLastWithdrawal] = useState<any>(null);
   const [banks, setBanks] = useState<{name: string, code: string}[]>([]);
 
   const [resolvingName, setResolvingName] = useState(false);
@@ -397,7 +400,17 @@ export default function Withdrawal() {
       });
 
       setSuccess(true);
-      setTimeout(() => navigate('/earnings'), 3000);
+      setLastWithdrawal({
+        amount: withdrawAmount,
+        netAmount: withdrawAmount * (withdrawalType === 'referral' ? 1 : 0.90),
+        fee: withdrawAmount * (withdrawalType === 'referral' ? 0 : 0.10),
+        bankName,
+        accountNumber,
+        accountName,
+        withdrawalType,
+        date: new Date().toISOString()
+      });
+      setShowReceipt(true);
     } catch (err: any) {
       console.error("Manual withdrawal dispatch failed", err);
       setError(err?.message || "Manual request compilation failed. Try again.");
@@ -417,6 +430,14 @@ export default function Withdrawal() {
   return (
     <Layout title="Wallet Protocol" showBack>
       {success && <Confetti />}
+      <PayoutReceipt 
+        isOpen={showReceipt} 
+        onClose={() => {
+          setShowReceipt(false);
+          navigate('/earnings');
+        }} 
+        data={lastWithdrawal} 
+      />
       <div className="p-3.5 sm:p-5 pb-24 space-y-4 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
 

@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { Task, TaskCompletion, PlanType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
+import { getOrGenerateDeviceFingerprint } from '../lib/security';
 import { PLANS } from '../constants/plans';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -135,6 +136,7 @@ export default function TaskDetail() {
     setError('');
     
     try {
+      const deviceFingerprint = getOrGenerateDeviceFingerprint();
       const response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
         method: 'POST',
         headers: {
@@ -146,7 +148,8 @@ export default function TaskDetail() {
           taskTitle: task.title,
           proof: proof || 'Screenshot Proof Provided',
           rewardAmount: calculatedReward,
-          screenshot: screenshot // Base64 data
+          screenshot: screenshot, // Base64 data
+          deviceFingerprint
         })
       });
 

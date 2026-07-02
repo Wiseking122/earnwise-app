@@ -54,7 +54,7 @@ export default function CoursePlayer() {
 
   const course = COURSES.find(c => c.id === id);
 
-  const maxFreeCredits = profile?.plan === 'golden' ? 5 : (profile?.plan === 'platinum' ? 2 : 0);
+  const maxFreeCredits = profile?.plan === 'golden' ? 4 : (profile?.plan === 'platinum' ? 2 : 0);
   const freeCreditsLeft = maxFreeCredits - (profile?.freeCoursesUsed || 0);
   const isAdmin = profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com';
   const hasFreeCredit = freeCreditsLeft > 0 || isAdmin;

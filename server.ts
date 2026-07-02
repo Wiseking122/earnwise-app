@@ -180,9 +180,9 @@ const PLAN_LIMITS: Record<string, { cap: number; daily: number }> = {
   pro: { cap: 22000, daily: 735 },
   bronze: { cap: 35000, daily: 1170 },
   diamond: { cap: 45000, daily: 1500 },
-  silver: { cap: 140000, daily: 2500 },
-  platinum: { cap: 210000, daily: 3000 },
-  golden: { cap: 350000, daily: 4000 }
+  silver: { cap: 9999999, daily: 2500 },
+  platinum: { cap: 9999999, daily: 3000 },
+  golden: { cap: 9999999, daily: 4000 }
 };
 
 // --- CONFIGURATION: Advertiser CPA Chart ---
@@ -952,7 +952,7 @@ async function startServer() {
    * Secure endpoint for verifying ad completions and crediting user accounts.
    */
   app.post("/api/rewards/verify", async (req, res) => {
-    const { userId, taskId, type } = req.body;
+    const { userId, taskId, type, deviceFingerprint } = req.body;
     
     console.log(`[REWARD-VERIFY] Processing reward for User: ${userId}, Task: ${taskId}, Type: ${type}`);
     
@@ -960,12 +960,56 @@ async function startServer() {
       return res.status(400).json({ success: false, message: "Missing required parameters" });
     }
 
+    // Velocity Gate (Anti-Bot & Multi-Account Farming)
+    const now = Date.now();
+    const cooldownMs = 45 * 1000;
+    
+    // Check both User ID and Device Fingerprint for cooldown
+    const lastUserActivityTime = lastUserActivity.get(userId.toString()) || 0;
+    const lastDeviceActivityTime = deviceFingerprint ? (lastUserActivity.get(`DEV_${deviceFingerprint}`) || 0) : 0;
+    
+    const maxLastActivity = Math.max(lastUserActivityTime, lastDeviceActivityTime);
+
+    if (now - maxLastActivity < cooldownMs) {
+      const remaining = Math.ceil((cooldownMs - (now - maxLastActivity)) / 1000);
+      return res.status(429).json({ 
+        success: false, 
+        message: `Fraud Detection: Pacing required. Please wait ${remaining}s.` 
+      });
+    }
+    
+    lastUserActivity.set(userId.toString(), now);
+    if (deviceFingerprint) lastUserActivity.set(`DEV_${deviceFingerprint}`, now);
+
     try {
       if (isDbAdminCapable) {
         const userRef = dbAdmin.collection('users').doc(userId.toString());
         const userDoc = await userRef.get();
 
         if (userDoc.exists) {
+          const userData = userDoc.data()!;
+
+          // Device Binding Security Check (One-Phone-One-Account)
+          if (deviceFingerprint) {
+            // Check if THIS device is owned by someone ELSE
+            const deviceOwnerSnap = await dbAdmin.collection('users')
+              .where('deviceFingerprint', '==', deviceFingerprint)
+              .limit(1)
+              .get();
+            
+            if (!deviceOwnerSnap.empty && deviceOwnerSnap.docs[0].id !== userId.toString()) {
+              return res.status(403).json({
+                success: false,
+                message: "Security Violation: This device is associated with another Earnwise account. Multi-account usage on one device is strictly prohibited."
+              });
+            }
+
+            // Bind device if not set or update if changed (and verified above as not owned)
+            if (userData.deviceFingerprint !== deviceFingerprint) {
+              await userRef.update({ deviceFingerprint });
+            }
+          }
+
           // Calculate dynamic reward based on task type or specific taskId
           let rewardAmount = 50; // Default reward
           if (type === 'video_ad') {
@@ -973,7 +1017,6 @@ async function startServer() {
             rewardAmount = 50; 
           }
           
-          const userData = userDoc.data()!;
           const multiplier = TIER_MULTIPLIERS[userData.plan || 'free'] || 1.0;
           const finalReward = rewardAmount * multiplier;
 
@@ -1402,7 +1445,7 @@ async function startServer() {
   });
 
   app.post("/api/admin/send-payout-email", async (req, res) => {
-    const { email, name, amount, netPayout, fee, withdrawalId, bankName, accountName, accountNumber } = req.body;
+    const { email, name, amount, netPayout, fee, withdrawalId, bankName, accountName, accountNumber, withdrawalType } = req.body;
     
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
@@ -1447,8 +1490,8 @@ async function startServer() {
                     <td style="color: #1e293b; font-weight: 700; text-align: right;">₦${Number(amount).toLocaleString()}</td>
                   </tr>
                   <tr style="height: 30px;">
-                    <td style="color: #64748b; font-weight: 500;">Processing Fee (${Number(fee) === 0 ? 'Free' : '10%'})</td>
-                    <td style="${Number(fee) === 0 ? 'color: #10b981;' : 'color: #e11d48;'} font-weight: 700; text-align: right;">${Number(fee) === 0 ? 'Free (₦0)' : `-₦${Number(fee).toLocaleString()}`}</td>
+                    <td style="color: #64748b; font-weight: 500;">Processing Fee (${withdrawalType === 'referral' ? 'Free' : '10%'})</td>
+                    <td style="${withdrawalType === 'referral' ? 'color: #10b981;' : 'color: #e11d48;'} font-weight: 700; text-align: right;">${withdrawalType === 'referral' ? 'Free (₦0)' : `-₦${Number(fee).toLocaleString()}`}</td>
                   </tr>
                 </table>
               </div>
@@ -1615,14 +1658,108 @@ async function startServer() {
     }
   });
 
+  const getNigerianDateString = () => {
+    const d = new Date();
+    const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const wat = new Date(utc + (3600000 * 1)); // WAT is UTC+1
+    return wat.toISOString().split('T')[0];
+  };
+
+  async function checkAndIncrementAiLimit(userId: string): Promise<{ allowed: boolean; message?: string }> {
+    if (!isDbAdminCapable) {
+      return { allowed: true };
+    }
+
+    try {
+      const userRef = dbAdmin.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        return { allowed: false, message: "User profile not found. Please log in again." };
+      }
+
+      const userData = userDoc.data();
+      const role = userData?.role || 'user';
+      const email = userData?.email || '';
+      const plan = userData?.plan || 'free';
+
+      if (role === 'admin' || email === 'wiseking7890@gmail.com') {
+        return { allowed: true };
+      }
+
+      if (plan === 'free') {
+        return { 
+          allowed: false, 
+          message: "Wise AI Assistant is not available on the Free plan. Please upgrade to Elite or higher in the Upgrade tab to unlock AI support!" 
+        };
+      }
+
+      const limitedPlans = ['elite', 'starter', 'pro', 'bronze', 'diamond'];
+      const isLimited = limitedPlans.includes(plan);
+
+      if (!isLimited) {
+        return { allowed: true };
+      }
+
+      // Check if user has bought any course - if they have, they get unlimited AI
+      try {
+        const coursePurchases = await dbAdmin.collection('coursePurchases')
+          .where('userId', '==', userId)
+          .limit(1)
+          .get();
+        
+        if (!coursePurchases.empty) {
+          return { allowed: true };
+        }
+      } catch (courseErr: any) {
+        console.warn("[AI-LIMIT] Course check failed:", courseErr.message);
+      }
+
+      const today = getNigerianDateString();
+      const lastAiUsedDate = userData?.lastAiUsedDate || '';
+      let aiTodayCount = userData?.aiTodayCount || 0;
+
+      if (lastAiUsedDate !== today) {
+        aiTodayCount = 0;
+      }
+
+      if (aiTodayCount >= 3) {
+        return { 
+          allowed: false, 
+          message: "Daily AI Limit Reached! Under your current plan, you can use Wise AI up to 3 times a day. Upgrade to DIAMOND or higher to get UNLIMITED AI requests, or wait until tomorrow!" 
+        };
+      }
+
+      await userRef.update({
+        lastAiUsedDate: today,
+        aiTodayCount: admin.firestore.FieldValue.increment(1)
+      });
+
+      return { allowed: true };
+    } catch (err: any) {
+      console.error("[AI-LIMIT] Error checking or incrementing limit:", err.message);
+      return { allowed: true };
+    }
+  }
+
   /**
    * POST /api/ai/assistant
    * Centralized AI Assistant for Earnwise
    */
   app.post("/api/ai/assistant", async (req, res) => {
     const { action, payload } = req.body;
+    const userId = req.body.userId || payload?.userId;
     const activeApiKey = (process.env.GEMINI_API_KEY || "").trim();
     const promptMessage = payload?.prompt || "";
+
+    if (userId) {
+      const limitCheck = await checkAndIncrementAiLimit(userId);
+      if (!limitCheck.allowed) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.write(`⚠️ ${limitCheck.message}`);
+        res.end();
+        return;
+      }
+    }
 
     if (!activeApiKey || activeApiKey === "your_gemini_api_key_here") {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -1750,22 +1887,60 @@ IMPORTANT INSTRUCTIONS:
    * POST /api/v1/tasks/verify-proof
    */
   app.post("/api/v1/tasks/verify-proof", async (req, res) => {
-    const { userId, taskId, taskTitle, proof, rewardAmount, screenshot } = req.body;
+    const { userId, taskId, taskTitle, proof, rewardAmount, screenshot, deviceFingerprint } = req.body;
 
     if (!userId || !taskId || (!proof && !screenshot)) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+
+    // Velocity Gate (Anti-Bot & Hardware Pacing)
+    const now = Date.now();
+    const cooldownMs = 45 * 1000;
+    
+    const lastUserActivityTime = lastUserActivity.get(userId.toString()) || 0;
+    const lastDeviceActivityTime = deviceFingerprint ? (lastUserActivity.get(`DEV_${deviceFingerprint}`) || 0) : 0;
+    
+    const maxLastActivity = Math.max(lastUserActivityTime, lastDeviceActivityTime);
+
+    if (now - maxLastActivity < cooldownMs) {
+      const remaining = Math.ceil((cooldownMs - (now - maxLastActivity)) / 1000);
+      return res.status(429).json({ 
+        error: `Submission Pacing: Please wait ${remaining}s.` 
+      });
+    }
+    
+    lastUserActivity.set(userId.toString(), now);
+    if (deviceFingerprint) lastUserActivity.set(`DEV_${deviceFingerprint}`, now);
 
     // Ensure rewardAmount is a valid positive number
     const numericReward = Math.max(0, Number(rewardAmount) || 0);
 
     try {
       if (isDbAdminCapable) {
-        const userDoc = await dbAdmin.collection('users').doc(userId).get();
+        const userRef = dbAdmin.collection('users').doc(userId);
+        const userDoc = await userRef.get();
         if (userDoc.exists) {
           const userData = userDoc.data()!;
           if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
             return res.status(403).json({ error: "Upgrade your plan to start earning from tasks." });
+          }
+
+          // Device Binding Security Check
+          if (deviceFingerprint) {
+            const deviceOwnerSnap = await dbAdmin.collection('users')
+              .where('deviceFingerprint', '==', deviceFingerprint)
+              .limit(1)
+              .get();
+            
+            if (!deviceOwnerSnap.empty && deviceOwnerSnap.docs[0].id !== userId) {
+              return res.status(403).json({
+                error: "Fraud Protection: This device is already linked to another profile. One-Phone-One-Account rule enforced."
+              });
+            }
+
+            if (userData.deviceFingerprint !== deviceFingerprint) {
+              await userRef.update({ deviceFingerprint });
+            }
           }
         }
       }
@@ -2196,6 +2371,16 @@ Please verify if the submission is a plausible and honest completion of a social
         const userData = userDoc.data()!;
         const taskData = taskDoc.data()!;
 
+        // SECURITY: Automated Pacing (IVT Prevention)
+        const nowMs = Date.now();
+        const lastActivityTime = lastUserActivity.get(userId) || 0;
+        const cooldownSeconds = 45; 
+        if (nowMs - lastActivityTime < cooldownSeconds * 1000 && userData.role !== 'admin') {
+           const waitRemaining = Math.ceil((cooldownSeconds * 1000 - (nowMs - lastActivityTime)) / 1000);
+           throw new Error(`Security Pacing: Quality verification in progress. Please wait ${waitRemaining}s before your next submission.`);
+        }
+        lastUserActivity.set(userId, nowMs);
+
         // Check 30-Day Plan Expiration
         let currentPlan = userData.plan || 'free';
         const payoutsData = payoutsDoc.exists ? payoutsDoc.data() : null;
@@ -2253,7 +2438,7 @@ Please verify if the submission is a plausible and honest completion of a social
           const dailyTracking = userData.dailyTaskEarningsTracking || {};
           const dailyEarnedToday = dailyTracking.date === todayStr ? (dailyTracking.amount || 0) : 0;
           if (dailyEarnedToday + finalPayout > planLimit.daily) {
-            throw new Error(`Daily task earning limit reached for your plan (₦${planLimit.daily.toLocaleString()}). Come back tomorrow!`);
+            throw new Error("Daily high-quality task limit reached. Resumes tomorrow!");
           }
 
           // Update Limits Tracking fields
@@ -2978,6 +3163,35 @@ Please verify if the submission is a plausible and honest completion of a social
     }
   });
 
+  app.post("/api/auth/login-check", async (req, res) => {
+    const { email, deviceFingerprint, telegramId } = req.body;
+
+    try {
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      const userSnap = await dbAdmin.collection('users').where('email', '==', email).limit(1).get();
+      if (userSnap.empty) return res.status(200).json({ success: true }); 
+
+      const userDoc = userSnap.docs[0];
+      const userData = userDoc.data();
+
+      // Telegram Binding Check
+      if (telegramId && userData.telegramId && String(userData.telegramId) !== String(telegramId)) {
+        return res.status(403).json({
+          error: "Security Alert: This account is bound to a different Telegram profile."
+        });
+      }
+
+      // Login is now allowed on any device to support "friend login"
+      // Fingerprint will be updated/tracked in the login endpoint
+      
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("[AUTH_LOGIN_CHECK] Error:", err);
+      return res.status(500).json({ error: "Security validation error." });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     const { deviceFingerprint, telegramId } = req.body;
 
@@ -3013,13 +3227,29 @@ Please verify if the submission is a plausible and honest completion of a social
     }
   });
 
-  // Login endpoint - completely unrestricted by device tracking
+  // Login endpoint - updates device fingerprint
   app.post("/api/auth/login", async (req, res) => {
-    // Unrestricted by device tracking or fingerprint checks as requested
-    return res.status(200).json({ 
-      success: true, 
-      message: "Login tracking bypass initialized. Device fingerprint unrestricted." 
-    });
+    const { email, deviceFingerprint, telegramId } = req.body;
+    
+    try {
+      if (email && deviceFingerprint) {
+        const userSnap = await dbAdmin.collection('users').where('email', '==', email).limit(1).get();
+        if (!userSnap.empty) {
+          const userDoc = userSnap.docs[0];
+          await userDoc.ref.update({
+            deviceFingerprint,
+            telegramId: telegramId || userDoc.data().telegramId || null,
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+      return res.status(200).json({ 
+        success: true, 
+        message: "Session authenticated securely." 
+      });
+    } catch (err) {
+      return res.status(500).json({ error: "Session update failed." });
+    }
   });
 
   // Send Welcome Email
@@ -3408,10 +3638,10 @@ Please verify if the submission is a plausible and honest completion of a social
         return res.status(400).json({ error: windowMessage || "Payout Gateway Closed. Processing windows are strictly scheduled by Administration." });
       }
 
-      // --- DYNAMIC FEE CALCULATION (0% Referral, 10% Task) ---
-      const isReferral = withdrawalType === 'referral';
-      const netPayout = isReferral ? amount : amount * 0.90;
-      const fee = isReferral ? 0 : amount * 0.10;
+      // --- DYNAMIC FEE CALCULATION (10% Task, Free Referral) ---
+      const feeRate = withdrawalType === 'referral' ? 0.0 : 0.10;
+      const netPayout = amount * (1 - feeRate);
+      const fee = amount * feeRate;
 
       // Create Transfer Recipient
       const recipientResponse = await axios.post("https://api.paystack.co/transferrecipient", {
@@ -3489,8 +3719,9 @@ Please verify if the submission is a plausible and honest completion of a social
         if (userData.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
           try {
             const isReferral = withdrawalType === 'referral';
-            const netPayout = isReferral ? amount : amount * 0.90;
-            const fee = isReferral ? 0 : amount * 0.10;
+            const feeRate = isReferral ? 0.0 : 0.10;
+            const netPayout = amount * (1 - feeRate);
+            const fee = amount * feeRate;
             const name = userData.displayName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || "Earner";
             await transporter.sendMail({
               from: `"Earnwise Payouts" <${process.env.EMAIL_USER}>`,
@@ -3880,6 +4111,15 @@ Please verify if the submission is a plausible and honest completion of a social
         const { message, userId, history = [] } = payload;
         
         if (!message) return;
+
+        if (userId) {
+          const limitCheck = await checkAndIncrementAiLimit(userId);
+          if (!limitCheck.allowed) {
+            ws.send(JSON.stringify({ type: 'chunk', content: `⚠️ ${limitCheck.message}` }));
+            ws.send(JSON.stringify({ type: 'done' }));
+            return;
+          }
+        }
 
         const ai = getAi();
         if (!ai) {

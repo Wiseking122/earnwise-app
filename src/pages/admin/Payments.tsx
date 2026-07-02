@@ -353,7 +353,8 @@ export default function AdminPayments() {
                 withdrawalId: request.id,
                 bankName: request.bankDetails?.bankName,
                 accountName: request.bankDetails?.accountName,
-                accountNumber: request.bankDetails?.accountNumber
+                accountNumber: request.bankDetails?.accountNumber,
+                withdrawalType: request.withdrawalType || (isReferral ? 'referral' : 'task')
               })
             }).catch(fetchErr => console.warn("Backend payout email fetch error:", fetchErr));
 

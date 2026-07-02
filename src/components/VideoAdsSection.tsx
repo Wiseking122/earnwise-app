@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
+import { getOrGenerateDeviceFingerprint } from '../lib/security';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Clock, Coins, Tv, CheckCircle, X, Sparkles, Loader2 } from 'lucide-react';
 
@@ -74,11 +75,12 @@ export default function VideoAdsSection() {
   const rewardUser = async (userId: string | number, taskId: string) => {
     console.log(`[REWARD] Crediting user ${userId} for task ${taskId}`);
     try {
+      const deviceFingerprint = getOrGenerateDeviceFingerprint();
       // Placeholder fetch request to secure backend endpoint
       const response = await fetch(getApiUrl('/api/rewards/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, taskId, type: 'video_ad' }),
+        body: JSON.stringify({ userId, taskId, type: 'video_ad', deviceFingerprint }),
       });
       const data = await response.json();
       console.log('[REWARD_RESPONSE]', data);

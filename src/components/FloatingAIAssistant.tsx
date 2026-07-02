@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { getApiUrl, WS_BASE_URL } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function FloatingAIAssistant() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', content: string, image?: string}[]>([
     { role: 'ai', content: "Welcome to EarnWise! I am Wise AI, your mentor proudly owned by EarnWise and sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. I'm here to help you maximize your earnings on Nigeria's largest digital task network.\n\nTo activate your account and start earning, simply fund your wallet via Paystack on the Upgrade page and select your preferred tier!" }
@@ -124,6 +126,7 @@ export default function FloatingAIAssistant() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         message: p,
+        userId: user?.uid,
         history: messages.map(m => ({ 
           role: m.role === 'user' ? 'user' : 'model', 
           parts: [{ text: m.content }] 
@@ -137,6 +140,7 @@ export default function FloatingAIAssistant() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'generate-text',
+            userId: user?.uid,
             payload: { 
               prompt: p,
               history: messages.map(m => ({
