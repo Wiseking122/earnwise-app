@@ -230,6 +230,17 @@ export default function Welcome() {
         });
 
         await signInWithEmailAndPassword(auth, loginEmail, password);
+
+        // --- UPDATE LOGIN TRACKING ---
+        try {
+          await axios.post(getApiUrl('/api/auth/login'), {
+            email: loginEmail,
+            deviceFingerprint,
+            telegramId
+          });
+        } catch (trackErr) {
+          console.warn("Login tracking failed, but session is active:", trackErr);
+        }
       } else {
         if (!username.trim()) throw new Error("Username is required");
         if (!email.trim()) throw new Error("Email is required");
