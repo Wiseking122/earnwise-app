@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Download, ShieldCheck, X, Share2, Info, Copy, MessageCircle, Send, Check } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useAuth } from '../context/AuthContext';
+import WebApp from '@twa-dev/sdk';
 
 interface TransactionReceiptProps {
   receipt: {
@@ -118,6 +119,22 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [downloadedImage, setDownloadedImage] = useState<string | null>(null);
+  const [renderedImage, setRenderedImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Generate the canvas in the background shortly after mount so it's ready when clicked
+    const timer = setTimeout(() => {
+      generateCanvas().then(canvas => {
+        if (canvas) {
+          const dataUrl = canvas.toDataURL('image/png');
+          setRenderedImage(dataUrl);
+        }
+      }).catch(err => {
+        console.error("Background receipt render failed:", err);
+      });
+    }, 450); // 450ms is perfect: allows the modal animate entrance to complete fully, ensuring html2canvas grabs a clean, non-scaled/non-animated snapshot of the receipt card!
+    return () => clearTimeout(timer);
+  }, [receipt]);
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -284,10 +301,8 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const canvas = await generateCanvas();
-      if (!canvas) throw new Error("Could not construct canvas element");
-      
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (!dataUrl) throw new Error("Could not construct canvas element");
       
       // Attempt standard browser download first
       try {
@@ -316,10 +331,9 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const copyBothToClipboard = async () => {
     setSharing(true);
     try {
-      const canvas = await generateCanvas();
-      if (!canvas) throw new Error("Could not construct canvas");
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (!dataUrl) throw new Error("Could not construct canvas");
       
-      const dataUrl = canvas.toDataURL('image/png');
       const blob = dataURLtoBlob(dataUrl);
       const textBlob = new Blob([shareText], { type: 'text/plain' });
 
@@ -351,9 +365,8 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const shareToPlatform = async (platform: 'whatsapp' | 'telegram' | 'copy') => {
     if (platform === 'whatsapp') {
       try {
-        const canvas = await generateCanvas();
-        if (canvas) {
-          const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+        if (dataUrl) {
           const blob = dataURLtoBlob(dataUrl);
           const textBlob = new Blob([shareText], { type: 'text/plain' });
           if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
@@ -378,19 +391,28 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
         const isMobileDevice = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         const url = isMobileDevice 
           ? `whatsapp://send?text=${encodeURIComponent(shareText)}`
-          : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+          : `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
         
-        if (isMobileDevice) {
-          window.location.href = url;
-        } else {
-          window.open(url, '_blank');
+        try {
+          if (WebApp && WebApp.openLink) {
+            WebApp.openLink(url);
+          } else if (isMobileDevice) {
+            window.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
+        } catch (err) {
+          if (isMobileDevice) {
+            window.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
         }
-      }, 800);
+      }, 50);
     } else if (platform === 'telegram') {
       try {
-        const canvas = await generateCanvas();
-        if (canvas) {
-          const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+        if (dataUrl) {
           const blob = dataURLtoBlob(dataUrl);
           const textBlob = new Blob([shareText], { type: 'text/plain' });
           if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
@@ -415,12 +437,22 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
         const isMobileDevice = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         const url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
         
-        if (isMobileDevice) {
-          window.location.href = url;
-        } else {
-          window.open(url, '_blank');
+        try {
+          if (WebApp && WebApp.openLink) {
+            WebApp.openLink(url);
+          } else if (isMobileDevice) {
+            window.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
+        } catch (err) {
+          if (isMobileDevice) {
+            window.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
         }
-      }, 800);
+      }, 50);
     } else {
       await copyBothToClipboard();
     }
@@ -429,10 +461,9 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const handleNativeShare = async () => {
     setSharing(true);
     try {
-      const canvas = await generateCanvas();
-      if (!canvas) throw new Error("Could not construct canvas");
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (!dataUrl) throw new Error("Could not construct canvas");
 
-      const dataUrl = canvas.toDataURL('image/png');
       const blob = dataURLtoBlob(dataUrl);
       const file = new File([blob], `earnwise_receipt_${receipt.id.slice(0, 8)}.png`, { type: 'image/png' });
 
@@ -469,6 +500,11 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
       triggerToast("Choose options below!");
     } catch (err) {
       console.warn("Native sharing failed, opening options:", err);
+      // Fallback
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (dataUrl) {
+        setDownloadedImage(dataUrl);
+      }
       setShowShareOptions(true);
       triggerToast("Choose sharing option below!");
     } finally {
@@ -570,7 +606,28 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
           </div>
 
           {/* Body Details */}
-          <div className="p-2.5 sm:p-3 space-y-2.5 sm:space-y-3" style={{ backgroundColor: '#ffffff' }}>
+          <div className="p-2.5 sm:p-3 space-y-2.5 sm:space-y-3 relative overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
+            {/* Elegant Background Diagonal Watermark */}
+            <div 
+              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-[0.035]"
+              style={{ zIndex: 0 }}
+            >
+              <div 
+                className="font-black text-center tracking-[0.25em] uppercase whitespace-nowrap rotate-[-25deg] select-none pointer-events-none"
+                style={{ 
+                  color: '#0f172a',
+                  fontSize: '13px',
+                  lineHeight: '1.7'
+                }}
+              >
+                GROWING SECURE WEALTH<br />
+                GROWING SECURE WEALTH<br />
+                GROWING SECURE WEALTH<br />
+                GROWING SECURE WEALTH<br />
+                GROWING SECURE WEALTH<br />
+                GROWING SECURE WEALTH
+              </div>
+            </div>
             {/* Net Amount Display */}
             <div className="text-center py-0.5">
               <p className="text-[7px] sm:text-[7.5px] font-bold uppercase tracking-widest mb-0.5 animate-pulse" style={{ color: '#10b981' }}>
@@ -683,13 +740,16 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
             </div>
 
             {/* Verified Indicator Badge */}
-            <div className="flex justify-center pt-0.5">
+            <div className="flex flex-col items-center gap-1.5 pt-0.5">
               <div className="flex items-center gap-1 py-0.5 px-2 rounded-full" style={{ backgroundColor: '#f0fdf4' }}>
                 <ShieldCheck size={9} style={{ color: '#10b981' }} />
                 <span className="text-[6.5px] sm:text-[7px] uppercase tracking-widest font-black" style={{ color: '#15803d' }}>
                   Secured & Escrow Verified
                 </span>
               </div>
+              <span className="text-[6px] sm:text-[6.5px] text-slate-400 font-extrabold tracking-[0.2em] uppercase select-none pointer-events-none">
+                ★ GROWING SECURE WEALTH ★
+              </span>
             </div>
           </div>
 
