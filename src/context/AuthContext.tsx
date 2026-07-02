@@ -78,58 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           needsUpdate = true;
         }
 
-        // Self-heal: Award the referral upgrade bonus to the referrer if this user is upgraded
-        // but the referrer hasn't received the bonus yet.
-        if (userData.plan && userData.plan !== 'free' && userData.referredBy && !userData.hasReceivedReferralBonus) {
-          const planDetails = PLANS.find(p => p.id === userData.plan);
-          const planCost = planDetails?.cost || 0;
-          const bonusAmount = Math.floor(planCost * 0.3);
-          
-          if (bonusAmount > 0) {
-            console.log(`[REFERRAL_HEAL] Attempting to award missed referral bonus of ₦${bonusAmount} to referrer ${userData.referredBy}`);
-            try {
-              const refVariants = Array.from(new Set([
-                userData.referredBy,
-                userData.referredBy.toLowerCase(),
-                userData.referredBy.toUpperCase()
-              ].filter(Boolean) as string[]));
-              
-              let referrerSnap = await getDocs(query(collection(db, 'users'), where('referralCode', 'in', refVariants), limit(1)));
-              if (referrerSnap.empty) {
-                referrerSnap = await getDocs(query(collection(db, 'users'), where('username', 'in', refVariants), limit(1)));
-              }
-              
-              if (!referrerSnap.empty) {
-                const referrerDoc = referrerSnap.docs[0];
-                
-                // Atomically increment the referrer's balance using Firestore increment
-                await updateDoc(referrerDoc.ref, {
-                  balance: increment(bonusAmount),
-                  referralBalance: increment(bonusAmount),
-                  withdrawableBalance: increment(bonusAmount),
-                  referralEarnings: increment(bonusAmount),
-                  updatedAt: serverTimestamp()
-                });
-                
-                // Create a notification for the referrer
-                await addDoc(collection(db, 'notifications'), {
-                  userId: referrerDoc.id,
-                  title: '🎁 Referral Upgrade Commission!',
-                  message: `Your friend (${userData.displayName || userData.username}) upgraded to ${userData.plan}! You have received a 30% commission of ₦${bonusAmount}.`,
-                  type: 'reward',
-                  createdAt: serverTimestamp(),
-                  readBy: []
-                });
-                
-                updates.hasReceivedReferralBonus = true;
-                needsUpdate = true;
-                console.log(`[REFERRAL_HEAL] Successfully awarded referral bonus to referrer ${userData.referredBy}`);
-              }
-            } catch (err) {
-              console.error("[REFERRAL_HEAL] Failed to self-heal referral bonus:", err);
-            }
-          }
-        }
+
 
         if (needsUpdate) {
           try {
@@ -295,82 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubProfile();
   }, [user]);
 
-  // Referrer self-healing: automatically credit missed referral upgrade commissions when the referrer loads their session
-  useEffect(() => {
-    if (!profile?.referralCode || !profile?.uid) return;
-    
-    let isCancelled = false;
-    
-    async function healReferrals() {
-      try {
-        const variants = Array.from(new Set([
-          profile.referralCode,
-          profile.referralCode.toLowerCase(),
-          profile.referralCode.toUpperCase(),
-          profile.username,
-          profile.username?.toLowerCase(),
-          profile.username?.toUpperCase()
-        ].filter(Boolean) as string[]));
 
-        console.log(`[REFERRAL_HEAL] Running referrer self-healing check for code: ${profile.referralCode}...`);
-        const q = query(
-          collection(db, 'users'),
-          where('referredBy', 'in', variants)
-        );
-        const querySnapshot = await getDocs(q);
-        if (isCancelled) return;
-        
-        for (const docSnap of querySnapshot.docs) {
-          const rUser = docSnap.data();
-          if (rUser.plan && rUser.plan !== 'free' && !rUser.hasReceivedReferralBonus) {
-            const planDetails = PLANS.find(p => p.id === rUser.plan);
-            const planCost = planDetails?.cost || 0;
-            const bonusAmount = Math.floor(planCost * 0.3);
-            
-            if (bonusAmount > 0) {
-              console.log(`[REFERRAL_HEAL] Found upgraded referral ${docSnap.id} without bonus. Awarding ₦${bonusAmount} to referrer ${profile.uid}`);
-              
-              // 1. Update referred user first to prevent duplicate bonus processing
-              await updateDoc(doc(db, 'users', docSnap.id), {
-                hasReceivedReferralBonus: true
-              });
-              
-              // 2. Increment referrer's balances atomically in Firestore
-              await updateDoc(doc(db, 'users', profile.uid), {
-                balance: increment(bonusAmount),
-                referralBalance: increment(bonusAmount),
-                withdrawableBalance: increment(bonusAmount),
-                referralEarnings: increment(bonusAmount),
-                updatedAt: serverTimestamp()
-              });
-              
-              // 3. Append notification log for the referrer
-              await addDoc(collection(db, 'notifications'), {
-                userId: profile.uid,
-                title: '🎁 Referral Upgrade Commission!',
-                message: `Your friend (${rUser.displayName || rUser.username || 'Someone'}) upgraded to ${rUser.plan}! You have received a 30% commission of ₦${bonusAmount}.`,
-                type: 'reward',
-                createdAt: serverTimestamp(),
-                readBy: []
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.error("[REFERRAL_HEAL] Error in referrer self-healing check:", err);
-      }
-    }
-    
-    // Check after a short delay to let profile loading stabilize
-    const timer = setTimeout(() => {
-      healReferrals();
-    }, 2000);
-    
-    return () => {
-      isCancelled = true;
-      clearTimeout(timer);
-    };
-  }, [profile?.referralCode, profile?.uid]);
 
   const logout = async () => {
     await signOut(auth);

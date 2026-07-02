@@ -328,7 +328,7 @@ export default function Deposit() {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
                 min="500"
-                className="w-full bg-white border border-slate-100 rounded-xl py-2.5 pl-10 pr-4 text-xl sm:text-2xl font-display font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:text-slate-100 placeholder:italic appearance-none shadow-sm"
+                className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xl sm:text-2xl font-display font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:text-slate-400 placeholder:italic appearance-none shadow-sm"
               />
             </div>
           </div>
@@ -341,7 +341,7 @@ export default function Deposit() {
                 className={`py-2.5 rounded-lg font-display font-black text-[11px] sm:text-xs italic tracking-tight transition-all active:scale-90 border-2 ${
                   amount === amt.toString() 
                     ? "bg-slate-950 border-slate-950 text-white shadow-xl" 
-                    : "bg-white border-slate-100 text-slate-400 hover:border-blue-200 hover:text-slate-900"
+                    : "bg-white border-slate-200 text-slate-700 hover:border-blue-200 hover:text-slate-900"
                 }`}
               >
                 ₦{amt.toLocaleString()}

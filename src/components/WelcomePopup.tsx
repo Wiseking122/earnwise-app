@@ -103,16 +103,26 @@ export default function WelcomePopup() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3.5">
+              <a 
+                href="https://t.me/Earnwise01"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleClose}
+                className="w-full bg-[#0088cc] hover:bg-[#0077b5] text-white font-black py-4 rounded-2xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2.5 group active:scale-[0.98] cursor-pointer"
+              >
+                <span>Join Official Telegram Group</span>
+                <Users size={18} className="group-hover:scale-110 transition-transform" />
+              </a>
+
               <button 
                 onClick={handleClose}
-                className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 group"
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl transition-all text-sm active:scale-[0.98] cursor-pointer"
               >
-                Let's Start Earning
-                <CheckCircle2 size={18} className="group-hover:scale-110 transition-transform" />
+                Skip & Start Earning
               </button>
               
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-1">
                 Powered by Wise AI • Earnwise Strategy
               </p>
             </div>

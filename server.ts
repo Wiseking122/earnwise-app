@@ -306,23 +306,25 @@ async function startServer() {
     if (!isDbAdminCapable) return;
     try {
       const userRef = dbAdmin.collection('users').doc(userId);
-      const userDoc = await userRef.get();
-      if (!userDoc.exists) return;
-      const userData = userDoc.data();
       
-      // Only award if they haven't received it yet and they have a referrer
-      if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
-        const referrerDoc = await findReferrerDoc(userData.referredBy);
+      await dbAdmin.runTransaction(async (transaction) => {
+        // Read user document INSIDE the transaction for guaranteed atomicity
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) return;
+        const userData = userDoc.data();
         
-        if (referrerDoc) {
-          // Calculate 30% of plan cost
-          const planCost = PLAN_COSTS[planId] || 0;
-          const bonusAmount = Math.floor(planCost * 0.3);
+        // Ensure bonus hasn't already been awarded, and they actually have a referrer
+        if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
+          const referrerDoc = await findReferrerDoc(userData.referredBy);
           
-          if (bonusAmount <= 0) return; // No bonus for free or zero cost plans
+          if (referrerDoc) {
+            // Calculate exactly 30% of the plan cost
+            const planCost = PLAN_COSTS[planId] || 0;
+            const bonusAmount = Math.floor(planCost * 0.3);
+            
+            if (bonusAmount <= 0) return; // No bonus for free/zero plans
 
-          await dbAdmin.runTransaction(async (transaction) => {
-            // Update referrer
+            // Update referrer's balances atomically
             transaction.update(referrerDoc.ref, {
               balance: admin.firestore.FieldValue.increment(bonusAmount),
               referralBalance: admin.firestore.FieldValue.increment(bonusAmount),
@@ -331,7 +333,7 @@ async function startServer() {
               updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
             
-            // Set flag on referred user to prevent duplicate bonuses
+            // Set flag on referred user within the same transaction to prevent duplicate execution
             transaction.update(userRef, {
               hasReceivedReferralBonus: true
             });
@@ -346,11 +348,13 @@ async function startServer() {
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               readBy: []
             });
-          });
-          
-          console.log(`[REFERRAL] Awarded ₦${bonusAmount} (30% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
+
+            console.log(`[REFERRAL] Awarded ₦${bonusAmount} (30% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
+          }
+        } else {
+          console.log(`[REFERRAL] Skip award for user ${userId}: already awarded or no referrer found.`);
         }
-      }
+      });
     } catch (err) {
       console.error("[REFERRAL] FAILED to award upgrade bonus:", err);
     }

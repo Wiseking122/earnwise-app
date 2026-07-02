@@ -289,7 +289,7 @@ export default function DepositTab() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full border border-slate-600 rounded-2xl py-4 pl-12 pr-4 text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:italic appearance-none shadow-sm"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-2xl font-display font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all placeholder:text-slate-400 placeholder:italic appearance-none shadow-sm"
               />
             </div>
           </div>
@@ -302,7 +302,7 @@ export default function DepositTab() {
                 className={`py-2 rounded-xl font-display font-black text-[11px] italic tracking-tight transition-all active:scale-90 border-2 ${
                   amount === amt.toString() 
                     ? "bg-slate-950 border-slate-950 text-white shadow-xl shadow-slate-900/40" 
-                    : "bg-white border-slate-100 text-slate-450 hover:border-blue-200 hover:text-slate-900"
+                    : "bg-white border-slate-200 text-slate-700 hover:border-blue-200 hover:text-slate-900"
                 }`}
               >
                 ₦{amt.toLocaleString()}
