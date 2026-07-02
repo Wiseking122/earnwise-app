@@ -102,6 +102,7 @@ export default function Welcome() {
           referralBalance: existingData?.referralBalance ?? 0,
           telegramId: telegramId,
           deviceFingerprint: existingData?.deviceFingerprint || getOrGenerateDeviceFingerprint(),
+          registeredDeviceFingerprint: existingData?.registeredDeviceFingerprint || getOrGenerateDeviceFingerprint(),
           pendingBalance: existingData?.pendingBalance ?? 0,
           withdrawableBalance: existingData?.withdrawableBalance ?? 0,
           depositBalance: existingData?.depositBalance ?? 0,

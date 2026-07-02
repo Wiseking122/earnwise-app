@@ -3150,11 +3150,22 @@ Please verify if the submission is a plausible and honest completion of a social
       }
 
       if (deviceFingerprint) {
-        const fpSnap = await dbAdmin.collection('users')
-          .where('deviceFingerprint', '==', String(deviceFingerprint))
+        // 1. Check if anyone originally registered with this fingerprint
+        const regSnap = await dbAdmin.collection('users')
+          .where('registeredDeviceFingerprint', '==', String(deviceFingerprint))
           .limit(1)
           .get();
-        if (!fpSnap.empty) {
+        
+        // 2. Fallback check for legacy profiles that don't have registeredDeviceFingerprint yet
+        let legacySnap = null;
+        if (regSnap.empty) {
+          legacySnap = await dbAdmin.collection('users')
+            .where('deviceFingerprint', '==', String(deviceFingerprint))
+            .limit(1)
+            .get();
+        }
+
+        if (!regSnap.empty || (legacySnap && !legacySnap.empty)) {
           return res.status(400).json({
             error: "Registration limit reached. Only one Earnwise account can be registered per device."
           });
@@ -3224,11 +3235,22 @@ Please verify if the submission is a plausible and honest completion of a social
       }
 
       if (deviceFingerprint) {
-        const fpSnap = await dbAdmin.collection('users')
-          .where('deviceFingerprint', '==', String(deviceFingerprint))
+        // 1. Check if anyone originally registered with this fingerprint
+        const regSnap = await dbAdmin.collection('users')
+          .where('registeredDeviceFingerprint', '==', String(deviceFingerprint))
           .limit(1)
           .get();
-        if (!fpSnap.empty) {
+        
+        // 2. Fallback check for legacy profiles
+        let legacySnap = null;
+        if (regSnap.empty) {
+          legacySnap = await dbAdmin.collection('users')
+            .where('deviceFingerprint', '==', String(deviceFingerprint))
+            .limit(1)
+            .get();
+        }
+
+        if (!regSnap.empty || (legacySnap && !legacySnap.empty)) {
           return res.status(400).json({
             error: "Registration limit reached. Only one Earnwise account can be registered per device."
           });

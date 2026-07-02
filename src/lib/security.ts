@@ -1,14 +1,17 @@
-
 export const getOrGenerateDeviceFingerprint = (): string => {
+  // 1. Try to get permanent unique UUID token from persistent localStorage
   try {
-    // 1. Try to get permanent unique UUID token from persistent localStorage
-    let token = localStorage.getItem('earnwise_registration_token');
+    const token = localStorage.getItem('earnwise_registration_token');
     if (token) return token;
+  } catch (e) {
+    console.warn("localStorage is not accessible:", e);
+  }
 
-    // 2. Generate a canvas/hardware fingerprint as a reliable hardware-based indicator
+  // 2. Generate a canvas/hardware fingerprint as a reliable hardware-based indicator
+  let canvasHash = 'N/A';
+  try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    let canvasHash = '';
     if (ctx) {
       ctx.textBaseline = "top";
       ctx.font = "14px 'Arial'";
@@ -27,20 +30,24 @@ export const getOrGenerateDeviceFingerprint = (): string => {
       }
       canvasHash = String(Math.abs(hash));
     }
-
-    const fingerprintParts = [
-      navigator.userAgent,
-      navigator.language,
-      screen.colorDepth,
-      screen.width + 'x' + screen.height,
-      navigator.hardwareConcurrency || 'N/A',
-      canvasHash || 'N/A'
-    ];
-
-    const finalFingerprint = 'FP_' + fingerprintParts.join('_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 100);
-    return finalFingerprint;
-  } catch (err) {
-    console.error("Error generating fingerprint:", err);
-    return 'FP_FALLBACK_' + Math.random().toString(36).substring(2, 15);
+  } catch (canvasErr) {
+    console.warn("Canvas drawing is restricted or blocked by browser privacy features:", canvasErr);
+    canvasHash = 'BLOCKED';
   }
+
+  // Combine robust browser & device hardware characteristics
+  const fingerprintParts = [
+    navigator.userAgent || 'UA_UNKNOWN',
+    navigator.language || 'LANG_UNKNOWN',
+    screen.colorDepth || 'DEPTH_UNKNOWN',
+    (screen.width && screen.height) ? `${screen.width}x${screen.height}` : 'RES_UNKNOWN',
+    navigator.hardwareConcurrency || 'CONCUR_UNKNOWN',
+    canvasHash
+  ];
+
+  // Replace special characters to form a clean identifier
+  const rawFingerprint = 'FP_' + fingerprintParts.join('_').replace(/[^a-zA-Z0-9_]/g, '');
+  
+  // Return the stable, non-randomized hardware identity limit to 100 chars
+  return rawFingerprint.slice(0, 100);
 };
