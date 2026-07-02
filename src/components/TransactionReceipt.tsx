@@ -379,7 +379,12 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
         const url = isMobileDevice 
           ? `whatsapp://send?text=${encodeURIComponent(shareText)}`
           : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-        window.open(url, '_blank');
+        
+        if (isMobileDevice) {
+          window.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
       }, 800);
     } else if (platform === 'telegram') {
       try {
@@ -407,7 +412,14 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
         } catch (err) {}
       }
       setTimeout(() => {
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
+        const isMobileDevice = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
+        
+        if (isMobileDevice) {
+          window.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
       }, 800);
     } else {
       await copyBothToClipboard();

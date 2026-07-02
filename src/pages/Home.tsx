@@ -284,7 +284,7 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="p-3 sm:p-5 pb-24 space-y-5 sm:space-y-8 max-w-2xl mx-auto relative">
+      <div className="px-3 sm:px-4 py-3 sm:py-5 pb-24 space-y-4 sm:space-y-6 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
         
         <PayoutTicker />
@@ -337,7 +337,7 @@ export default function Home() {
           className="grid grid-cols-6 gap-3 sm:gap-4"
         >
           {/* Main Balance Card (Restored Virtual Card Design) */}
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 bg-slate-900/80 backdrop-blur-3xl border border-blue-500/30 rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-6 text-white relative overflow-hidden group shadow-[0_15px_50px_rgba(37,99,235,0.2)]">
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6 bg-slate-900/80 backdrop-blur-3xl border border-blue-500/30 rounded-xl sm:rounded-3xl p-3.5 sm:p-5 text-white relative overflow-hidden group shadow-[0_12px_40px_rgba(37,99,235,0.15)]">
             {/* Holographic metallic effect */}
             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-400/5 to-white/10 opacity-50 z-0 pointer-events-none" />
             
@@ -345,53 +345,53 @@ export default function Home() {
             <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full -ml-20 -mb-20 pointer-events-none blur-2xl" style={{ background: 'radial-gradient(circle, rgba(147, 51, 234, 0.3) 0%, transparent 70%)' }} />
             
             {/* Virtual Card Chip & Logo */}
-            <div className="relative z-10 flex justify-between items-center mb-4 sm:mb-6">
-              <div className="w-10 h-7 rounded border border-amber-500/30 bg-gradient-to-br from-amber-200/20 to-yellow-500/10 flex flex-col justify-center gap-1 px-2 overflow-hidden shadow-inner relative">
+            <div className="relative z-10 flex justify-between items-center mb-2.5 sm:mb-4">
+              <div className="w-8 h-5.5 rounded border border-amber-500/30 bg-gradient-to-br from-amber-200/20 to-yellow-500/10 flex flex-col justify-center gap-0.5 px-1.5 overflow-hidden shadow-inner relative">
                  <div className="w-full h-px bg-amber-500/20"></div>
                  <div className="w-full h-px bg-amber-500/20"></div>
                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/30 to-transparent w-[200%] -translate-x-[50%] group-hover:translate-x-[0%] transition-transform duration-1000" />
               </div>
-              <div className="flex gap-1 opacity-80">
-                 <div className="w-5 h-5 rounded-full bg-red-500/80 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
-                 <div className="w-5 h-5 rounded-full bg-amber-500/80 -ml-2.5 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
+              <div className="flex gap-0.5 opacity-80">
+                 <div className="w-4 h-4 rounded-full bg-red-500/80 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
+                 <div className="w-4 h-4 rounded-full bg-amber-500/80 -ml-2 mix-blend-screen mix-blend-lighten blur-[0.5px]"></div>
               </div>
             </div>
-
-              <div className="relative z-10 flex flex-col h-full justify-start gap-3 sm:gap-6">
+ 
+              <div className="relative z-10 flex flex-col h-full justify-start gap-2.5 sm:gap-4">
                 <div className="flex justify-between items-start gap-2">
                   <div className="space-y-0.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 mb-1 sm:mb-2">
-                      <p className="text-blue-200 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] truncate drop-shadow-md">Available Balance</p>
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <p className="text-blue-200 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] truncate drop-shadow-md">Available Balance</p>
                       <div className="w-1 h-1 bg-emerald-400 opacity-80 rounded-full animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                     </div>
-                    <h2 className="text-2xl sm:text-4xl md:text-5xl font-display font-black tracking-tight text-white mb-0.5 break-all select-all drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-display font-black tracking-tight text-white mb-0.5 break-all select-all drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
                       ₦<AnimatedNumber value={profile?.balance || 0} fractionDigits={2} />
                     </h2>
-                    <p className="text-blue-400/80 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest truncate">Digital Earning Assets Secured</p>
+                    <p className="text-blue-400/80 text-[7.5px] sm:text-[9px] font-bold uppercase tracking-widest truncate">Digital Earning Assets Secured</p>
                   </div>
-                  <div className="flex gap-1.5 sm:gap-3 shrink-0">
-                    <Link to="/deposit" className="w-9 h-9 sm:w-12 sm:h-12 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all active:scale-95 group/icon relative overflow-hidden">
+                  <div className="flex gap-1.5 sm:gap-2 shrink-0">
+                    <Link to="/deposit" className="w-8 h-8 sm:w-10 sm:h-10 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 rounded-lg flex items-center justify-center transition-all active:scale-95 group/icon relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/20 to-transparent opacity-0 group-hover/icon:opacity-100 transition-opacity" />
-                      <Zap size={16} className="text-blue-400 sm:w-5 sm:h-5 group-hover/icon:scale-110 transition-transform drop-shadow" />
+                      <Zap size={14} className="text-blue-400 group-hover/icon:scale-110 transition-transform drop-shadow" />
                     </Link>
-                    <Link to="/withdrawal" className="w-9 h-9 sm:w-12 sm:h-12 bg-linear-to-tr from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 rounded-lg sm:rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.4)]">
-                      <Wallet size={16} className="text-white sm:w-5 sm:h-5 drop-shadow" />
+                    <Link to="/withdrawal" className="w-8 h-8 sm:w-10 sm:h-10 bg-linear-to-tr from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 rounded-lg flex items-center justify-center transition-all active:scale-95 shadow-[0_0_12px_rgba(37,99,235,0.3)]">
+                      <Wallet size={14} className="text-white drop-shadow" />
                     </Link>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 sm:gap-4 mt-1 mb-1">
-                  <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
+ 
+                <div className="grid grid-cols-2 gap-2 mt-0.5 mb-0.5">
+                  <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-lg sm:rounded-xl p-2 sm:p-3 shadow-inner relative overflow-hidden group/card shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
                     <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Task Wallet</p>
-                    <h3 className="text-sm sm:text-lg font-display font-black text-white truncate drop-shadow-md">
+                    <p className="text-slate-400 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest mb-0.5 truncate">Task Wallet</p>
+                    <h3 className="text-xs sm:text-base font-display font-black text-white truncate drop-shadow-md">
                       ₦<AnimatedNumber value={profile?.taskBalance || 0} />
                     </h3>
                   </div>
-                  <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-inner relative overflow-hidden group/card shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
+                  <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-lg sm:rounded-xl p-2 sm:p-3 shadow-inner relative overflow-hidden group/card shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
                     <div className="absolute -inset-2 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-0.5 truncate">Referral Wallet</p>
-                    <h3 className="text-sm sm:text-lg font-display font-black text-white truncate drop-shadow-md">
+                    <p className="text-slate-400 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest mb-0.5 truncate">Referral Wallet</p>
+                    <h3 className="text-xs sm:text-base font-display font-black text-white truncate drop-shadow-md">
                       ₦<AnimatedNumber value={profile?.referralBalance || 0} />
                     </h3>
                   </div>
@@ -402,30 +402,30 @@ export default function Home() {
           {/* Plan Status Banner */}
           <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="col-span-6">
             {profile?.plan !== 'free' || isAdmin ? (
-              <div className="bg-linear-to-r from-amber-400 to-orange-500 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between shadow-md border border-orange-400/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center border border-white/20">
-                    <Crown size={20} className="fill-white" />
+              <div className="bg-linear-to-r from-amber-400 to-orange-500 p-3 sm:p-3.5 rounded-xl text-white flex items-center justify-between shadow-md border border-orange-400/20">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center border border-white/20">
+                    <Crown size={16} className="fill-white" />
                   </div>
                   <div>
-                    <h4 className="font-display font-black text-sm sm:text-base leading-tight uppercase tracking-tighter">
+                    <h4 className="font-display font-black text-xs sm:text-sm leading-tight uppercase tracking-tighter">
                       {isAdmin ? 'Admin Elite' : `${profile?.plan} Plan`} Active
                     </h4>
-                    <p className="text-white/80 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest mb-0.5">
+                    <p className="text-white/80 text-[7.5px] sm:text-[9px] font-bold uppercase tracking-widest mb-0.5">
                       Multiplier: {isAdmin ? '10.0' : multiplier}x Reward Boost {isAdmin && '(Free Admin Access)'}
                     </p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex items-center gap-1 mt-0.5">
                       {isRenewalRequired ? (
                         <>
-                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                          <p className="text-white/90 text-[8.5px] sm:text-[10px] font-black uppercase tracking-widest">
+                          <div className="w-1 h-1 bg-white rounded-full animate-pulse" />
+                          <p className="text-white/90 text-[7.5px] sm:text-[9px] font-black uppercase tracking-widest">
                             {daysLeft !== null ? (daysLeft <= 0 ? 'Expired' : `${daysLeft} Days Remaining`) : 'Active'}
                           </p>
                         </>
                       ) : (
                         <>
-                          <div className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-ping" />
-                          <p className="text-emerald-100 text-[8.5px] sm:text-[10px] font-black uppercase tracking-widest">
+                          <div className="w-1 h-1 bg-emerald-300 rounded-full animate-ping" />
+                          <p className="text-emerald-100 text-[7.5px] sm:text-[9px] font-black uppercase tracking-widest">
                             Status: Earning Enabled (Account Active)
                           </p>
                         </>
@@ -434,23 +434,23 @@ export default function Home() {
                   </div>
                 </div>
                 {!isAdmin && (
-                  <Link to="/upgrade" className="bg-white text-orange-600 px-4 py-2 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
+                  <Link to="/upgrade" className="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
                     Upgrade
                   </Link>
                 )}
               </div>
             ) : (
-              <Link to="/upgrade" className="bg-blue-600 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between shadow-md border border-blue-500 group">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                    <Zap size={20} className="fill-white animate-pulse" />
+              <Link to="/upgrade" className="bg-blue-600 p-3 sm:p-3.5 rounded-xl text-white flex items-center justify-between shadow-md border border-blue-500 group">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                    <Zap size={16} className="fill-white animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="font-display font-black text-sm sm:text-base leading-tight">Activate High-Yield Plan</h4>
-                    <p className="text-white/70 text-[8.5px] sm:text-[10px] font-bold uppercase tracking-widest">Boost your earnings by 5.0x</p>
+                    <h4 className="font-display font-black text-xs sm:text-sm leading-tight">Activate High-Yield Plan</h4>
+                    <p className="text-white/70 text-[7.5px] sm:text-[9px] font-bold uppercase tracking-widest">Boost your earnings by 5.0x</p>
                   </div>
                 </div>
-                <ArrowRight className="group-hover:translate-x-1.5 transition-transform" size={16} />
+                <ArrowRight className="group-hover:translate-x-1 transition-transform" size={14} />
               </Link>
             )}
           </motion.div>
@@ -463,160 +463,160 @@ export default function Home() {
         <DailyGoal />
 
         {/* Weekly Leaderboard (Hall of Fame) Promo Card */}
-        <section className="space-y-4">
+        <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
-              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Hall of Fame</h3>
+              <h3 className="text-base font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Hall of Fame</h3>
             </div>
-            <Link to="/leaderboard" className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-yellow-400 transition-colors">
+            <Link to="/leaderboard" className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest hover:text-yellow-400 transition-colors">
               Weekly Prizes
             </Link>
           </div>
 
           <Link 
             to="/leaderboard"
-            className="block bg-gradient-to-br from-yellow-950/40 to-slate-900 border border-yellow-500/30 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 text-white relative overflow-hidden shadow-2xl hover:border-yellow-400/50 transition-all active:scale-[0.98] group"
+            className="block bg-gradient-to-br from-yellow-950/40 to-slate-900 border border-yellow-500/30 rounded-xl p-3 sm:p-4 text-white relative overflow-hidden shadow-xl hover:border-yellow-400/50 transition-all active:scale-[0.98] group"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" style={{ background: 'radial-gradient(circle, rgba(234, 179, 8, 0.3) 0%, transparent 70%)' }} />
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none -mr-8 -mt-8 opacity-40 group-hover:opacity-60 transition-opacity" style={{ background: 'radial-gradient(circle, rgba(234, 179, 8, 0.3) 0%, transparent 70%)' }} />
             <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
             
-            <div className="relative z-10 flex items-center gap-3.5">
-              <div className="w-11 h-11 bg-yellow-500/20 border border-yellow-500/40 rounded-xl flex items-center justify-center text-yellow-400 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-transform shrink-0">
-                <Trophy size={24} className="drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+            <div className="relative z-10 flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-yellow-500/20 border border-yellow-500/40 rounded-lg flex items-center justify-center text-yellow-400 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-transform shrink-0">
+                <Trophy size={18} className="drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h4 className="font-display font-black text-base leading-tight uppercase italic text-white group-hover:text-yellow-200 transition-colors">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <h4 className="font-display font-black text-sm leading-tight uppercase italic text-white group-hover:text-yellow-200 transition-colors">
                     Weekly Cash Prizes
                   </h4>
-                  <div className="bg-yellow-500/20 px-2 py-0.5 rounded-full border border-yellow-500/30">
-                    <span className="text-[7px] font-black text-yellow-300 uppercase tracking-widest">₦15,000 Max</span>
+                  <div className="bg-yellow-500/20 px-1.5 py-0.5 rounded-full border border-yellow-500/30">
+                    <span className="text-[6.5px] font-black text-yellow-300 uppercase tracking-widest">₦15,000 Max</span>
                   </div>
                 </div>
-                <p className="text-slate-400 text-[10px] sm:text-xs font-medium leading-tight max-w-sm sm:max-w-md">
+                <p className="text-slate-400 text-[9.5px] sm:text-[10.5px] font-medium leading-tight max-w-sm sm:max-w-md">
                   Complete tasks, invite active members and earn XP. Top 10 earners get cash bonuses every Sunday at 11:59 PM!
                 </p>
               </div>
-              <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-yellow-500 transition-colors shrink-0">
-                <ArrowRight size={16} className="text-white group-hover:translate-x-0.5 transition-transform" />
+              <div className="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-yellow-500 transition-colors shrink-0">
+                <ArrowRight size={14} className="text-white group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           </Link>
         </section>
 
         {/* Wise AI Assistant Section */}
-        <section className="space-y-4">
+        <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Wise AI Mentor</h3>
+              <h3 className="text-base font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Wise AI Mentor</h3>
             </div>
           </div>
 
           <div 
             onClick={viewAiPlan}
-            className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-2xl sm:rounded-[2rem] p-3.5 sm:p-5 text-white relative overflow-hidden shadow-2xl cursor-pointer group hover:border-blue-400/50 transition-all active:scale-[0.98]"
+            className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-xl p-3 sm:p-4 text-white relative overflow-hidden shadow-xl cursor-pointer group hover:border-blue-400/50 transition-all active:scale-[0.98]"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)' }} />
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none -mr-8 -mt-8 opacity-40 group-hover:opacity-60 transition-opacity" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)' }} />
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-transparent pointer-events-none" />
             
-            <div className="relative z-10 flex items-center gap-3.5">
-              <div className="w-11 h-11 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-center text-blue-400 shadow-inner group-hover:scale-110 transition-transform">
-                <Bot size={24} className="drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+            <div className="relative z-10 flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-blue-600/20 border border-blue-500/40 rounded-lg flex items-center justify-center text-blue-400 shadow-inner group-hover:scale-110 transition-transform">
+                <Bot size={18} className="drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
               </div>
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h4 className="font-display font-black text-base leading-tight uppercase italic text-white group-hover:text-blue-200 transition-colors">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <h4 className="font-display font-black text-sm leading-tight uppercase italic text-white group-hover:text-blue-200 transition-colors">
                     Wise AI Strategy
                   </h4>
-                  <div className="bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-500/30">
-                    <span className="text-[7px] font-black text-blue-300 uppercase tracking-widest">Dune & Oak</span>
+                  <div className="bg-blue-500/20 px-1.5 py-0.5 rounded-full border border-blue-500/30">
+                    <span className="text-[6.5px] font-black text-blue-300 uppercase tracking-widest">Dune & Oak</span>
                   </div>
                 </div>
-                <p className="text-slate-400 text-[10px] font-medium leading-tight max-w-xs">
+                <p className="text-slate-400 text-[9.5px] font-medium leading-tight max-w-xs">
                   Generate personalized daily earning strategy with AI.
                 </p>
               </div>
-              <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-blue-600 transition-colors">
-                <ArrowRight size={16} className="text-white" />
+              <div className="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-blue-600 transition-colors">
+                <ArrowRight size={14} className="text-white" />
               </div>
             </div>
           </div>
         </section>
 
         {/* Refer & Earn (30% Team Program) Widget */}
-        <section className="space-y-4">
+        <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
-              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Team Program</h3>
+              <h3 className="text-base font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Team Program</h3>
             </div>
-            <Link to="/referral" className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-400 transition-colors">
+            <Link to="/referral" className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-400 transition-colors">
               View Analytics
             </Link>
           </div>
 
-          <div className="bg-gradient-to-br from-indigo-950/90 to-slate-900 border border-indigo-500/30 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 text-white relative overflow-hidden shadow-2xl">
+          <div className="bg-gradient-to-br from-indigo-950/90 to-slate-900 border border-indigo-500/30 rounded-xl p-3 sm:p-4 text-white relative overflow-hidden shadow-xl">
             {/* Ambient glows */}
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-12 -mt-12 opacity-50" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%)' }} />
-            <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full pointer-events-none -ml-8 -mb-8 opacity-30" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)' }} />
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none -mr-8 -mt-8 opacity-50" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%)' }} />
+            <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full pointer-events-none -ml-6 -mb-6 opacity-30" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)' }} />
 
-            <div className="relative z-10 flex flex-col lg:flex-row gap-4 sm:gap-5 items-stretch lg:items-center justify-between">
-              <div className="space-y-2 text-center lg:text-left flex-1 min-w-0">
-                <div className="flex items-center justify-center lg:justify-start gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full w-fit mx-auto lg:mx-0">
-                  <Gift size={12} className="text-indigo-400" />
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Instant 30% Rewards</span>
+            <div className="relative z-10 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+              <div className="space-y-1.5 text-center lg:text-left flex-1 min-w-0">
+                <div className="flex items-center justify-center lg:justify-start gap-1.5 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full w-fit mx-auto lg:mx-0">
+                  <Gift size={10} className="text-indigo-400" />
+                  <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Instant 30% Rewards</span>
                 </div>
-                <h4 className="font-display font-black text-base sm:text-lg leading-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-white to-blue-200">
+                <h4 className="font-display font-black text-sm sm:text-base leading-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-white to-blue-200">
                   Invite Friends & Earn Commission
                 </h4>
-                <p className="text-slate-400 text-[11px] sm:text-xs font-medium max-w-sm leading-relaxed mx-auto lg:mx-0">
-                  Earn 30% commission instantly on all plan upgrades. Grow your team and earn dynamic direct commissions.
+                <p className="text-slate-400 text-[10px] font-medium max-w-sm leading-relaxed mx-auto lg:mx-0">
+                  Earn 30% commission instantly on all plan upgrades. Grow your team and earn commissions.
                 </p>
                 
                 {/* Micro Stats inside home widget */}
-                <div className="flex items-center justify-center lg:justify-start gap-3 pt-1">
-                  <div className="bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-center min-w-[5rem] sm:min-w-[5.5rem] flex-1 sm:flex-initial">
-                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-1">Total Referred</p>
-                    <p className="text-xs sm:text-sm font-black text-indigo-300">{profile?.totalReferrals || 0}</p>
+                <div className="flex items-center justify-center lg:justify-start gap-2 pt-0.5">
+                  <div className="bg-white/5 border border-white/5 rounded-lg px-2 py-0.5 text-center min-w-[4.5rem] flex-1 sm:flex-initial">
+                    <p className="text-[7.5px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-0.5">Total Referred</p>
+                    <p className="text-xs font-black text-indigo-300">{profile?.totalReferrals || 0}</p>
                   </div>
-                  <div className="bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-center min-w-[5rem] sm:min-w-[5.5rem] flex-1 sm:flex-initial">
-                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-1">Total Earnings</p>
-                    <p className="text-xs sm:text-sm font-black text-amber-400">₦{(profile?.referralEarnings || 0).toLocaleString()}</p>
+                  <div className="bg-white/5 border border-white/5 rounded-lg px-2 py-0.5 text-center min-w-[4.5rem] flex-1 sm:flex-initial">
+                    <p className="text-[7.5px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-0.5">Total Earnings</p>
+                    <p className="text-xs font-black text-amber-400">₦{(profile?.referralEarnings || 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="w-full lg:w-auto bg-slate-950/60 backdrop-blur-md rounded-2xl p-4 border border-white/5 space-y-3 flex-shrink-0 lg:max-w-xs">
+              <div className="w-full lg:w-auto bg-slate-950/60 backdrop-blur-md rounded-xl p-3 border border-white/5 space-y-2.5 flex-shrink-0 lg:max-w-xs">
                 <div>
-                  <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest text-center mb-1.5">Your Referral Code</p>
-                  <div className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 px-3 py-2 rounded-xl">
-                    <span className="font-mono font-black text-white text-sm sm:text-base tracking-[0.2em]">{profile?.referralCode || 'N/A'}</span>
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest text-center mb-1">Your Referral Code</p>
+                  <div className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 px-2 py-1.5 rounded-lg">
+                    <span className="font-mono font-black text-white text-xs sm:text-sm tracking-[0.2em]">{profile?.referralCode || 'N/A'}</span>
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
                       onClick={copyCodeToClipboard}
                       className="text-indigo-400 hover:text-white transition-colors cursor-pointer"
                     >
                       <AnimatePresence mode="wait">
-                        {copiedCode ? <CheckCircle2 size={14} className="text-green-400" /> : <Copy size={14} />}
+                        {copiedCode ? <CheckCircle2 size={12} className="text-green-400" /> : <Copy size={12} />}
                       </AnimatePresence>
                     </motion.button>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <motion.button 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={copyLinkToClipboard}
-                    className="flex-1 py-2 sm:py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest cursor-pointer shadow-sm text-center flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg font-black text-[8px] uppercase tracking-widest cursor-pointer shadow-sm text-center flex items-center justify-center gap-0.5"
                   >
                     <AnimatePresence mode="wait">
                       {copiedLink ? (
-                        <span className="text-green-400 flex items-center gap-1"><CheckCircle2 size={12} /> Copied</span>
+                        <span className="text-green-400 flex items-center gap-0.5"><CheckCircle2 size={10} /> Copied</span>
                       ) : (
-                        <span className="flex items-center gap-1"><ExternalLink size={11} /> Copy Link</span>
+                        <span className="flex items-center gap-0.5"><ExternalLink size={10} /> Copy Link</span>
                       )}
                     </AnimatePresence>
                   </motion.button>
@@ -625,9 +625,9 @@ export default function Home() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleShare}
-                    className="flex-1 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest cursor-pointer shadow-md text-center flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-black text-[8px] uppercase tracking-widest cursor-pointer shadow-md text-center flex items-center justify-center gap-0.5"
                   >
-                    <Share2 size={11} /> Share
+                    <Share2 size={10} /> Share
                   </motion.button>
                 </div>
               </div>
@@ -636,106 +636,106 @@ export default function Home() {
         </section>
 
         {/* Quick Links Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          <Link to="/lucky-spin" className="dark-glass-card p-4 rounded-2xl text-white group relative overflow-hidden active:scale-[0.98] transition-all">
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link to="/lucky-spin" className="dark-glass-card p-3 rounded-xl text-white group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm">
             <div className="absolute inset-0 bg-linear-to-br from-emerald-500/20 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                  <Play size={18} className="fill-white" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-8.5 h-8.5 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                  <Play size={14} className="fill-white" />
                 </div>
                 <div>
-                  <h4 className="font-display font-black text-base">Daily Spin</h4>
-                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Rewards Reset in 4h</p>
+                  <h4 className="font-display font-black text-sm text-white">Daily Spin</h4>
+                  <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5">Reset: 4h</p>
                 </div>
               </div>
-              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform" size={16} />
+              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform" size={14} />
             </div>
           </Link>
 
-          <Link to="/outline" className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-4 rounded-2xl group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm hover:shadow-md hover:border-blue-500/30">
+          <Link to="/outline" className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-3 rounded-xl group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm hover:border-blue-500/30">
             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-500/30 text-blue-400 rounded-xl flex items-center justify-center">
-                  <TrendingUp size={18} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-8.5 h-8.5 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-500/30 text-blue-400 rounded-lg flex items-center justify-center shrink-0">
+                  <TrendingUp size={14} />
                 </div>
                 <div>
-                  <h4 className="font-display font-black text-base text-white drop-shadow-sm">Earning Guide</h4>
-                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Master EarnWise</p>
+                  <h4 className="font-display font-black text-sm text-white drop-shadow-sm">Guide</h4>
+                  <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5">Master App</p>
                 </div>
               </div>
-              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform group-hover:text-blue-400" size={16} />
+              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform group-hover:text-blue-400" size={14} />
             </div>
           </Link>
         </div>
 
         {/* Featured Opportunities Section */}
-        <section className="space-y-4">
+        <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-              <h3 className="text-lg font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Premium Jobs</h3>
+              <h3 className="text-base font-display font-black text-white uppercase tracking-tighter drop-shadow-md">Premium Jobs</h3>
             </div>
-            <Link to="/tasks" className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-400 transition-colors">
+            <Link to="/tasks" className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-400 transition-colors">
               View All Tasks
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5">
+          <div className="grid grid-cols-1 gap-2.5">
              {/* Earning Channels Grid */}
-             <div className="grid grid-cols-2 gap-3">
+             <div className="grid grid-cols-2 gap-2.5">
                <Link 
                 to="/tasks?category=survey"
-                className="bg-orange-500/10 border border-orange-500/30 p-3 sm:p-4 rounded-2xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
+                className="bg-orange-500/10 border border-orange-500/30 p-2.5 rounded-xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white mb-2 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
-                   <Search size={14} className="sm:w-[18px] sm:h-[18px]" />
+                 <div className="w-7.5 h-7.5 bg-orange-500 rounded-lg flex items-center justify-center text-white mb-2 shadow-md group-hover:rotate-12 transition-transform">
+                   <Search size={12} />
                  </div>
-                 <h4 className="font-display font-black text-white text-[11px] sm:text-base uppercase italic tracking-tighter">Paid Surveys</h4>
-                 <p className="text-orange-400 text-[7px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5">CPX Network</p>
+                 <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Paid Surveys</h4>
+                 <p className="text-orange-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">CPX Network</p>
                </Link>
                
                <Link 
                 to="/tasks?category=ad"
-                className="bg-emerald-500/10 border border-emerald-500/30 p-3 sm:p-4 rounded-2xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
+                className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
                >
-                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-2 sm:mb-3 shadow-md group-hover:rotate-12 transition-transform">
-                   <Play size={14} className="fill-white sm:w-[18px] sm:h-[18px]" />
+                 <div className="w-7.5 h-7.5 bg-emerald-500 rounded-lg flex items-center justify-center text-white mb-2 shadow-md group-hover:rotate-12 transition-transform">
+                   <Play size={12} className="fill-white" />
                  </div>
-                 <h4 className="font-display font-black text-white text-[11px] sm:text-base uppercase italic tracking-tighter">Ads Center</h4>
-                 <p className="text-emerald-400 text-[7px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5">Montage</p>
+                 <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Ads Center</h4>
+                 <p className="text-emerald-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">Montage</p>
                </Link>
              </div>
 
             {loading ? (
-              [1, 2].map(i => <div key={`skeleton-home-${i}`} className="h-28 bg-slate-800/50 rounded-2xl animate-pulse border border-white/5" />)
+              [1, 2].map(i => <div key={`skeleton-home-${i}`} className="h-24 bg-slate-800/50 rounded-xl animate-pulse border border-white/5" />)
             ) : (
               featuredTasks.map((task, index) => (
                 <Link 
                   key={task.id || index} 
                   to={`/tasks/${task.id}`}
-                  className="group bg-slate-900/60 backdrop-blur-3xl border border-white/10 p-4 rounded-2xl shadow-sm hover:border-blue-500/30 hover:bg-slate-900/80 transition-all active:scale-[0.98] relative overflow-hidden"
+                  className="group bg-slate-900/60 backdrop-blur-3xl border border-white/10 p-3 rounded-xl shadow-sm hover:border-blue-500/30 hover:bg-slate-900/80 transition-all active:scale-[0.98] relative overflow-hidden"
                 >
                   <div className="flex justify-between items-center relative z-10">
-                    <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
-                      <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-slate-300 border border-white/10 group-hover:bg-blue-500/20 group-hover:border-blue-500/40 group-hover:text-blue-400 transition-all duration-300 shadow-inner shrink-0">
-                        <Target size={18} className="group-hover:scale-110 transition-transform" />
+                    <div className="flex gap-2.5 items-center min-w-0 flex-1 mr-2">
+                      <div className="w-8.5 h-8.5 bg-white/5 rounded-lg flex items-center justify-center text-slate-300 border border-white/10 group-hover:bg-blue-500/20 group-hover:border-blue-500/40 group-hover:text-blue-400 transition-all duration-300 shadow-inner shrink-0">
+                        <Target size={14} className="group-hover:scale-110 transition-transform" />
                       </div>
                       <div className="space-y-0.5 min-w-0">
                         <div className="flex items-center gap-1.5">
-                            <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-300 transition-colors">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-300 transition-colors">
                             {task.type.replace('_', ' ')}
                             </span>
                         </div>
-                        <h4 className="font-display font-black text-white text-base leading-tight group-hover:text-blue-400 transition-colors uppercase italic drop-shadow-sm truncate">{task.title}</h4>
+                        <h4 className="font-display font-black text-white text-xs sm:text-sm leading-tight group-hover:text-blue-400 transition-colors uppercase italic drop-shadow-sm truncate">{task.title}</h4>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-amber-400 font-display font-black text-lg sm:text-2xl tracking-tighter">₦{((task.reward ?? task.userPayout ?? 0) * multiplier).toFixed(0)}</p>
-                      <div className="flex items-center justify-end gap-1">
-                        <Zap size={10} className="text-blue-600 fill-blue-600" />
-                        <span className="text-[9px] text-blue-600 font-black uppercase tracking-tighter">Boosted</span>
+                      <p className="text-amber-400 font-display font-black text-sm sm:text-base tracking-tighter">₦{((task.reward ?? task.userPayout ?? 0) * multiplier).toFixed(0)}</p>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Zap size={8} className="text-blue-600 fill-blue-600" />
+                        <span className="text-[8px] text-blue-600 font-black uppercase tracking-tighter">Boosted</span>
                       </div>
                     </div>
                   </div>
@@ -747,21 +747,21 @@ export default function Home() {
 
 
         {/* Global Activity Feed */}
-        <section className="bg-slate-950 rounded-2xl sm:rounded-[3rem] p-4 sm:p-10 text-white space-y-6 sm:space-y-8 overflow-hidden relative shadow-2xl">
+        <section className="bg-slate-950 rounded-xl p-3.5 sm:p-5 text-white space-y-4 overflow-hidden relative shadow-xl">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.1),transparent)]" />
             
             <div className="flex items-center justify-between relative z-10">
-                <div className="space-y-1">
-                  <h3 className="font-display font-black text-2xl tracking-tight leading-none">Global Pulse</h3>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Live Network Activity</p>
+                <div className="space-y-0.5">
+                  <h3 className="font-display font-black text-base tracking-tight leading-none">Global Pulse</h3>
+                  <p className="text-slate-500 text-[8px] font-bold uppercase tracking-widest">Live Network Activity</p>
                 </div>
-                <div className="flex items-center gap-2 bg-blue-500/10 px-4 py-2 rounded-full border border-blue-500/20">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest italic">Live Now</span>
+                <div className="flex items-center gap-1.5 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest italic leading-none">Live Now</span>
                 </div>
             </div>
 
-            <div className="space-y-4 relative z-10 overflow-hidden">
+            <div className="space-y-2.5 relative z-10 overflow-hidden">
                 <AnimatePresence mode="popLayout" initial={false}>
                     {globalActivities.map((item) => {
                         let iconColor = 'text-blue-500';
@@ -799,20 +799,20 @@ export default function Home() {
                                     damping: 25,
                                     opacity: { duration: 0.25 }
                                 }}
-                                className="flex items-center justify-between bg-white/5 p-5 rounded-[2rem] border border-white/5 hover:bg-white/10 hover:border-blue-500/20 transition-all group"
+                                className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 hover:border-blue-500/20 transition-all group"
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center border border-white/5 overflow-hidden group-hover:border-blue-500/50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center border border-white/5 overflow-hidden group-hover:border-blue-500/50 transition-colors">
                                         <div className={`w-full h-full bg-linear-to-br ${bgGradient} flex items-center justify-center`}>
-                                            <IconComponent size={20} className={`${iconColor} opacity-90 group-hover:scale-110 transition-transform`} />
+                                            <IconComponent size={15} className={`${iconColor} opacity-90 group-hover:scale-110 transition-transform`} />
                                         </div>
                                     </div>
                                     <div className="space-y-0.5">
-                                        <p className="text-sm font-black text-white">{item.title}</p>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{item.message}</p>
+                                        <p className="text-xs font-black text-white leading-tight">{item.title}</p>
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider leading-none">{item.message}</p>
                                     </div>
                                 </div>
-                                <span className="text-[10px] font-black text-slate-600 uppercase italic whitespace-nowrap">
+                                <span className="text-[9px] font-black text-slate-600 uppercase italic whitespace-nowrap">
                                     {item.time || 'Recently'}
                                 </span>
                             </motion.div>
@@ -825,23 +825,23 @@ export default function Home() {
         </section>
 
         {/* Community Links */}
-        <div className="grid grid-cols-2 gap-3">
-            <a href="https://t.me/earnwise0" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-white/5 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:bg-slate-900/80 hover:border-[#0088cc]/30 transition-all group shadow-sm">
-                <div className="w-10 h-10 bg-[#0088cc]/10 border border-[#0088cc]/20 rounded-xl flex items-center justify-center group-hover:bg-[#0088cc] group-hover:border-[#0088cc] transition-colors duration-500 shadow-inner">
-                    <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png" className="w-5 h-5 brightness-200 contrast-200 grayscale-0 opacity-80 group-hover:brightness-0 group-hover:invert group-hover:opacity-100 transition-all" alt="Telegram" />
+        <div className="grid grid-cols-2 gap-2.5">
+            <a href="https://t.me/earnwise0" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 p-3 bg-slate-900/60 backdrop-blur-3xl border border-white/5 rounded-xl hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:bg-slate-900/80 hover:border-[#0088cc]/30 transition-all group shadow-sm">
+                <div className="w-8.5 h-8.5 bg-[#0088cc]/10 border border-[#0088cc]/20 rounded-lg flex items-center justify-center group-hover:bg-[#0088cc] group-hover:border-[#0088cc] transition-colors duration-500 shadow-inner">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png" className="w-4 h-4 brightness-200 contrast-200 grayscale-0 opacity-80 group-hover:brightness-0 group-hover:invert group-hover:opacity-100 transition-all" alt="Telegram" />
                 </div>
-                <div className="text-center mt-1">
-                    <h5 className="font-display font-black text-white text-[10px] drop-shadow-sm">Channel</h5>
-                    <p className="text-[8px] text-[#0088cc] font-bold uppercase tracking-tighter mt-0.5">Updates</p>
+                <div className="text-center mt-0.5">
+                    <h5 className="font-display font-black text-white text-[10px] drop-shadow-sm leading-none">Channel</h5>
+                    <p className="text-[8px] text-[#0088cc] font-bold uppercase tracking-tighter mt-0.5 leading-none">Updates</p>
                 </div>
             </a>
-            <a href="https://t.me/Earnwise01" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-4 bg-slate-900/60 backdrop-blur-3xl border border-blue-500/20 rounded-[2rem] hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)] hover:bg-slate-900/80 hover:border-blue-400/40 transition-all group shadow-sm ring-1 ring-blue-500/10">
-                <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-600 transition-colors duration-500 shadow-inner">
-                    <Users size={20} className="text-blue-400 group-hover:text-white transition-all" />
+            <a href="https://t.me/Earnwise01" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 p-3 bg-slate-900/60 backdrop-blur-3xl border border-blue-500/20 rounded-xl hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)] hover:bg-slate-900/80 hover:border-blue-400/40 transition-all group shadow-sm ring-1 ring-blue-500/10">
+                <div className="w-8.5 h-8.5 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-center group-hover:bg-blue-600 transition-colors duration-500 shadow-inner">
+                    <Users size={16} className="text-blue-400 group-hover:text-white transition-all" />
                 </div>
-                <div className="text-center mt-1">
-                    <h5 className="font-display font-black text-white text-[10px] drop-shadow-sm">Chat Group</h5>
-                    <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tighter mt-0.5">Community</p>
+                <div className="text-center mt-0.5">
+                    <h5 className="font-display font-black text-white text-[10px] drop-shadow-sm leading-none">Chat Group</h5>
+                    <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tighter mt-0.5 leading-none">Community</p>
                 </div>
             </a>
         </div>

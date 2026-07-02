@@ -237,7 +237,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       className="flex flex-col h-screen bg-transparent text-white overflow-hidden font-sans relative"
     >
       {/* Header */}
-      <header className="px-5 flex items-center justify-between bg-slate-900/50 backdrop-blur-3xl border-b border-white/5 shadow-xs sticky top-0 z-[100] h-14">
+      <header className="px-4 flex items-center justify-between bg-slate-900/50 backdrop-blur-3xl border-b border-white/5 shadow-xs sticky top-0 z-[100] h-14">
         <div className="flex items-center gap-2">
           {showBack && (
             <motion.button 
