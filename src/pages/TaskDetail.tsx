@@ -457,11 +457,16 @@ export default function TaskDetail() {
       setShowRestriction(true);
       return;
     }
-    if (!task || !user || alreadyCompleted || submitted || !proof) return;
+    if (!task || !user || alreadyCompleted || submitted) return;
+    if (!screenshot && !proof) {
+      setError('Please upload a screenshot of your completed task or provide written verification details.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     setWiseAiMessage('');
     try {
+      const deviceFingerprint = getOrGenerateDeviceFingerprint();
       const response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
         method: 'POST',
         headers: {
@@ -471,9 +476,10 @@ export default function TaskDetail() {
           userId: user.uid,
           taskId: task.id,
           taskTitle: task.title,
-          proof: proof,
+          proof: proof || 'Screenshot Proof Provided',
           screenshot: screenshot, // Send screenshot proof
-          rewardAmount: calculatedReward
+          rewardAmount: calculatedReward,
+          deviceFingerprint
         })
       });
 
@@ -831,23 +837,84 @@ export default function TaskDetail() {
                    </motion.button>
                  </div>
                ) : task?.requiresProof ? (
-                 <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
+                 <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-md space-y-4">
                    <div className="flex items-center gap-2 mb-2">
-                     <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">W</span>
-                     <h4 className="font-black text-lg">Wise AI Verification</h4>
+                     <span className="w-8 h-8 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">★</span>
+                     <h4 className="font-black text-lg text-slate-900">Wise AI Verification Proof</h4>
                    </div>
-                   <p className="text-xs text-slate-500 font-medium">Please provide proof of completion. Wise AI will review your submission instantly.</p>
+                   
+                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                     Please upload a screenshot of your completed task. Wise AI will review and verify your submission instantly.
+                   </p>
+
+                   {/* Drag and Drop Zone */}
+                   <div 
+                     onDragEnter={handleDrag}
+                     onDragOver={handleDrag}
+                     onDragLeave={handleDrag}
+                     onDrop={handleDrop}
+                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer relative group ${
+                       dragActive 
+                         ? 'border-blue-500 bg-blue-50/50' 
+                         : screenshot 
+                         ? 'border-emerald-500/50 bg-emerald-50/20' 
+                         : 'border-slate-200 hover:border-blue-400 bg-slate-50/50'
+                     }`}
+                   >
+                     <input 
+                       type="file" 
+                       accept="image/*" 
+                       onChange={handleFileChange} 
+                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                     />
+                     
+                     {screenshot ? (
+                       <div className="space-y-3">
+                         <div className="relative inline-block z-20">
+                           <img 
+                             src={screenshot} 
+                             alt="Upload Preview" 
+                             className="h-28 mx-auto rounded-xl object-cover shadow-sm border border-slate-100" 
+                           />
+                           <button 
+                             type="button"
+                             onClick={(e) => {
+                               e.preventDefault();
+                               e.stopPropagation();
+                               setScreenshot(null);
+                             }} 
+                             className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-red-650 transition-all text-xs flex items-center justify-center font-bold"
+                           >
+                             ✕
+                           </button>
+                         </div>
+                         <p className="text-xs text-emerald-600 font-bold">✓ Screenshot Loaded Successfully</p>
+                         <p className="text-[10px] text-slate-400">Click or drag again to replace</p>
+                       </div>
+                     ) : (
+                       <div className="space-y-2 pointer-events-none">
+                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm text-slate-400 group-hover:text-blue-500 transition-colors">
+                           <Upload size={24} />
+                         </div>
+                         <p className="text-sm font-bold text-slate-700">Drag & drop your screenshot proof here</p>
+                         <p className="text-xs text-slate-400">or <span className="text-blue-600 underline">browse files</span></p>
+                         <p className="text-[10px] text-slate-400 italic">Supports PNG, JPG, JPEG (Max 2MB)</p>
+                       </div>
+                     )}
+                   </div>
+
                    <textarea
                      className="w-full p-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                     placeholder="Paste screenshot URL, your username, or activity link here..."
+                     placeholder="Optional: Enter your username, handle, or any additional description here..."
                      value={proof}
                      onChange={(e) => setProof(e.target.value)}
                    />
+
                    <motion.button
                      animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
                      transition={{ duration: 0.4 }}
                      onClick={() => {
-                       if (submitting || !proof) {
+                       if (submitting || (!screenshot && !proof)) {
                          setShake(true);
                          setTimeout(() => setShake(false), 400);
                        } else {
@@ -855,10 +922,10 @@ export default function TaskDetail() {
                        }
                      }}
                      className={`w-full py-4 rounded-2xl font-black text-lg text-white active:scale-[0.98] transition-all ${
-                       submitting || !proof ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                       submitting || (!screenshot && !proof) ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100'
                      }`}
                    >
-                     {submitting ? 'Submitting...' : 'Submit Proof'}
+                     {submitting ? 'Submitting Proof...' : 'Submit Verification Proof'}
                    </motion.button>
                  </div>
                ) : (
