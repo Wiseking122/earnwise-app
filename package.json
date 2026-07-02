@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@fingerprintjs/fingerprintjs": "^5.2.0",
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^2.7.0",
     "@google/generative-ai": "^0.24.1",

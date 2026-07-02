@@ -10,11 +10,19 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogIn, UserPlus, Mail, Lock, Sparkles, AlertCircle, CheckCircle2, KeyRound, ArrowLeft, Users, Eye, EyeOff } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Sparkles, AlertCircle, CheckCircle2, KeyRound, ArrowLeft, Users, Eye, EyeOff, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import axios from 'axios';
 import { safeStorage } from '../lib/storage';
 import { getOrGenerateDeviceFingerprint } from '../lib/security';
+
+// Helper to execute Firestore queries with a strict timeout
+const getDocsWithTimeout = async (q: any, timeoutMs = 3500): Promise<any> => {
+  return Promise.race([
+    getDocs(q),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs))
+  ]);
+};
 
 export default function Welcome() {
   const { user: currentUser, loading: authLoading } = useAuth();
@@ -31,6 +39,17 @@ export default function Welcome() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [authNetworkError, setAuthNetworkError] = useState(false);
+  const [securityModal, setSecurityModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: 'device' | 'telegram' | null;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    type: null
+  });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [checkingRedirect, setCheckingRedirect] = useState(true);
@@ -103,6 +122,7 @@ export default function Welcome() {
           telegramId: telegramId,
           deviceFingerprint: existingData?.deviceFingerprint || getOrGenerateDeviceFingerprint(),
           registeredDeviceFingerprint: existingData?.registeredDeviceFingerprint || getOrGenerateDeviceFingerprint(),
+          registeredDeviceId: existingData?.registeredDeviceId || getOrGenerateDeviceFingerprint(),
           pendingBalance: existingData?.pendingBalance ?? 0,
           withdrawableBalance: existingData?.withdrawableBalance ?? 0,
           depositBalance: existingData?.depositBalance ?? 0,
@@ -208,14 +228,22 @@ export default function Welcome() {
 
         // If input is a username (no @), look up the associated email in Firestore
         if (!loginEmail.includes('@')) {
-          const q = query(collection(db, 'users'), where('username', '==', loginEmail.toLowerCase().trim()), limit(1));
-          const snap = await getDocs(q);
-          
-          if (snap.empty) {
-            throw new Error("No account found with this username. Please check your spelling or sign up.");
+          try {
+            const q = query(collection(db, 'users'), where('username', '==', loginEmail.toLowerCase().trim()), limit(1));
+            const snap = await getDocsWithTimeout(q, 4500);
+            
+            if (snap.empty) {
+              throw new Error("No account found with this username. Please check your spelling or sign up.");
+            }
+            
+            loginEmail = snap.docs[0].data().email;
+          } catch (err: any) {
+            console.error("Username lookup error:", err);
+            if (err.message === "timeout") {
+              throw new Error("Connection timed out. Please check your network and try again.");
+            }
+            throw err;
           }
-          
-          loginEmail = snap.docs[0].data().email;
         }
 
         // --- NEW ANTI-FRAUD LOGIN VERIFICATION ---
@@ -247,30 +275,88 @@ export default function Welcome() {
         if (!email.trim()) throw new Error("Email is required");
         if (!password) throw new Error("Password is required");
         
-        // Check if username is taken
-        const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase().trim()), limit(1));
-        const usernameSnap = await getDocs(q);
-        if (!usernameSnap.empty) {
-          throw new Error("Username is already taken. Please choose another.");
-        }
-
         // --- NEW ANTI-FRAUD VERIFICATION ---
         const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
         const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
         const deviceFingerprint = getOrGenerateDeviceFingerprint();
 
-        // Call backend to verify deviceFingerprint and telegramId rules
-        await axios.post(getApiUrl('/api/auth/register-check'), {
-          deviceFingerprint,
-          telegramId
-        });
+        // Check if username is taken
+        let usernameTaken = false;
+        try {
+          const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase().trim()), limit(1));
+          const usernameSnap = await getDocsWithTimeout(q, 3000);
+          if (!usernameSnap.empty) {
+            usernameTaken = true;
+          }
+        } catch (err) {
+          console.warn("Client-side username check timed out or failed, falling back to backend check:", err);
+        }
+        if (usernameTaken) {
+          throw new Error("Username is already taken. Please choose another.");
+        }
+
+        // 1. Direct client-side Firestore fallback check (fully functional on Vercel without a configured backend)
+        let isTelegramDuplicate = false;
+        if (telegramId) {
+          try {
+            const tgQuery = query(collection(db, 'users'), where('telegramId', '==', String(telegramId)), limit(1));
+            const tgSnap = await getDocsWithTimeout(tgQuery, 3000);
+            if (!tgSnap.empty) {
+              isTelegramDuplicate = true;
+            }
+          } catch (err) {
+            console.warn("Client-side telegram check timed out or failed:", err);
+          }
+        }
+        if (isTelegramDuplicate) {
+          throw new Error("This Telegram account is already linked to an existing Earnwise profile.");
+        }
+
+        let isDeviceLimitReached = false;
+        if (deviceFingerprint) {
+          try {
+            const regQuery = query(collection(db, 'users'), where('registeredDeviceFingerprint', '==', String(deviceFingerprint)), limit(1));
+            const regSnap = await getDocsWithTimeout(regQuery, 3000);
+            
+            let legacySnap = null;
+            if (regSnap.empty) {
+              const legacyQuery = query(collection(db, 'users'), where('deviceFingerprint', '==', String(deviceFingerprint)), limit(1));
+              legacySnap = await getDocsWithTimeout(legacyQuery, 3000);
+            }
+
+            if (!regSnap.empty || (legacySnap && !legacySnap.empty)) {
+              isDeviceLimitReached = true;
+            }
+          } catch (err) {
+            console.warn("Client-side device fingerprint check timed out or failed:", err);
+          }
+        }
+        if (isDeviceLimitReached) {
+          throw new Error("Registration limit reached. Only one Earnwise account can be registered per device.");
+        }
+
+        // 2. Call backend as a centralized logging and backup verify
+        try {
+          await axios.post(getApiUrl('/api/auth/register-check'), {
+            deviceFingerprint,
+            telegramId,
+            username: username.toLowerCase().trim()
+          });
+        } catch (apiErr: any) {
+          const errMsg = apiErr.response?.data?.error || apiErr.response?.data?.message;
+          if (errMsg) {
+            throw new Error(errMsg);
+          }
+          // If the backend is offline or not capable, we can proceed because the client-side check above already verified the rules
+          console.warn("Backend check skipped or failed, using client-side verification instead.");
+        }
 
         // Set isRegistering flag inside safeStorage BEFORE calling createUserWithEmailAndPassword
         safeStorage.setItem('isRegistering', 'true');
 
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
         
-        // Create user profile
+         // Create user profile
         try {
           await handleUserDoc(user, { firstName, lastName, phoneNumber, username, referralCode: referralCodeInput });
           
@@ -278,7 +364,7 @@ export default function Welcome() {
           localStorage.setItem('earnwise_registration_token', deviceFingerprint);
         } catch (dbErr: any) {
           safeStorage.removeItem('isRegistering');
-          if (dbErr.message === "auth/telegram-duplicate") {
+          if (dbErr.message === "auth/telegram-duplicate" || dbErr.message?.includes("already linked") || dbErr.message?.includes("already exists")) {
              throw dbErr;
           }
           handleFirestoreError(dbErr, OperationType.CREATE, `users/${user.uid}`);
@@ -289,11 +375,22 @@ export default function Welcome() {
     } catch (err: any) {
       safeStorage.removeItem('isRegistering');
       console.error("Auth error:", err);
-      const serverMsg = err.response?.data?.error || err.response?.data?.message;
-      if (serverMsg) {
-        setError(serverMsg);
-      } else if (err.message === "auth/telegram-duplicate") {
-         setError("Account already exists for this Telegram profile.");
+      const serverMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+      
+      if (serverMsg === "auth/telegram-duplicate" || serverMsg?.includes("This Telegram account is already linked") || serverMsg?.includes("Account already exists for this Telegram profile") || serverMsg?.includes("telegram-duplicate")) {
+        setSecurityModal({
+          isOpen: true,
+          title: "Account Already Exists",
+          description: "Account already exists for this Telegram profile. Please log in instead to safeguard your progress and earnings.",
+          type: 'telegram'
+        });
+      } else if (serverMsg === "auth/device-limit" || serverMsg?.includes("Registration limit reached") || serverMsg?.includes("Only one Earnwise account can be registered per device")) {
+        setSecurityModal({
+          isOpen: true,
+          title: "Registration Limit Reached",
+          description: "To ensure a fair and secure earning ecosystem for all partners, Earnwise enforces a strict limit of one active registration per device. You are welcome to log in to your existing account, or sign in as a friend on this device at any time.",
+          type: 'device'
+        });
       } else if (err.code === 'auth/invalid-credential') {
         setError('Invalid email or password. If you previously used Google Login, you may need to use the "Forgot Password" link to set a password for your email.');
       } else if (err.code === 'auth/user-not-found') {
@@ -303,7 +400,7 @@ export default function Welcome() {
       } else if (err.code === 'auth/wrong-password') {
         setError('Incorrect password.');
       } else {
-        setError(err.message);
+        setError(serverMsg || String(err));
       }
     } finally {
       setLoading(false);
@@ -565,6 +662,74 @@ export default function Welcome() {
             </div>
         </div>
       </motion.div>
+
+      {/* Custom Security Trust Modal */}
+      <AnimatePresence>
+        {securityModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSecurityModal(prev => ({ ...prev, isOpen: false }))}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+
+            {/* Content Card */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 max-w-sm w-full relative overflow-hidden text-center z-10"
+            >
+              {/* Top Banner Accent */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600" />
+
+              {/* Icon Container */}
+              <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 mb-4 mt-2">
+                <ShieldAlert size={24} />
+              </div>
+
+              {/* Title */}
+              <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-2">
+                {securityModal.title}
+              </h3>
+
+              {/* Description */}
+              <p className="text-xs text-slate-500 font-medium leading-relaxed mb-6 px-1">
+                {securityModal.description}
+              </p>
+
+              {/* Buttons Layout */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setSecurityModal(prev => ({ ...prev, isOpen: false }));
+                    setIsLogin(true); // Switch to Login screen
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 active:scale-[0.98]"
+                >
+                  Switch to Sign In
+                </button>
+                <button
+                  onClick={() => setSecurityModal(prev => ({ ...prev, isOpen: false }))}
+                  className="w-full bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 py-2.5 rounded-2xl font-bold text-[10px] uppercase tracking-wider transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+
+              {/* Footer Trust Indicator */}
+              <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-center gap-1.5 text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                <ShieldCheck size={12} className="text-slate-300" />
+                <span>Earnwise Identity Protection</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

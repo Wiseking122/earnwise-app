@@ -3129,7 +3129,7 @@ Please verify if the submission is a plausible and honest completion of a social
 
   // Anti-fraud registration constraints
   app.post("/api/auth/register-check", async (req, res) => {
-    const { deviceFingerprint, telegramId } = req.body;
+    const { deviceFingerprint, telegramId, username } = req.body;
 
     if (!isDbAdminCapable) {
       console.warn("[AUTH_CHECK] Admin SDK is not capable. Bypassing registration check.");
@@ -3137,14 +3137,27 @@ Please verify if the submission is a plausible and honest completion of a social
     }
 
     try {
+      if (username) {
+        const uSnap = await dbAdmin.collection('users')
+          .where('username', '==', String(username).toLowerCase().trim())
+          .limit(1)
+          .get();
+        if (!uSnap.empty) {
+          return res.status(400).json({
+            error: "Username is already taken. Please choose another."
+          });
+        }
+      }
+
       if (telegramId) {
         const tgSnap = await dbAdmin.collection('users')
           .where('telegramId', '==', String(telegramId))
           .limit(1)
           .get();
         if (!tgSnap.empty) {
+          console.log(`Registration attempt for Device ID: ${deviceFingerprint || 'unknown'} - Result: Blocked`);
           return res.status(400).json({
-            error: "This Telegram account is already linked to an existing Earnwise profile."
+            error: "Account already exists for this Telegram profile. Please log in instead"
           });
         }
       }
@@ -3166,12 +3179,14 @@ Please verify if the submission is a plausible and honest completion of a social
         }
 
         if (!regSnap.empty || (legacySnap && !legacySnap.empty)) {
+          console.log(`Registration attempt for Device ID: ${deviceFingerprint} - Result: Blocked`);
           return res.status(400).json({
             error: "Registration limit reached. Only one Earnwise account can be registered per device."
           });
         }
       }
 
+      console.log(`Registration attempt for Device ID: ${deviceFingerprint || 'unknown'} - Result: Allowed`);
       return res.status(200).json({ success: true });
     } catch (err: any) {
       console.error("[AUTH_CHECK] Error in registration validation:", err);
@@ -3228,8 +3243,9 @@ Please verify if the submission is a plausible and honest completion of a social
           .limit(1)
           .get();
         if (!tgSnap.empty) {
+          console.log(`Registration attempt for Device ID: ${deviceFingerprint || 'unknown'} - Result: Blocked`);
           return res.status(400).json({
-            error: "This Telegram account is already linked to an existing Earnwise profile."
+            error: "Account already exists for this Telegram profile. Please log in instead"
           });
         }
       }
@@ -3251,12 +3267,14 @@ Please verify if the submission is a plausible and honest completion of a social
         }
 
         if (!regSnap.empty || (legacySnap && !legacySnap.empty)) {
+          console.log(`Registration attempt for Device ID: ${deviceFingerprint} - Result: Blocked`);
           return res.status(400).json({
             error: "Registration limit reached. Only one Earnwise account can be registered per device."
           });
         }
       }
 
+      console.log(`Registration attempt for Device ID: ${deviceFingerprint || 'unknown'} - Result: Allowed`);
       return res.status(200).json({ success: true });
     } catch (err: any) {
       console.error("[AUTH_REGISTER] Error in registration logic:", err);
@@ -3343,11 +3361,19 @@ Please verify if the submission is a plausible and honest completion of a social
                 <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 20px;">Need a hand? Simply reply to this email, and our support team will be ready to help.</p>
               </div>
             `,
-            attachments: [{
-              filename: 'logo.png',
-              path: path.join(process.cwd(), 'public/icon.png'),
-              cid: 'earnwise_logo'
-            }]
+            attachments: (() => {
+              const logoPath = path.join(process.cwd(), 'public/logo.png');
+              const iconPath = path.join(process.cwd(), 'public/icon.png');
+              const icon512Path = path.join(process.cwd(), 'public/icon-512.png');
+              if (fs.existsSync(logoPath)) {
+                return [{ filename: 'logo.png', path: logoPath, cid: 'earnwise_logo' }];
+              } else if (fs.existsSync(iconPath)) {
+                return [{ filename: 'logo.png', path: iconPath, cid: 'earnwise_logo' }];
+              } else if (fs.existsSync(icon512Path)) {
+                return [{ filename: 'logo.png', path: icon512Path, cid: 'earnwise_logo' }];
+              }
+              return [];
+            })()
           });
           emailSent = true;
           console.log(`[AUTH] SUCCESS! Welcome email sent to ${email}`);

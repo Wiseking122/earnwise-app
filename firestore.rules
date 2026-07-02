@@ -114,7 +114,7 @@ service cloud.firestore {
         (request.auth.uid == userId && (
           !incoming().diff(existing()).affectedKeys().hasAny(['role'])
         )) ||
-        (incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'referralBalance', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt']))
+        (set(['balance', 'referralBalance', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt']).hasAll(incoming().diff(existing()).affectedKeys()))
       );
     }
 
@@ -150,8 +150,8 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update: if isSignedIn() && (
         isAdmin() || 
-        (resource.data.userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) ||
-        (resource.data.userId == 'all' && incoming().diff(existing()).affectedKeys().hasOnly(['readBy']))
+        (resource.data.userId == request.auth.uid && set(['read']).hasAll(incoming().diff(existing()).affectedKeys())) ||
+        (resource.data.userId == 'all' && set(['readBy']).hasAll(incoming().diff(existing()).affectedKeys()))
       );
     }
 
@@ -166,7 +166,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidVaultEntry(incoming()) && isValidId(vaultEntryId) &&
                       getUserData(request.auth.uid).withdrawableBalance >= incoming().amount;
       allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidVaultEntry(incoming()) && (
-                      incoming().diff(existing()).affectedKeys().hasOnly(['status', 'claimedAt']) &&
+                      set(['status', 'claimedAt']).hasAll(incoming().diff(existing()).affectedKeys()) &&
                       existing().status == 'locked' &&
                       incoming().status == 'unlocked' &&
                       incoming().claimedAt == request.time
