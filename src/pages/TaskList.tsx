@@ -45,19 +45,7 @@ export default function TaskList() {
   const category = searchParams.get('category');
 
   useEffect(() => {
-    let script: HTMLScriptElement | null = null;
-    if (category === 'ad') {
-      script = document.createElement('script');
-      script.dataset.zone = '11109247';
-      script.src = 'https://n6wxm.com/vignette.min.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
-    return () => {
-      if (script) {
-        script.remove();
-      }
-    };
+    // Ad category effect logic
   }, [category]);
   
   const initialCategory = (category as TaskType | 'all') || 'all';

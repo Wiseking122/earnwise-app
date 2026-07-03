@@ -405,7 +405,7 @@ export default function LuckySpin() {
                             }}
                             className="w-full py-3 text-slate-500 hover:text-slate-400 font-bold text-xs uppercase tracking-wider transition-all text-center"
                           >
-                            Cancel visit
+                            Cancel
                           </button>
                         </div>
                       ) : (

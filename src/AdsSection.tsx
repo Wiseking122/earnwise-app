@@ -314,14 +314,8 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
 
     // Clear existing contents
     adContainer.innerHTML = '';
-
-    // Create a new script element
-    const script = document.createElement('script');
-    script.dataset.zone = '11223633';
-    script.src = 'https://n6wxm.com/vignette.min.js';
-
-    // Append to the target container
-    adContainer.appendChild(script);
+    
+    // Adsterra/Monetag injection disabled to prevent aggressive ads
 
     return () => {
       const containerOnCleanup = document.getElementById('adsterra-timer-banner');

@@ -236,7 +236,7 @@ export default function TaskDetail() {
     const initialBodyChildren = Array.from(document.body.children);
     const initialHtmlChildren = Array.from(document.documentElement.children);
 
-    const cleanupMonetag = () => {
+    const cleanupAdsterra = () => {
       // 1. Clear target ad container
       const container = document.getElementById('adsterra-timer-banner');
       if (container) {
@@ -245,7 +245,6 @@ export default function TaskDetail() {
 
       // 2. Remove script elements from DOM entirely
       const scriptSelectors = [
-        'script[src*="vignette.min.js"]',
         'script[src*="invoke.js"]',
         'script[src*="sturgeonvelocity.com"]'
       ];
@@ -260,7 +259,7 @@ export default function TaskDetail() {
           try {
             child.remove();
           } catch (e) {
-            console.error("Error removing body child during Monetag/Adsterra cleanup:", e);
+            console.error("Error removing body child during Adsterra cleanup:", e);
           }
         }
       });
@@ -271,16 +270,15 @@ export default function TaskDetail() {
           try {
             child.remove();
           } catch (e) {
-            console.error("Error removing html child during Monetag/Adsterra cleanup:", e);
+            console.error("Error removing html child during Adsterra cleanup:", e);
           }
         }
       });
 
-      // 4. Fallback search for any known vignette or adsterra classes, frames, or overlays to destroy them from memory
+      // 4. Fallback search for any known adsterra classes, frames, or overlays to destroy them from memory
       const querySelectors = [
-        '[class*="vignette"]', '[id*="vignette"]',
         '[class*="adsterra"]', '[id*="adsterra"]',
-        'iframe[src*="vignette"]', 'iframe[src*="adsterra"]',
+        'iframe[src*="adsterra"]',
         'iframe[src*="sturgeonvelocity.com"]',
         'div[style*="z-index"][style*="position: fixed"]' // common pattern for overlay ads
       ];
@@ -300,7 +298,7 @@ export default function TaskDetail() {
     };
 
     if (!isCountingDown) {
-      cleanupMonetag();
+      cleanupAdsterra();
       return;
     }
 
@@ -321,18 +319,12 @@ export default function TaskDetail() {
       adsterraScript.type = 'text/javascript';
       adsterraScript.src = 'https://sturgeonvelocity.com/676b0b6eb3c82b512b4b9ca2349ac3e7/invoke.js';
 
-      // 2. Configure and load Monetag vignette
-      const monetagScript = document.createElement('script');
-      monetagScript.dataset.zone = '11223633';
-      monetagScript.src = 'https://n6wxm.com/vignette.min.js';
-
-      // Append both scripts to the dedicated adsterra-timer-banner container
-      adContainer.appendChild(monetagScript);
+      // Append script to the dedicated adsterra-timer-banner container
       adContainer.appendChild(adsterraScript);
     }
 
     return () => {
-      cleanupMonetag();
+      cleanupAdsterra();
     };
   }, [countdown]);
 

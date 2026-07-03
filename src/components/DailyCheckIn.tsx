@@ -81,16 +81,16 @@ export const DailyCheckIn: React.FC = () => {
       return;
     }
     if (!canCheckIn || loading) return;
-
+    
     // Open current day's link in a new tab
     if (currentReward.link) {
       window.open(currentReward.link, '_blank', 'noopener,noreferrer');
     }
-    
+
     setLoading(true);
     const rewardAmount = currentReward.amount;
     const xpAmount = currentReward.xp;
-    
+
     try {
       // 1. Transactionally update user profile document
       const userRef = doc(db, 'users', profile.uid);
