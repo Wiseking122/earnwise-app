@@ -45,6 +45,7 @@ import { DailyCheckIn } from '../components/DailyCheckIn';
 import { useLiveActivities } from '../hooks/useLiveActivities';
 import { DailyGoal } from './DailyGoal';
 import { CpxWidget } from '../components/CpxWidget';
+import { AdsterraBanner } from '../components/AdsterraBanner';
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
 import PayoutTicker from '../components/PayoutTicker';
@@ -669,6 +670,25 @@ export default function Home() {
             </div>
           </Link>
         </div>
+
+        {/* Home Ad Banner Placement */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.6 }}
+          className="w-full"
+        >
+          <div className="bg-slate-950/40 backdrop-blur-2xl border border-white/5 rounded-2xl p-4 overflow-hidden relative group shadow-xl">
+             <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-1 bg-blue-500 rounded-full animate-ping" />
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Partner Content</span>
+              </div>
+              <span className="text-[7.5px] font-bold text-blue-400/60 bg-blue-500/5 px-2 py-0.5 rounded-full border border-blue-500/10">Wise Ad Network</span>
+            </div>
+            <AdsterraBanner type="native" />
+          </div>
+        </motion.div>
 
         {/* Featured Opportunities Section */}
         <section className="space-y-3">

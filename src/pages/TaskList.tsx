@@ -173,6 +173,7 @@ export default function TaskList() {
             {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
               <button
                 key={cat.id}
+                data-category={cat.id}
                 onClick={() => {
                   if (isUserFree && cat.id !== 'all' && cat.id !== 'referral') {
                     setShowRestriction(true);

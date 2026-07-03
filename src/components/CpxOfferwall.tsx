@@ -96,15 +96,26 @@ export const CpxOfferwall: React.FC<CpxOfferwallProps> = ({ userId, userName, us
                   </p>
                 </div>
 
-                <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-800 bg-white shadow-inner">
-                  <iframe 
-                    width="100%" 
-                    frameBorder="0" 
-                    height="2000px"  
-                    src={signedUrl}
-                    title="CPX Research Surveys"
-                    className="w-full rounded-2xl sm:rounded-3xl"
-                  />
+                <div className="py-12 px-6 bg-slate-900/50 rounded-[2.5rem] border border-slate-800 shadow-inner flex flex-col items-center justify-center space-y-6">
+                  <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
+                    <ShieldCheck className="text-blue-500" size={32} />
+                  </div>
+                  <div className="text-center space-y-2">
+                    <p className="text-white font-black text-xl uppercase tracking-tight">Earning Portal Ready</p>
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-relaxed max-w-[200px]">Click the button below to launch the survey environment in a new tab.</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => window.open(signedUrl, '_blank')}
+                    className="w-full sm:w-auto px-12 py-5 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-2xl shadow-[0_20px_50px_rgba(234,88,12,0.3)] transition-all active:scale-[0.98] uppercase italic tracking-tighter text-lg"
+                  >
+                    Launch Survey Portal
+                  </button>
+                  
+                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.3em] flex items-center gap-2">
+                    <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
+                    Secure Verified Connection
+                  </p>
                 </div>
               </div>
             ) : (

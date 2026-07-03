@@ -22,6 +22,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import DepositTab from '../components/DepositTab';
 import { CpxWidget } from '../components/CpxWidget';
 import { CpxOfferwall } from '../components/CpxOfferwall';
+import { AdsterraBanner } from '../components/AdsterraBanner';
 import AnimatedNumber from '../components/AnimatedNumber';
 import TransactionReceipt from '../components/TransactionReceipt';
 
@@ -196,6 +197,20 @@ export default function Earnings() {
             </div>
           </div>
         </div>
+
+        {/* Ad Placement in Vault */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden"
+        >
+          <div className="flex items-center gap-2 mb-4 px-2">
+            <DollarSign size={14} className="text-amber-500" />
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sponsored Financial Insight</span>
+          </div>
+          <AdsterraBanner type="native" />
+        </motion.div>
 
         <div className="grid grid-cols-2 gap-4">
            <div className="bg-slate-900/40 rounded-3xl p-6 border border-white/5">

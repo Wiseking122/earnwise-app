@@ -162,7 +162,6 @@
     <meta name="twitter:image" content="https://earnwise1.vercel.app/logo.png" />
 
     <!-- Meta tags -->
-    
   </head>
   <body>
     <div id="root"></div>
@@ -182,13 +181,18 @@
         const isAdUrl = e.filename && (
           e.filename.includes('vignette') || 
           e.filename.includes('n6wxm') || 
+          e.filename.includes('sturgeonvelocity') ||
           e.filename.includes('adsterra') || 
-          e.filename.includes('monetag')
+          e.filename.includes('monetag') ||
+          e.filename.includes('dde86cd45f7bfcfcc96137effdc5cb39') ||
+          e.filename.includes('676b0b6eb3c82b512b4b9ca2349ac3e7') ||
+          e.filename.includes('6ed51d6a0308b91327d83ade173f1aa5')
         );
         if (isScriptError || isAdUrl) {
-          console.warn('Suppressed third-party/ad network script error:', e.message, e.filename);
+          // Silent suppression to avoid cluttering reporting tools
           e.preventDefault();
           e.stopPropagation();
+          return false;
         }
       }, true);
 
@@ -225,6 +229,46 @@
         window.deferredPrompt = e;
         console.log('Earnwise: Installation ready');
       });
+    </script>
+    
+    <!-- Third-party Ad Scripts Moved to End of Body -->
+    <script>(function(s){s.dataset.zone='11223633',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
+    
+    <script>
+      (function() {
+        // Localizing atOptions to avoid global collision if scripts are scoped
+        var atOptions1 = {
+          'key' : 'dde86cd45f7bfcfcc96137effdc5cb39',
+          'format' : 'iframe',
+          'height' : 300,
+          'width' : 160,
+          'params' : {}
+        };
+        window.atOptions = atOptions1;
+        var s = document.createElement('script');
+        s.src = "https://sturgeonvelocity.com/dde86cd45f7bfcfcc96137effdc5cb39/invoke.js";
+        document.body.appendChild(s);
+      })();
+    </script>
+    
+    <script src="https://sturgeonvelocity.com/ea/a5/34/eaa534755b2d067b2f4e22bc64dd3390.js" async></script>
+    
+    <script>
+      (function() {
+        // Second ad placement
+        var atOptions2 = {
+          'key' : '676b0b6eb3c82b512b4b9ca2349ac3e7',
+          'format' : 'iframe',
+          'height' : 50,
+          'width' : 320,
+          'params' : {}
+        };
+        // This still overwrites window.atOptions, but by this time the first script may have started
+        window.atOptions = atOptions2;
+        var s = document.createElement('script');
+        s.src = "https://sturgeonvelocity.com/676b0b6eb3c82b512b4b9ca2349ac3e7/invoke.js";
+        document.body.appendChild(s);
+      })();
     </script>
   </body>
 </html>
