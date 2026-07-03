@@ -29,6 +29,7 @@ import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
 import VideoAdsSection from '../components/VideoAdsSection';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
+import { MaintenanceModal } from '../components/MaintenanceModal';
 
 const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string, subtext?: string }[] = [
   { id: 'all', label: 'All Jobs', icon: SlidersHorizontal, color: 'bg-slate-900' },
@@ -68,7 +69,31 @@ export default function TaskList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isZeydooModalOpen, setZeydooModalOpen] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
+  const [showMaintenance, setShowMaintenance] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!");
+  const [adsMaintenanceMode, setAdsMaintenanceMode] = useState(false);
   const [isRenewalRequired, setIsRenewalRequired] = useState(true);
+
+  useEffect(() => {
+    // Listen for Ads Configuration
+    const adsConfigUnsub = onSnapshot(doc(db, 'system_settings', 'ads_config'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setAdsMaintenanceMode(data.adsMaintenanceMode ?? false);
+        setMaintenanceMessage(data.maintenanceMessage ?? maintenanceMessage);
+      }
+    });
+
+    return () => adsConfigUnsub();
+  }, []);
+
+  useEffect(() => {
+    // Prevent direct access to ad category via URL if maintenance is active
+    if (activeCategory === 'ad' && adsMaintenanceMode) {
+      setActiveCategory('survey');
+      setShowMaintenance(true);
+    }
+  }, [activeCategory, adsMaintenanceMode]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (snap) => {
@@ -175,6 +200,10 @@ export default function TaskList() {
                 key={cat.id}
                 data-category={cat.id}
                 onClick={() => {
+                  if (cat.id === 'ad' && adsMaintenanceMode) {
+                    setShowMaintenance(true);
+                    return;
+                  }
                   if (isUserFree && cat.id !== 'all' && cat.id !== 'referral') {
                     setShowRestriction(true);
                     return;
@@ -401,6 +430,12 @@ export default function TaskList() {
           </div>
         </div>
       )}
+
+      <MaintenanceModal 
+        isOpen={showMaintenance} 
+        onClose={() => setShowMaintenance(false)} 
+        message={maintenanceMessage}
+      />
 
       <PlanRestrictionModal 
         isOpen={showRestriction} 

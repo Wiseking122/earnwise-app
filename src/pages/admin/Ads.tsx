@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { db, storage } from '../../lib/firebase';
-import { collection, addDoc, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getApiUrl } from '../../lib/config';
 import { sendNotification, NotificationType } from '../../lib/notifications';
-import { Plus, Trash2, BarChart2, Video, Image as ImageIcon, Clock, Upload } from 'lucide-react';
+import { Plus, Trash2, BarChart2, Video, Image as ImageIcon, Clock, Upload, Construction, Save } from 'lucide-react';
 
 const isYouTubeUrl = (url: string) => {
   if (!url) return false;
@@ -193,6 +193,11 @@ const renderMediaElement = (mediaUrl: string, title: string, id: string, type: s
 
 export default function AdminAds() {
   const [ads, setAds] = useState<any[]>([]);
+  const [adsConfig, setAdsConfig] = useState<{ adsMaintenanceMode: boolean; maintenanceMessage: string }>({
+    adsMaintenanceMode: false,
+    maintenanceMessage: "🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!"
+  });
+  const [savingConfig, setSavingConfig] = useState(false);
   const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '' });
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -205,8 +210,39 @@ export default function AdminAds() {
     const unsub = onSnapshot(q, (snap) => {
       setAds(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return unsub;
+    
+    // Fetch Ads Config
+    const configUnsub = onSnapshot(doc(db, 'system_settings', 'ads_config'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setAdsConfig({
+          adsMaintenanceMode: data.adsMaintenanceMode ?? false,
+          maintenanceMessage: data.maintenanceMessage ?? adsConfig.maintenanceMessage
+        });
+      }
+    });
+
+    return () => {
+      unsub();
+      configUnsub();
+    };
   }, []);
+
+  const handleSaveConfig = async () => {
+    setSavingConfig(true);
+    try {
+      await setDoc(doc(db, 'system_settings', 'ads_config'), {
+        ...adsConfig,
+        updatedAt: new Date()
+      }, { merge: true });
+      showStatus("Ads Center configuration updated!", 'success');
+    } catch (err: any) {
+      console.error("Failed to update config:", err);
+      showStatus("Failed to update configuration: " + err.message, 'error');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   const showStatus = (text: string, type: 'success' | 'error') => {
     setStatusMsg({ text, type });
@@ -354,6 +390,73 @@ export default function AdminAds() {
       <div className="p-6 space-y-8 max-w-7xl mx-auto">
         <h1 className="text-4xl font-black text-slate-900 tracking-tight">Ad Management</h1>
         
+        {/* Ads Center Maintenance Controls */}
+        <div className="bg-slate-900 rounded-[2.5rem] p-8 sm:p-10 border border-white/10 shadow-2xl overflow-hidden relative group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-orange-500/20 transition-colors" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-orange-500/20 rounded-2xl">
+                  <Construction size={24} className="text-orange-500" />
+                </div>
+                <h2 className="text-2xl font-display font-black text-white uppercase italic tracking-tighter">
+                  Ads Center Status
+                </h2>
+              </div>
+              <p className="text-slate-400 text-sm font-bold tracking-tight">
+                Globally lock or unlock the Ads Center for maintenance or upgrades.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4 bg-slate-950/50 p-2 rounded-2xl border border-white/5">
+              <button
+                onClick={() => setAdsConfig(prev => ({ ...prev, adsMaintenanceMode: false }))}
+                className={`px-6 py-3 rounded-xl font-black uppercase italic tracking-tighter transition-all ${
+                  !adsConfig.adsMaintenanceMode 
+                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Unlocked
+              </button>
+              <button
+                onClick={() => setAdsConfig(prev => ({ ...prev, adsMaintenanceMode: true }))}
+                className={`px-6 py-3 rounded-xl font-black uppercase italic tracking-tighter transition-all ${
+                  adsConfig.adsMaintenanceMode 
+                    ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Locked
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
+                Maintenance Message
+              </label>
+              <textarea
+                value={adsConfig.maintenanceMessage}
+                onChange={e => setAdsConfig(prev => ({ ...prev, maintenanceMessage: e.target.value }))}
+                placeholder="Message to display when locked..."
+                className="w-full bg-slate-950/50 border border-white/10 rounded-2xl p-4 text-white text-sm font-bold focus:ring-2 focus:ring-orange-500 transition-all min-h-[100px] resize-none"
+              />
+            </div>
+            
+            <button
+              onClick={handleSaveConfig}
+              disabled={savingConfig}
+              className="flex items-center gap-2 bg-white hover:bg-slate-100 text-slate-900 px-8 py-4 rounded-2xl font-black uppercase italic tracking-tighter transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Save size={18} />
+              {savingConfig ? 'Saving...' : 'Update Status'}
+            </button>
+          </div>
+        </div>
+
         {/* Status Message */}
         {statusMsg && (
           <div className={`p-4 rounded-2xl border text-sm font-black uppercase tracking-tight ${

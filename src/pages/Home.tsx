@@ -46,6 +46,7 @@ import { useLiveActivities } from '../hooks/useLiveActivities';
 import { DailyGoal } from './DailyGoal';
 import { CpxWidget } from '../components/CpxWidget';
 import { AdsterraBanner } from '../components/AdsterraBanner';
+import { MaintenanceModal } from '../components/MaintenanceModal';
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
 import PayoutTicker from '../components/PayoutTicker';
@@ -64,6 +65,22 @@ export default function Home() {
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [aiInsightsError, setAiInsightsError] = useState<string | null>(null);
+  const [showMaintenance, setShowMaintenance] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!");
+  const [adsMaintenanceMode, setAdsMaintenanceMode] = useState(false);
+
+  useEffect(() => {
+    // Listen for Ads Configuration
+    const adsConfigUnsub = onSnapshot(doc(db, 'system_settings', 'ads_config'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setAdsMaintenanceMode(data.adsMaintenanceMode ?? false);
+        setMaintenanceMessage(data.maintenanceMessage ?? maintenanceMessage);
+      }
+    });
+
+    return () => adsConfigUnsub();
+  }, []);
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -264,8 +281,8 @@ export default function Home() {
       setAiInsights({
         prediction: `₦${estimatedEarning.toLocaleString()} daily earning potential based on your ${profile?.plan || 'free'} tier`,
         insights: [
-          { title: "🔥 Wise AI Direct Strategy", description: "Complete the SingingFiles high-yield survey or web verification offer in your Ads Center for an instant ₦20.00 credit. Make sure to complete all required steps to the very last screen to verify your reward.", type: "quick_win" },
-          { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete 1 more task today to maintain your 1.5x earnings multiplier!`, type: "strategy" },
+          { title: "🔥 Wise AI Direct Strategy", description: "Regular ad tasks are temporarily unavailable for upgrade. Complete high-yield surveys in the Survey section to maintain your daily earning momentum.", type: "quick_win" },
+          { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete at least one survey daily to maintain your 1.5x earnings multiplier!`, type: "strategy" },
           { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant ₦2,500 bonus per verified invite.", type: "upgrade" }
         ]
       });
@@ -276,11 +293,15 @@ export default function Home() {
 
   const handleAdsCenterClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    const script = document.createElement('script');
-    script.src = 'https://n6wxm.com/vignette.min.js';
-    script.dataset.zone = '11109247';
-    document.body.appendChild(script);
-    navigate('/tasks?category=ad');
+    if (adsMaintenanceMode) {
+      setShowMaintenance(true);
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://n6wxm.com/vignette.min.js';
+      script.dataset.zone = '11109247';
+      document.body.appendChild(script);
+      navigate('/tasks?category=ad');
+    }
   };
 
   return (
@@ -716,16 +737,16 @@ export default function Home() {
                  <p className="text-orange-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">CPX Network</p>
                </Link>
                
-               <Link 
-                to="/tasks?category=ad"
-                className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group"
+               <button 
+                onClick={(e) => handleAdsCenterClick(e)}
+                className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl text-left hover:bg-emerald-500/20 transition-all active:scale-95 group w-full"
                >
                  <div className="w-7.5 h-7.5 bg-emerald-500 rounded-lg flex items-center justify-center text-white mb-2 shadow-md group-hover:rotate-12 transition-transform">
                    <Play size={12} className="fill-white" />
                  </div>
                  <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Ads Center</h4>
                  <p className="text-emerald-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">Montage</p>
-               </Link>
+               </button>
              </div>
 
             {loading ? (
@@ -1116,6 +1137,11 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+      <MaintenanceModal 
+        isOpen={showMaintenance} 
+        onClose={() => setShowMaintenance(false)} 
+        message={maintenanceMessage}
+      />
     </Layout>
   );
 }

@@ -1641,12 +1641,12 @@ async function startServer() {
         insights: [
           { 
             title: "🔥 Wise AI Direct Strategy", 
-            description: "Complete the SingingFiles high-yield survey or web verification offer in your Ads Center for an instant ₦20.00 credit. Make sure to complete all required steps to the very last screen to verify your reward.", 
+            description: "Regular ad tasks are temporarily unavailable for upgrade. Complete high-yield surveys in the Survey section to maintain your daily earning momentum.", 
             type: "quick_win" 
           },
           { 
             title: "Streak Boost Active", 
-            description: `You have a ${streak || 1} day active streak. Complete at least one ad task from the Ads Center daily to maintain your 1.5x earnings multiplier!`, 
+            description: `You have a ${streak || 1} day active streak. Complete at least one survey daily to maintain your 1.5x earnings multiplier!`, 
             type: "strategy" 
           },
           { 

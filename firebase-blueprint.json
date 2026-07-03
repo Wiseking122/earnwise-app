@@ -150,12 +150,26 @@
         "claimedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "amount", "bonus", "payoutAmount", "status", "lockedAt", "unlocksAt"]
+    },
+    "SystemSettings": {
+      "title": "System Settings",
+      "description": "Global application configuration and toggles",
+      "type": "object",
+      "properties": {
+        "adsMaintenanceMode": { "type": "boolean", "description": "Global lock for the Ads Center" },
+        "maintenanceMessage": { "type": "string", "description": "Message to show when Ads Center is locked" },
+        "payoutEnabled": { "type": "boolean", "description": "Global toggle for withdrawals" }
+      }
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "SystemSettings",
+      "description": "Global configuration settings"
     },
     "/tasks/{taskId}": {
       "schema": "Task",
