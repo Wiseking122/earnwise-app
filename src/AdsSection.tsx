@@ -390,94 +390,61 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       .replace('{CLICK_ID}', clickId);
   };
 
-  const premiumPartnerTasks: AdTask[] = [
+  const sturgeonTasks: AdTask[] = [
     {
-      id: 'partner-singing-1',
-      name: '🔥 Premium Survey Task - Channel 1',
-      provider: 'SingingFiles Premium',
+      id: 'sturgeon-1',
+      name: '⚡ Premium Ad Stream - Channel 1',
+      provider: 'Sturgeon High-Yield',
       reward: 20.00,
       type: 'click',
-      color: 'bg-orange-600',
+      color: 'bg-indigo-600',
       icon: ExternalLink,
-      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=70075',
-      instructions: 'Click the link, complete all fields of the short survey/offer honestly, and finish the last step to verify your reward.'
+      link: 'https://sturgeonvelocity.com/g5zbtjxs6?key=b81682a90b1562b13c9a6b8876242bae',
+      instructions: 'Click to launch the stream. Stay active on the destination page to verify your reward.'
     },
     {
-      id: 'partner-singing-2',
-      name: '💎 VIP Verification - Channel 2',
-      provider: 'SingingFiles VIP',
+      id: 'sturgeon-2',
+      name: '💎 VIP Ad Stream - Channel 2',
+      provider: 'Sturgeon High-Yield',
       reward: 20.00,
       type: 'click',
-      color: 'bg-pink-600',
+      color: 'bg-violet-600',
       icon: ExternalLink,
-      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=63319',
-      instructions: 'Open the premium verification page, complete the quick questionnaire, and perform the final task to successfully claim your reward.'
+      link: 'https://sturgeonvelocity.com/a7gbcdbyy?key=80bf12cfa4ca2c7c22e598ee09d258ef',
+      instructions: 'Open the VIP channel and follow instructions on screen to credit your balance.'
     },
     {
-      id: 'partner-singing-3',
-      name: '⚡ High-Yield Reward - Channel 3',
-      provider: 'SingingFiles High-Yield',
+      id: 'sturgeon-3',
+      name: '🔥 Exclusive Ad Stream - Channel 3',
+      provider: 'Sturgeon High-Yield',
+      reward: 20.00,
+      type: 'click',
+      color: 'bg-fuchsia-600',
+      icon: ExternalLink,
+      link: 'https://sturgeonvelocity.com/q46trwhb54?key=6ca2957902753234c562c9b2e2a0fe75',
+      instructions: 'Access the exclusive partner stream. Complete verification to unlock your ₦20.00 reward.'
+    },
+    {
+      id: 'sturgeon-4',
+      name: '🚀 Velocity Ad Stream - Channel 4',
+      provider: 'Sturgeon High-Yield',
       reward: 20.00,
       type: 'click',
       color: 'bg-rose-600',
       icon: ExternalLink,
-      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=56776',
-      instructions: 'Complete the easy verification steps to unlock this special offer. Make sure to complete the last page to earn your cash bounty.'
+      link: 'https://sturgeonvelocity.com/nz179ju7h7?key=2aca4e3ac4bc450e62b1f2a48187f63b',
+      instructions: 'Fast-track your earnings by completing this quick web verification offer.'
     },
     {
-      id: 'partner-singing-4',
-      name: '🎁 Instant Cash Task - Channel 4',
-      provider: 'SingingFiles Instant',
-      reward: 20.00,
-      type: 'click',
-      color: 'bg-purple-600',
-      icon: ExternalLink,
-      link: 'https://singingfiles.com/show.php?l=0&u=2535550&id=36519',
-      instructions: 'Unlock your rewards by completing the quick file verification task. Stay active and finish all steps to guarantee manual verification.'
-    },
-    {
-      id: 'partner-smart-1',
-      name: '🚀 Nya5 Smart Stream - Channel 5',
-      provider: 'Nya5 Smart',
-      reward: 20.00,
-      type: 'click',
-      color: 'bg-emerald-600',
-      icon: ExternalLink,
-      link: 'https://nya5.com/link?z=11109391&var={SOURCE_ID}&ymid={CLICK_ID}',
-      instructions: 'Access the smart monetization portal, follow the prompt instructions, and complete the quick check-in to credit your balance.'
-    },
-    {
-      id: 'partner-smart-2',
-      name: '🛡️ Secure Web Verification - Channel 6',
-      provider: '1Buv Secure',
-      reward: 20.00,
-      type: 'click',
-      color: 'bg-sky-600',
-      icon: ExternalLink,
-      link: 'https://1buv.com/link?z=11223536&var={SOURCE_ID}&ymid={CLICK_ID}',
-      instructions: 'Validate your session by following the on-screen steps. Be sure to reach the final confirmation screen to unlock your automatic cash payout.'
-    },
-    {
-      id: 'partner-smart-3',
-      name: '💎 Exclusive Partner Offer - Channel 7',
-      provider: '1Buv Premium',
+      id: 'sturgeon-5',
+      name: '🛡️ Secure Ad Stream - Channel 5',
+      provider: 'Sturgeon High-Yield',
       reward: 20.00,
       type: 'click',
       color: 'bg-blue-600',
       icon: ExternalLink,
-      link: 'https://1buv.com/link?z=11223540&var={SOURCE_ID}&ymid={CLICK_ID}',
-      instructions: 'Complete the designated offer on our partner\'s portal. All steps must be fully finished to process your balance update.'
-    },
-    {
-      id: 'partner-smart-4',
-      name: '🔥 3Vetz Daily Bonus - Channel 8',
-      provider: '3Vetz Network',
-      reward: 20.00,
-      type: 'click',
-      color: 'bg-teal-600',
-      icon: ExternalLink,
-      link: 'https://3vetz.com/link?z=11178535&var={SOURCE_ID}&ymid={CLICK_ID}',
-      instructions: 'Participate in the sponsor campaign. You must complete the requirements on the destination page completely to verify eligibility.'
+      link: 'https://sturgeonvelocity.com/r6jntjqds?key=c7121e9cf3f96b845f5b4a48335dd597',
+      instructions: 'Securely verify your session via this high-yield ad channel to claim your instant credit.'
     }
   ];
 
@@ -494,7 +461,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
 
   const adTasks: AdTask[] = [
     ...mappedDbTasks,
-    ...premiumPartnerTasks,
+    ...sturgeonTasks,
     ...monetagTasks
   ];
 

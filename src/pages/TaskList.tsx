@@ -97,7 +97,7 @@ export default function TaskList() {
 
   const taskCounts = {
     survey: 'LIVE', 
-    ad: 9, 
+    ad: 'LIVE', 
     video: tasks.filter(t => t.type === 'video').length,
     referral: tasks.filter(t => t.type === 'referral').length,
   };
