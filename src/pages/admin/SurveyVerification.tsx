@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Layout from '../../components/Layout';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { 
   collection, 
   query, 
@@ -29,6 +29,7 @@ const SurveyVerification = () => {
   const [rewardAmount, setRewardAmount] = useState('50');
   const [showRejectionModal, setShowRejectionModal] = useState<SurveySubmission | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -102,18 +103,24 @@ const SurveyVerification = () => {
           status: 'completed',
           createdAt: serverTimestamp(),
         });
-
-        // 2.4. Send notification
-        const notifRef = doc(collection(db, 'notifications'));
-        transaction.set(notifRef, {
-          userId: sub.userId,
-          title: '🪙 Wise Coins Awarded!',
-          message: `Your survey proof for "${sub.surveyTitle || 'Untitled'}" was approved! You earned ${amount} WC.`,
-          type: 'reward',
-          createdAt: serverTimestamp(),
-          readBy: []
-        });
       });
+
+      // Send REAL push notification (this will create in-app notification doc and trigger real-time FCM)
+      try {
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: auth.currentUser?.uid,
+            title: '🪙 Wise Coins Awarded!',
+            message: `Your survey proof for "${sub.surveyTitle || 'Untitled'}" was approved! You earned ${amount} WC.`,
+            targeting: 'specific',
+            userId: sub.userId
+          })
+        });
+      } catch (e) {
+        console.warn('Failed to send push notification via backend:', e);
+      }
 
       alert('Survey approved and coins credited!');
     } catch (err: any) {
@@ -142,15 +149,22 @@ const SurveyVerification = () => {
         reviewedAt: serverTimestamp(),
       });
 
-      // Send notification
-      await addDoc(collection(db, 'notifications'), {
-        userId: sub.userId,
-        title: '❌ Survey Proof Rejected',
-        message: `Your survey proof for "${sub.surveyTitle || 'Untitled'}" was rejected. Reason: ${rejectionReason}`,
-        type: 'alert',
-        createdAt: serverTimestamp(),
-        readBy: []
-      });
+      // Send REAL push notification (this will create in-app notification doc and trigger real-time FCM)
+      try {
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: auth.currentUser?.uid,
+            title: '❌ Survey Proof Rejected',
+            message: `Your survey proof for "${sub.surveyTitle || 'Untitled'}" was rejected. Reason: ${rejectionReason.trim()}`,
+            targeting: 'specific',
+            userId: sub.userId
+          })
+        });
+      } catch (e) {
+        console.warn('Failed to send push notification via backend:', e);
+      }
 
       alert('Survey rejected');
     } catch (err: any) {
@@ -204,18 +218,24 @@ const SurveyVerification = () => {
               className="bg-slate-900/50 border border-white/10 rounded-2xl overflow-hidden flex flex-col group"
             >
               {/* Image Gallery */}
-              {filter !== 'approved' && (
-                <div className="aspect-video bg-black flex gap-1 p-1">
-                  {sub.screenshots.slice(0, 2).map((url, i) => (
-                    <div key={i} className="flex-1 relative overflow-hidden group/img">
-                      <img src={url} alt="Proof" className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-500" onClick={() => window.open(url, '_blank')} />
+              {sub.screenshots && sub.screenshots.length > 0 && (
+                <div className="aspect-video bg-slate-950 flex gap-1 p-1 border-b border-white/5">
+                  {(sub.screenshots || []).slice(0, 2).map((url, i) => (
+                    <div key={i} className="flex-1 relative overflow-hidden bg-slate-900/50 rounded-lg group/img flex items-center justify-center">
+                      <img 
+                        src={url} 
+                        alt="Proof" 
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-contain cursor-pointer hover:scale-105 transition-transform duration-500" 
+                        onClick={() => setActiveLightboxImage(url)} 
+                      />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
                         <ExternalLink size={20} className="text-white" />
                       </div>
                     </div>
                   ))}
                   {sub.screenshots.length > 2 && (
-                    <div className="w-20 bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500 relative cursor-pointer" onClick={() => window.open(sub.screenshots[2], '_blank')}>
+                    <div className="w-20 bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500 hover:text-white relative rounded-lg cursor-pointer" onClick={() => setActiveLightboxImage(sub.screenshots[2])}>
                       +{sub.screenshots.length - 2}
                     </div>
                   )}
@@ -351,6 +371,60 @@ const SurveyVerification = () => {
                   <button onClick={() => setShowRejectionModal(null)} className="flex-1 py-4 bg-white/5 text-slate-400 font-black rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest text-[10px]">Cancel</button>
                   <button onClick={handleReject} className="flex-2 py-4 bg-red-500 text-white font-black rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-900/20 uppercase tracking-widest text-[10px]">Confirm Reject</button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {activeLightboxImage && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setActiveLightboxImage(null)} 
+              className="absolute inset-0 bg-black/95 backdrop-blur-md" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="relative max-w-4xl max-h-[85vh] z-10 flex flex-col items-center gap-4"
+            >
+              <button 
+                onClick={() => setActiveLightboxImage(null)} 
+                className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white font-bold p-2.5 rounded-full transition-all focus:outline-none"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+              
+              <div className="relative overflow-auto rounded-xl border border-white/10 shadow-2xl bg-slate-950 flex items-center justify-center max-w-full">
+                <img 
+                  src={activeLightboxImage} 
+                  alt="Proof Fullscreen" 
+                  referrerPolicy="no-referrer"
+                  className="max-w-full max-h-[75vh] object-contain select-none" 
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setActiveLightboxImage(null)} 
+                  className="px-6 py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Close Proof
+                </button>
+                <a 
+                  href={activeLightboxImage} 
+                  download={`proof_survey_${Date.now()}.jpg`}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20"
+                >
+                  Download Proof
+                </a>
               </div>
             </motion.div>
           </div>

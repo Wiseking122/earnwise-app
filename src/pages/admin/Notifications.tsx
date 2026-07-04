@@ -62,36 +62,36 @@ export default function AdminNotifications() {
     e.preventDefault();
     setSending(true);
     try {
-      const payload = {
-        title,
-        message,
-        category,
-        priority,
-        userId: target === 'specific' ? specificUserId : target,
-        buttonText,
-        buttonUrl,
-        image,
-        status: 'sent',
-        createdAt: serverTimestamp(),
-        readBy: [],
-        isRead: false
-      };
+      // Send notification via server API which creates in-app records and triggers FCM Web Push
+      const response = await fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          adminId: auth.currentUser?.uid,
+          title,
+          message,
+          targeting: target,
+          userId: target === 'specific' ? specificUserId : undefined
+        })
+      });
 
-      await addDoc(collection(db, 'notifications'), payload);
-      
-      // Call backend to trigger push if needed
-      // await axios.post('/api/admin/notifications/send', payload);
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Server returned an error');
+      }
 
       setTitle('');
       setMessage('');
       setButtonText('');
       setButtonUrl('');
       setImage('');
-      alert('Notification sent successfully!');
+      alert('Notification sent successfully and broadcasted via Web Push!');
       fetchHistory();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to send notification');
+      alert('Failed to send notification: ' + err.message);
     } finally {
       setSending(false);
     }

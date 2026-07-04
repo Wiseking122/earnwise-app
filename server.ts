@@ -2641,6 +2641,67 @@ Please verify if the submission is a plausible and honest completion of a social
           // @ts-ignore
           await admin.messaging(firebaseApp).sendEachForMulticast(payload);
         }
+      } else if (targeting === 'premium' || targeting === 'free' || targeting === 'new') {
+        // Fetch all users to filter by segment
+        const usersSnap = await dbAdmin.collection('users').get();
+        const now = Date.now();
+        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+        const targetUsers = usersSnap.docs.filter(doc => {
+          const data = doc.data();
+          if (targeting === 'premium') {
+            return data.plan && data.plan !== 'free';
+          } else if (targeting === 'free') {
+            return !data.plan || data.plan === 'free';
+          } else if (targeting === 'new') {
+            const regTime = data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : new Date(data.createdAt).getTime()) : 0;
+            return regTime >= sevenDaysAgo;
+          }
+          return false;
+        });
+
+        const userIds = targetUsers.map(u => u.id);
+        const tokens: string[] = [];
+
+        if (userIds.length > 0) {
+          // Query device_tokens in chunks of 30 because of Firestore 'in' limitation
+          for (let i = 0; i < userIds.length; i += 30) {
+            const chunk = userIds.slice(i, i + 30);
+            const tokensSnap = await dbAdmin.collection('device_tokens').where('userId', 'in', chunk).get();
+            tokens.push(...tokensSnap.docs.map(d => d.data().token));
+          }
+
+          // Create in-app notifications in batches of 500
+          for (let i = 0; i < userIds.length; i += 500) {
+            const chunk = userIds.slice(i, i + 500);
+            const batch = dbAdmin.batch();
+            for (const uid of chunk) {
+              const notifRef = dbAdmin.collection('notifications').doc();
+              batch.set(notifRef, {
+                title,
+                message,
+                userId: uid,
+                type: 'direct',
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+            }
+            await batch.commit();
+          }
+        }
+
+        if (tokens.length > 0) {
+          // FCM multicast limit is 500 tokens per call
+          for (let i = 0; i < tokens.length; i += 500) {
+            const batchTokens = tokens.slice(i, i + 500);
+            const payload = {
+              notification: { title, body: message },
+              tokens: batchTokens
+            };
+            // @ts-ignore
+            await admin.messaging(firebaseApp).sendEachForMulticast(payload);
+          }
+        }
       }
 
       res.json({ status: "success" });

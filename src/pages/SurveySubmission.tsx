@@ -8,51 +8,102 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const compressAndGetBase64 = (file: File): Promise<string> => {
   return new Promise((resolve) => {
+    // If the file size is already reasonably small (under 400KB), 
+    // bypass any canvas manipulation entirely to avoid browser-specific canvas bugs.
+    if (file.size <= 400 * 1024) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        resolve(event.target?.result as string || '');
+      };
+      reader.onerror = () => {
+        resolve('');
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (!dataUrl) {
+        resolve('');
+        return;
+      }
+      
       const img = new Image();
-      img.onload = () => {
-        // We use 800px maximum width/height to make sure the screenshot is extremely clear 
-        // for text/survey proofs, but has a tiny footprint (usually 20KB - 40KB as JPEG)
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
-        let width = img.width;
-        let height = img.height;
+      img.onload = async () => {
+        // Guarantee image is fully decoded before trying to draw it onto canvas
+        try {
+          if ('decode' in img) {
+            await img.decode();
+          }
+        } catch (e) {
+          console.warn('[SURVEY] Image decode failed:', e);
+        }
+
+        const width = img.naturalWidth || img.width;
+        const height = img.naturalHeight || img.height;
+        
+        if (!width || !height) {
+          console.warn('[SURVEY] Image dimensions are zero, using original data URL');
+          resolve(dataUrl);
+          return;
+        }
+
+        // We use 1200px maximum width/height to make sure the screenshot is extremely clear 
+        // for text/survey proofs, while maintaining a tiny footprint
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let newWidth = width;
+        let newHeight = height;
 
         if (width > height) {
           if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
+            newHeight = Math.round((height * MAX_WIDTH) / width);
+            newWidth = MAX_WIDTH;
           }
         } else {
           if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
+            newWidth = Math.round((width * MAX_HEIGHT) / height);
+            newHeight = MAX_HEIGHT;
           }
         }
 
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = newWidth;
+        canvas.height = newHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
+          const isPng = file.type === 'image/png';
+          
+          if (!isPng) {
+            // Fill background with white to support transparency (PNG/WebP screenshots) 
+            // and prevent them turning completely black when converted to JPEG
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, newWidth, newHeight);
+          }
+          
+          ctx.drawImage(img, 0, 0, newWidth, newHeight);
+          
           try {
-            // Quality 0.5 provides crisp, clear screenshots at an incredibly small file size
-            const base64Url = canvas.toDataURL('image/jpeg', 0.5);
+            // Preserving the original format (PNG or JPEG) is much better for high contrast text screenshots
+            const outputType = isPng ? 'image/png' : 'image/jpeg';
+            const quality = isPng ? undefined : 0.8;
+            const base64Url = canvas.toDataURL(outputType, quality);
             resolve(base64Url);
           } catch (e) {
             console.warn('[SURVEY] Canvas toDataURL failed, using fallback:', e);
-            resolve(event.target?.result as string || '');
+            resolve(dataUrl);
           }
         } else {
-          resolve(event.target?.result as string || '');
+          resolve(dataUrl);
         }
       };
       img.onerror = () => {
-        resolve(event.target?.result as string || '');
+        console.warn('[SURVEY] Image loading failed, falling back to original');
+        resolve(dataUrl);
       };
-      img.src = event.target?.result as string;
+      img.src = dataUrl;
     };
     reader.onerror = () => {
       resolve('');
