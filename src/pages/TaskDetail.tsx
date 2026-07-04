@@ -153,12 +153,18 @@ export default function TaskDetail() {
         })
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Verification request failed. Please try again.');
+      const responseText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error('[TASK-DETAIL] Failed to parse response:', responseText);
+        throw new Error(`Server returned an invalid response (Status ${response.status}). Please try again later.`);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification request failed. Please try again.');
+      }
       
       if (data.fallback) {
         // Run client-side verification fallback
@@ -475,7 +481,14 @@ export default function TaskDetail() {
         })
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error('[TASK-DETAIL] Failed to parse response:', responseText);
+        throw new Error(`Server returned an invalid response (Status ${response.status}). Please try again later.`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Verification request failed. Please try again.');

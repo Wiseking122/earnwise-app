@@ -4,23 +4,18 @@ const rawWsUrl = (import.meta as any).env.VITE_WS_URL || '';
 // If the configured URL points to onrender.com, ignore it as we've migrated off Render
 const isRenderUrl = (url: string) => url.includes('onrender.com') || url.includes('render');
 
-const isDevPreview = typeof window !== 'undefined' && (
-  window.location.hostname.includes('run.app') || 
-  window.location.hostname.includes('localhost') || 
-  window.location.hostname.includes('127.0.0.1')
-);
+// Since we are running in a full-stack container on Cloud Run/Custom Domains, 
+// the API and WebSockets are hosted on the exact same domain.
+// We default to relative paths/local origin so everything works automatically out-of-the-box.
+export const API_BASE_URL = (rawApiUrl && !isRenderUrl(rawApiUrl)) 
+  ? rawApiUrl 
+  : '';
 
-export const API_BASE_URL = isDevPreview 
-  ? '' 
-  : (rawApiUrl && !isRenderUrl(rawApiUrl) 
-      ? rawApiUrl 
-      : 'https://earnwise-c30u.onrender.com');
-
-export const WS_BASE_URL = isDevPreview
-  ? (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/api/ws'
-  : (rawWsUrl && !isRenderUrl(rawWsUrl)
-      ? rawWsUrl
-      : 'wss://earnwise-c30u.onrender.com/api/ws');
+export const WS_BASE_URL = (rawWsUrl && !isRenderUrl(rawWsUrl))
+  ? rawWsUrl
+  : (typeof window !== 'undefined' 
+      ? (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/api/ws'
+      : '');
 
 // Helper to get absolute URL if needed, or relative if no base is set
 export const getApiUrl = (path: string) => {
