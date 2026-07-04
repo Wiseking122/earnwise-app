@@ -23,6 +23,8 @@ import { useAuth } from '../context/AuthContext';
 import { Logo } from './Logo';
 import InstallModal from './InstallModal';
 import NotificationPanel from './NotificationPanel';
+import { NotificationCenter } from './NotificationCenter';
+import { AnnouncementEngine } from './AnnouncementEngine';
 import { playNotificationSound } from '../pages/sounds';
 import TransactionReceipt from './TransactionReceipt';
 
@@ -284,6 +286,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
           </div>
         )}
       </header>
+      <AnnouncementEngine placement="sticky_banner" />
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
       <InstallModal />
       

@@ -47,6 +47,7 @@ import { DailyGoal } from './DailyGoal';
 import { CpxWidget } from '../components/CpxWidget';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import { MaintenanceModal } from '../components/MaintenanceModal';
+import { AnnouncementEngine, ScrollingBanner } from '../components/AnnouncementEngine';
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
 import PayoutTicker from '../components/PayoutTicker';
@@ -68,6 +69,19 @@ export default function Home() {
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!");
   const [adsMaintenanceMode, setAdsMaintenanceMode] = useState(false);
+  const [wiseCoinBalance, setWiseCoinBalance] = useState(0);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const unsub = onSnapshot(doc(db, 'wise_coin_wallets', profile.uid), (snap) => {
+      if (snap.exists()) {
+        setWiseCoinBalance(snap.data().balance || 0);
+      } else {
+        setWiseCoinBalance(0);
+      }
+    });
+    return () => unsub();
+  }, [profile?.uid]);
 
   useEffect(() => {
     // Listen for Ads Configuration
@@ -302,7 +316,9 @@ export default function Home() {
 
   return (
     <Layout>
+      <ScrollingBanner />
       <div className="px-3 sm:px-4 py-3 sm:py-5 pb-24 space-y-4 sm:space-y-6 max-w-2xl mx-auto relative">
+        <AnnouncementEngine placement="home_top" />
         <div className="premium-blur" />
         
         <PayoutTicker />
@@ -413,6 +429,25 @@ export default function Home() {
                       ₦<AnimatedNumber value={profile?.referralBalance || 0} />
                     </h3>
                   </div>
+                  <div className="col-span-2 bg-linear-to-br from-amber-500/10 to-yellow-600/5 backdrop-blur-md border border-amber-500/30 hover:bg-amber-500/15 transition-all duration-300 rounded-lg sm:rounded-xl p-2 sm:p-3 shadow-inner relative overflow-hidden group/card shadow-[0_4px_12px_rgba(245,158,11,0.1)]">
+                    <div className="absolute -inset-2 bg-gradient-to-r from-amber-400/0 via-amber-400/20 to-amber-400/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-500">
+                          <Star size={12} className="fill-amber-500" />
+                        </div>
+                        <div>
+                          <p className="text-amber-500/80 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest leading-none mb-0.5">Wise Coin (WC)</p>
+                          <p className="text-[6.5px] text-amber-500/60 font-bold uppercase tracking-widest leading-none">Survey Rewards</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <h3 className="text-sm sm:text-lg font-display font-black text-amber-400 drop-shadow-md">
+                          <AnimatedNumber value={wiseCoinBalance} /> WC
+                        </h3>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -475,6 +510,7 @@ export default function Home() {
         </motion.div>
 
         {/* Ads Center Maintenance Announcement */}
+        <AnnouncementEngine placement="home_floating" />
         {adsMaintenanceMode && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}

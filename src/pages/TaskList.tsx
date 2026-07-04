@@ -13,6 +13,7 @@ import {
   Dices,
   Play,
   Video,
+  Image as ImageIcon,
   Target, 
   ChevronRight,
   ShieldCheck,
@@ -252,9 +253,24 @@ export default function TaskList() {
           {activeCategory === 'video' && <VideoAdsSection />}
           {activeCategory === 'survey' && user && (
             <div className="space-y-6">
+               <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
+
+               <Link 
+                 to="/submit-survey"
+                 className="block w-full p-6 bg-linear-to-br from-amber-500 to-yellow-600 rounded-[2rem] text-center shadow-[0_10px_30px_rgba(245,158,11,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden"
+               >
+                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.2),transparent)]" />
+                 <div className="relative z-10 flex flex-col items-center gap-2">
+                   <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white mb-1">
+                     <ImageIcon size={24} className="group-hover:rotate-12 transition-transform duration-500" />
+                   </div>
+                   <h3 className="text-xl font-display font-black text-white uppercase italic tracking-tight">Submit Survey Proof</h3>
+                   <p className="text-white/80 text-[10px] font-black uppercase tracking-widest leading-none">Complete surveys & upload proof to earn Wise Coins</p>
+                 </div>
+               </Link>
+
                <WannadsWalls />
                <RapidoReachWall />
-               <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
             </div>
           )}
 

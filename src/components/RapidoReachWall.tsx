@@ -1,14 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ExternalLink, Rocket, ChevronRight, Zap } from 'lucide-react';
+import { X, ExternalLink, Rocket, ChevronRight, Zap, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../lib/config';
 
 export const RapidoReachWall: React.FC = () => {
   const { profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [wallUrl, setWallUrl] = useState<string>('');
+  const [finalUid, setFinalUid] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
-  // RapidoReach Webwall URL with dynamic user ID
-  const wallUrl = `https://www.rapidoreach.com/webwall?appid=iG8MJfAgkZI&userid=${profile?.uid || 'guest'}`;
+  useEffect(() => {
+    if (!isOpen || !profile?.uid) return;
+
+    let active = true;
+    async function loadSignedUrl() {
+      try {
+        setLoading(true);
+        const url = getApiUrl(`/api/rapidoreach/signed-url?user_id=${encodeURIComponent(profile.uid)}`);
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error('Failed to fetch signed RapidoReach URL');
+        }
+        const data = await res.json();
+        if (active) {
+          setWallUrl(data.url);
+          setFinalUid(data.uid);
+        }
+      } catch (err) {
+        console.error("Error loading signed RapidoReach URL:", err);
+        // Fallback to unsigned structure in case of server failure
+        const appId = 'iG8MJfAgkZI';
+        const fallbackUrl = `https://www.rapidoreach.com/ofw/?userid=${profile.uid}&userId=${profile.uid}`;
+        if (active) {
+          setWallUrl(fallbackUrl);
+          setFinalUid(profile.uid);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadSignedUrl();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, profile?.uid]);
 
   return (
     <>
@@ -74,18 +115,25 @@ export const RapidoReachWall: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex-1 w-full bg-white rounded-3xl overflow-hidden shadow-2xl relative">
-              <iframe
-                src={wallUrl}
-                className="w-full h-full border-none"
-                title="RapidoReach Survey Wall"
-                allow="geolocation"
-              />
+            <div className="flex-1 w-full bg-white rounded-3xl overflow-hidden shadow-2xl relative flex items-center justify-center">
+              {loading ? (
+                <div className="flex flex-col items-center gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Generating Secure Survey Signature...</p>
+                </div>
+              ) : (
+                <iframe
+                  src={wallUrl}
+                  className="w-full h-full border-none"
+                  title="RapidoReach Survey Wall"
+                  allow="geolocation"
+                />
+              )}
             </div>
 
             <div className="mt-4 flex items-center justify-center gap-2 text-slate-500 text-[10px] font-bold uppercase tracking-widest">
               <ExternalLink className="w-3 h-3" />
-              UID: {profile?.uid || 'GUEST_SESSION'} • Data encrypted via SSL
+              UID: {finalUid || profile?.uid || 'GUEST_SESSION'} • Data encrypted via SSL
             </div>
           </motion.div>
         )}

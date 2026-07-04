@@ -110,6 +110,9 @@ export const WannadsWalls: React.FC = () => {
                 className="w-full h-full border-none"
                 title={activeWall.title}
                 allow="geolocation"
+                scrolling="yes"
+                frameBorder="0"
+                style={{ width: '100%', height: '100%', border: 0, padding: 0, margin: 0 }}
               />
             </div>
 

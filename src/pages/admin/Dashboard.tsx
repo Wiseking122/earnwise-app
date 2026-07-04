@@ -23,7 +23,9 @@ import {
   Target,
   Plus,
   X,
-  BookOpen
+  BookOpen,
+  ShieldCheck,
+  Coins
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { sendNotification, NotificationType } from '../../lib/notifications';
@@ -34,7 +36,8 @@ export default function AdminDashboard() {
     activeTasks: 0,
     pendingCompletions: 0,
     pendingWithdrawals: 0,
-    pendingEscrow: 0, // NEW
+    pendingEscrow: 0, 
+    pendingSurveys: 0,
     totalPending: 0,
     totalWithdrawable: 0
   });
@@ -95,12 +98,17 @@ export default function AdminDashboard() {
       setStats(prev => ({ ...prev, pendingEscrow: snap.size }));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'pending_escrow'));
 
+    const unsubSurveys = onSnapshot(query(collection(db, 'survey_submissions'), where('status', '==', 'pending')), (snap) => {
+      setStats(prev => ({ ...prev, pendingSurveys: snap.size }));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'survey_submissions'));
+
     return () => {
       unsubUsers();
       unsubTasks();
       unsubComps();
       unsubWiths();
       unsubEscrow();
+      unsubSurveys();
     };
   }, []);
 
@@ -124,6 +132,8 @@ export default function AdminDashboard() {
     { label: 'Payment Requests', icon: CreditCard, path: '/admin/payments', count: stats.pendingWithdrawals + stats.pendingEscrow, color: 'green' },
     { label: 'Verify Tasks', icon: CheckCircle, path: '/admin/tasks', count: stats.pendingCompletions, color: 'orange' },
     { label: 'User Directory', icon: Users, path: '/admin/users', count: stats.users, color: 'purple' },
+    { label: 'Survey Verification', icon: ShieldCheck, path: '/admin/survey-verification', count: stats.pendingSurveys, color: 'orange' },
+    { label: 'Wise Coin Manager', icon: Coins, path: '/admin/wise-coin', count: 0, color: 'blue' },
     { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },
     { label: 'Ad Management', icon: Megaphone, path: '/admin/ads', count: 0, color: 'indigo' },
   ];

@@ -1316,14 +1316,29 @@ async function startServer() {
     }
 
     try {
+      let actualUserId = endUserId as string;
+      const appId = process.env.RAPIDOREACH_APP_ID || 'iG8MJfAgkZI';
+      
+      // Since the format is internalUserId-appId-checksum, we can find the indices:
+      const appIdIndex = actualUserId.indexOf(`-${appId}-`);
+      if (appIdIndex !== -1) {
+        actualUserId = actualUserId.substring(0, appIdIndex);
+      } else {
+        // Fallback: slice off the last two parts (appId and checksum)
+        const parts = actualUserId.split('-');
+        if (parts.length >= 3) {
+          actualUserId = parts.slice(0, parts.length - 2).join('-');
+        }
+      }
+
       // Status "C" = Completed
       if (status === 'C') {
         if (isDbAdminCapable) {
-          const userRef = dbAdmin.collection('users').doc(endUserId as string);
+          const userRef = dbAdmin.collection('users').doc(actualUserId);
           const userDoc = await userRef.get();
 
           if (!userDoc.exists) {
-            console.warn(`[WEBHOOK-RAPIDOREACH] User ${endUserId} not found.`);
+            console.warn(`[WEBHOOK-RAPIDOREACH] User ${actualUserId} (derived from ${endUserId}) not found.`);
             return res.status(200).send("1"); 
           }
 
@@ -1343,7 +1358,7 @@ async function startServer() {
             // Record Transaction
             const transRef = dbAdmin.collection('transactions').doc();
             transaction.set(transRef, {
-              userId: endUserId,
+              userId: actualUserId,
               amount: amount,
               type: 'earning',
               description: `RapidoReach Survey Reward - TID: ${transactionId}`,
@@ -1353,7 +1368,7 @@ async function startServer() {
             // Notification
             const notifRef = dbAdmin.collection('notifications').doc();
             transaction.set(notifRef, {
-              userId: endUserId,
+              userId: actualUserId,
               title: "🚀 RapidoReach Reward!",
               message: `You earned ₦${amount} from a RapidoReach survey.`,
               type: 'reward',
@@ -1363,11 +1378,11 @@ async function startServer() {
             });
           });
 
-          console.log(`[WEBHOOK-RAPIDOREACH] SUCCESS: Credited User ${endUserId} with ₦${amount}`);
+          console.log(`[WEBHOOK-RAPIDOREACH] SUCCESS: Credited User ${actualUserId} with ₦${amount}`);
         }
       } else if (status === 'P') {
         // Status "P" = Attempted/Screenout
-        console.log(`[WEBHOOK-RAPIDOREACH] INFO: User ${endUserId} screened out of survey ${transactionId}.`);
+        console.log(`[WEBHOOK-RAPIDOREACH] INFO: User ${actualUserId} (derived from ${endUserId}) screened out of survey ${transactionId}.`);
       }
 
       // RapidoReach expects "1" on success
@@ -1399,6 +1414,43 @@ async function startServer() {
     }
 
     res.json({ url: signedUrl });
+  });
+
+  /**
+   * GET /api/rapidoreach/signed-url
+   * Generates a secure RapidoReach Offerwall URL using the server-side App Key.
+   * Signature is generated exactly as: md5(internalUserId-appId-appKey)
+   * The final UID is built as: internalUserId-appId-checksum
+   */
+  app.get("/api/rapidoreach/signed-url", async (req, res) => {
+    const { user_id } = req.query;
+    const internalUserId = String(user_id || '').trim();
+
+    if (!internalUserId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const appId = process.env.RAPIDOREACH_APP_ID || 'iG8MJfAgkZI';
+    const appKey = process.env.RAPIDOREACH_APP_KEY;
+
+    if (!appKey) {
+      console.warn("[RAPIDOREACH] RAPIDOREACH_APP_KEY is missing on the server. Falling back to non-secure signature.");
+      const fallbackUrl = `https://www.rapidoreach.com/ofw/?userid=${internalUserId}&userId=${internalUserId}`;
+      return res.json({ url: fallbackUrl, uid: internalUserId });
+    }
+
+    // Generate checksum exactly as: md5(internalUserId-appId-appKey)
+    // using hyphens (-) between values, without URL-encoding.
+    const rawString = `${internalUserId}-${appId}-${appKey}`;
+    const checksum = crypto.createHash('md5').update(rawString).digest('hex');
+
+    // Build the final UID exactly as: internalUserId-appId-checksum
+    const finalUid = `${internalUserId}-${appId}-${checksum}`;
+
+    // Build the final Offerwall URL with correct URL parameters
+    const wallUrl = `https://www.rapidoreach.com/ofw/?userid=${finalUid}&userId=${finalUid}`;
+
+    res.json({ url: wallUrl, uid: finalUid });
   });
 
   // Admin Coaching Debugging
@@ -2504,6 +2556,97 @@ Please verify if the submission is a plausible and honest completion of a social
     } catch (error: any) {
       console.error("Verification Error:", error.message);
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // --- 4. ADMIN & SYSTEM APIS ---
+
+  app.get("/api/admin/system-stats", async (req, res) => {
+    const { adminId } = req.query;
+    if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
+
+    try {
+      const adminDoc = await dbAdmin.collection('users').doc(adminId as string).get();
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email !== 'wiseking7890@gmail.com')) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      // Fetch parallel stats
+      const [usersSnap, tasksSnap, transSnap, payoutSnap] = await Promise.all([
+        dbAdmin.collection('users').count().get(),
+        dbAdmin.collection('tasks').where('status', '==', 'active').count().get(),
+        dbAdmin.collection('transactions').where('type', '==', 'withdrawal').where('status', '==', 'pending').count().get(),
+        dbAdmin.collection('transactions').where('type', '==', 'withdrawal').where('status', '==', 'completed').get()
+      ]);
+
+      let totalPaidOut = 0;
+      payoutSnap.docs.forEach(doc => {
+        totalPaidOut += Math.abs(doc.data().amount || 0);
+      });
+
+      res.json({
+        totalUsers: usersSnap.data().count,
+        activeTasks: tasksSnap.data().count,
+        pendingWithdrawals: transSnap.data().count,
+        totalPaidOut
+      });
+    } catch (err) {
+      console.error("Stats error:", err);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  app.post("/api/notifications/send", async (req, res) => {
+    const { adminId, title, message, targeting, userId } = req.body;
+    if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
+
+    try {
+      const adminDoc = await dbAdmin.collection('users').doc(adminId).get();
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email !== 'wiseking7890@gmail.com')) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      if (targeting === 'all') {
+        // Create in-app notification for 'all'
+        await dbAdmin.collection('notifications').add({
+          title,
+          message,
+          userId: 'all',
+          type: 'system',
+          readBy: [],
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Broadcast Push
+        await broadcastPushNotification(title, message);
+      } else if (targeting === 'specific' && userId) {
+        await dbAdmin.collection('notifications').add({
+          title,
+          message,
+          userId,
+          type: 'direct',
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Get target user tokens
+        const tokensSnap = await dbAdmin.collection('device_tokens').where('userId', '==', userId).get();
+        const tokens = tokensSnap.docs.map(d => d.data().token);
+        
+        if (tokens.length > 0) {
+          const payload = {
+            notification: { title, body: message },
+            tokens
+          };
+          // @ts-ignore
+          await admin.messaging(firebaseApp).sendEachForMulticast(payload);
+        }
+      }
+
+      res.json({ status: "success" });
+    } catch (err) {
+      console.error("Notification send error:", err);
+      res.status(500).json({ error: "Failed to send notification" });
     }
   });
 
@@ -4021,9 +4164,11 @@ Please verify if the submission is a plausible and honest completion of a social
       res.setHeader('Transfer-Encoding', 'chunked');
 
       try {
+        const history = req.body.history || [];
         const responseStream = await withRetry((modelName) => ai.models.generateContentStream({
           model: modelName,
           contents: [
+            ...history,
             {
               role: "user",
               parts: [{
@@ -4034,10 +4179,25 @@ Please verify if the submission is a plausible and honest completion of a social
             }
           ],
           config: {
-            systemInstruction: "You are the Earnwise Elite Academy Master Tutor. Your goal is to help students understand financial concepts and earning strategies in the context of Nigeria and the Earnwise platform.",
-            temperature: 0.5,
-            topP: 0.8,
-            maxOutputTokens: 800,
+            systemInstruction: `You are the Earnwise Elite Academy Master Tutor, a world-class financial strategist and digital earning expert specialized in the Nigerian economy. 
+
+Your goal is to provide deep, exhaustive, and actionable execution blueprints for students. 
+
+CRITICAL PROTOCOLS:
+1. RESPONSE LENGTH: Responses MUST be exhaustive. Aim for 1000-2000 words for tactical questions. Short answers are strictly prohibited.
+2. NIGERIAN CONTEXT: Always specify local Nigerian tools, websites (e.g., PiggyVest, Bamboo, CAC, OPay), legal requirements, and local payment gateways (Paystack, Flutterwave).
+3. STRUCTURE: Use a rich hierarchy of bold headings (H1, H2), bulleted lists, and detailed tables.
+4. CONTENT MODULES: Every answer should include:
+   - "Execution Blueprint" (Step-by-step tactical protocol)
+   - "Advanced Execution Hacks" (Pro tips not found in standard courses)
+   - "Profit Projections & ROI" (Mathematical breakdown of earnings)
+   - "Tools & Resources" (Direct links/names of Nigerian services)
+   - "Risk Mitigation" (How to avoid common Nigerian digital scams/pitfalls)
+5. COURSE ALIGNMENT: Answer real-time questions about the specific course content provided in the context.
+6. TONE: Professional, authoritative, and deeply strategic. You are a mentor building the next generation of Nigerian digital millionaires.`,
+            temperature: 0.7,
+            topP: 0.9,
+            maxOutputTokens: 4096,
           }
         }));
 

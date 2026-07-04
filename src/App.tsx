@@ -28,6 +28,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Support from './pages/Support';
 import Academy from './pages/Academy';
+import SurveySubmission from './pages/SurveySubmission';
+import SurveyHistory from './pages/SurveyHistory';
 
 import CoursePlayer from './pages/CoursePlayer';
 import VideoPlayer from './pages/VideoPlayer';
@@ -36,7 +38,11 @@ import AdminTasks from './pages/admin/Tasks';
 import AdminPayments from './pages/admin/Payments';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
+import SurveyVerification from './pages/admin/SurveyVerification';
+import WiseCoinManager from './pages/admin/WiseCoinManager';
 import AdminAds from './pages/admin/Ads';
+import AdminNotifications from './pages/admin/Notifications';
+import AdminAnnouncements from './pages/admin/Announcements';
 import InstallAppModal from './components/InstallAppModal';
 import { TelegramJoinPopup } from './components/TelegramJoinPopup';
 import WelcomePopup from './components/WelcomePopup';
@@ -80,6 +86,8 @@ function AppRoutes() {
         <Route path="/advertiser" element={<PrivateRoute><AdvertiserPortal /></PrivateRoute>} />
         <Route path="/achievements" element={<PrivateRoute><Achievements /></PrivateRoute>} />
         <Route path="/academy" element={<PrivateRoute><Academy /></PrivateRoute>} />
+        <Route path="/submit-survey" element={<PrivateRoute><SurveySubmission /></PrivateRoute>} />
+        <Route path="/survey-history" element={<PrivateRoute><SurveyHistory /></PrivateRoute>} />
 
         <Route path="/academy/course/:id" element={<PrivateRoute><CoursePlayer /></PrivateRoute>} />
         <Route path="/player" element={<PrivateRoute><VideoPlayer /></PrivateRoute>} />
@@ -92,9 +100,13 @@ function AppRoutes() {
         <Route path="/admin" element={<PrivateRoute adminOnly bypassPlanCheck><AdminDashboard /></PrivateRoute>} />
         <Route path="/admin/tasks" element={<PrivateRoute adminOnly bypassPlanCheck><AdminTasks /></PrivateRoute>} />
         <Route path="/admin/payments" element={<PrivateRoute adminOnly bypassPlanCheck><AdminPayments /></PrivateRoute>} />
+        <Route path="/admin/survey-verification" element={<PrivateRoute adminOnly bypassPlanCheck><SurveyVerification /></PrivateRoute>} />
+        <Route path="/admin/wise-coin" element={<PrivateRoute adminOnly bypassPlanCheck><WiseCoinManager /></PrivateRoute>} />
         <Route path="/admin/users" element={<PrivateRoute adminOnly bypassPlanCheck><AdminUsers /></PrivateRoute>} />
         <Route path="/admin/courses" element={<PrivateRoute adminOnly bypassPlanCheck><AdminCourses /></PrivateRoute>} />
         <Route path="/admin/ads" element={<PrivateRoute adminOnly bypassPlanCheck><AdminAds /></PrivateRoute>} />
+        <Route path="/admin/notifications" element={<PrivateRoute adminOnly bypassPlanCheck><AdminNotifications /></PrivateRoute>} />
+        <Route path="/admin/announcements" element={<PrivateRoute adminOnly bypassPlanCheck><AdminAnnouncements /></PrivateRoute>} />
         
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

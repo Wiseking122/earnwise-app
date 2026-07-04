@@ -266,6 +266,14 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     try {
       setMessages(prev => [...prev, { role: 'ai', content: '' }]);
       
+      const enrichedStep = getEnrichedStep(course.title, course.steps[activeStep], activeStep);
+      const lessonContext = `
+        Lesson: ${course.steps[activeStep]}
+        Module: ${enrichedStep.moduleTitle}
+        Key Points: ${enrichedStep.subsections.map(s => `${s.subtitle}: ${s.content}`).join(' | ')}
+        Assignment: ${enrichedStep.assignment.tasks.join(', ')}
+      `;
+
       const res = await fetchWithRetry(getApiUrl('/api/v1/academy/ask-tutor'), {
         method: 'POST',
         headers: {
@@ -276,7 +284,11 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
           courseId: course.id,
           courseTitle: course.title,
           question: userMsg,
-          context: course.steps.join(' | ')
+          context: lessonContext,
+          history: messages.slice(-12).map(m => ({
+            role: m.role === 'ai' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+          }))
         })
       });
       
@@ -331,6 +343,14 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     setAiLoading(true);
     setExpandedStep("");
     try {
+      const enrichedStep = getEnrichedStep(course.title, course.steps[activeStep], activeStep);
+      const lessonContext = `
+        Lesson: ${course.steps[activeStep]}
+        Module: ${enrichedStep.moduleTitle}
+        Key Points: ${enrichedStep.subsections.map(s => `${s.subtitle}: ${s.content}`).join(' | ')}
+        Assignment: ${enrichedStep.assignment.tasks.join(', ')}
+      `;
+
       const res = await fetch(getApiUrl('/api/v1/academy/ask-tutor'), {
         method: 'POST',
         headers: {
@@ -341,7 +361,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
           courseId: course.id,
           courseTitle: course.title,
           question: `Provide a full, 1000-word detailed execution blueprint for Step ${activeStep + 1}: ${course.steps[activeStep]}. Include specific Nigerian tools, legal requirements, mathematical profit projections, and advanced execution hacks.`,
-          context: course.steps.join(' | ')
+          context: lessonContext
         })
       });
       

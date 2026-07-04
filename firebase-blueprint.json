@@ -114,13 +114,85 @@
       "type": "object",
       "properties": {
         "notificationId": { "type": "string" },
-        "userId": { "type": "string", "description": "Specific user, or 'all' for broadcast" },
+        "userId": { "type": "string", "description": "Specific user, or 'all', 'premium', 'free', 'new'" },
+        "targetPlanIds": { "type": "array", "items": { "type": "string" } },
         "title": { "type": "string" },
+        "subtitle": { "type": "string" },
         "message": { "type": "string" },
+        "image": { "type": "string" },
+        "icon": { "type": "string" },
+        "buttonText": { "type": "string" },
+        "buttonUrl": { "type": "string" },
+        "deepLink": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] },
+        "category": { "type": "string", "enum": ["system", "reward", "withdrawal", "promo", "security", "task"] },
+        "status": { "type": "string", "enum": ["pending", "sent", "failed", "scheduled"] },
         "createdAt": { "type": "string", "format": "date-time" },
-        "read": { "type": "boolean" }
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array", "items": { "type": "string" } },
+        "isRead": { "type": "boolean" }
       },
-      "required": ["title", "message", "createdAt"]
+      "required": ["title", "message", "createdAt", "priority", "category", "status"]
+    },
+    "DeviceToken": {
+      "title": "Device Token",
+      "description": "FCM tokens for push notifications",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "userId": { "type": "string" },
+        "deviceType": { "type": "string" },
+        "browser": { "type": "string" },
+        "platform": { "type": "string", "enum": ["web", "android", "ios", "telegram"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastUsedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["token", "userId", "createdAt", "lastUsedAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Dynamic banners and popups",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "shortMessage": { "type": "string" },
+        "fullDescription": { "type": "string" },
+        "bannerImage": { "type": "string" },
+        "icon": { "type": "string" },
+        "buttonText": { "type": "string" },
+        "buttonLink": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "textColor": { "type": "string" },
+        "priority": { "type": "number" },
+        "category": { "type": "string" },
+        "placements": { "type": "array", "items": { "type": "string" } },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "isActive": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["draft", "published", "scheduled", "archived"] },
+        "targetAudience": { "type": "string" },
+        "displayFrequency": { "type": "string" },
+        "manualClose": { "type": "boolean" },
+        "stickyUntilClosed": { "type": "boolean" },
+        "requireAcknowledgement": { "type": "boolean" },
+        "animationType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "shortMessage", "priority", "category", "placements", "startDate", "endDate", "isActive", "status"]
+    },
+    "AnnouncementAnalytics": {
+      "title": "Announcement Analytics",
+      "description": "Tracking for announcements",
+      "type": "object",
+      "properties": {
+        "announcementId": { "type": "string" },
+        "totalViews": { "type": "number" },
+        "totalClicks": { "type": "number" },
+        "totalDismissals": { "type": "number" },
+        "totalAcknowledgements": { "type": "number" }
+      }
     },
     "CoursePurchase": {
       "title": "Course Purchase",
@@ -191,6 +263,18 @@
       "schema": "Notification",
       "description": "System notifications"
     },
+    "/device_tokens/{tokenId}": {
+      "schema": "DeviceToken",
+      "description": "FCM device tokens"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "System announcements"
+    },
+    "/announcement_analytics/{announcementId}": {
+      "schema": "AnnouncementAnalytics",
+      "description": "Analytics for announcements"
+    },
     "/coursePurchases/{purchaseId}": {
       "schema": "CoursePurchase",
       "description": "Academy course purchases"
@@ -198,6 +282,112 @@
     "/vault_entries/{vaultEntryId}": {
       "schema": "VaultEntry",
       "description": "Vault staking entries"
+    },
+    "/wise_coin_wallets/{userId}": {
+      "schema": "WiseCoinWallet",
+      "description": "Wise Coin user balances"
+    },
+    "/survey_submissions/{submissionId}": {
+      "schema": "SurveySubmission",
+      "description": "User survey proof submissions"
+    },
+    "/wise_coin_transactions/{transactionId}": {
+      "schema": "WiseCoinTransaction",
+      "description": "Wise Coin transaction logs"
+    },
+    "/coin_conversions/{conversionId}": {
+      "schema": "CoinConversion",
+      "description": "Logs for WC to Naira conversions"
     }
-  }
+  },
+  "indexes": [
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "announcements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "placements",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "survey_submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submittedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "survey_submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submittedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "survey_submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "wise_coin_transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ]
 }
