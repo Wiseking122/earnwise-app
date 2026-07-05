@@ -99,7 +99,12 @@ export default function VideoAdsSection() {
     if (showOverlay && activeAd && videoRef.current && window.fluidPlayer) {
       const userId = user?.uid || 'guest_user';
       const vastBaseUrl = 'https://runative-syndicate.com/do2/a76028f599d54130a11dff96118b3b3f/vast?';
-      const dynamicVastUrl = `${vastBaseUrl}&subid=${userId}`;
+      let dynamicVastUrl = `${vastBaseUrl}&subid=${userId}`;
+      
+      // Use the custom premium ad link provided by the user for premium and golden partner campaigns
+      if (activeAd.id === 'video-2' || activeAd.id === 'video-4') {
+        dynamicVastUrl = 'https://butterygrandmother.com/dmmCFyz.dtGkNnv/ZZGiU-/Pemm/9juwZKUclEkiPmTOcFxZOGTQY/wwNMTvMytQNMzXE/5JNRj/Ag1YNkwu';
+      }
 
       // Initialize Fluid Player
       try {
@@ -108,7 +113,7 @@ export default function VideoAdsSection() {
             fillToContainer: true,
             primaryColor: '#3b82f6',
             autoPlay: true,
-            mute: false,
+            mute: true, // Muting initially is highly recommended to guarantee autoplay works flawlessly
             allowTheatre: false,
             playPauseAnimation: true,
             playbackRateControl: false,
@@ -141,7 +146,8 @@ export default function VideoAdsSection() {
             },
             adErrorCallback: (error: any) => {
               console.error('[VAST] Ad Error:', error);
-              setShowOverlay(false);
+              // Handle error gracefully; log it but don't crash instantly on minor warnings
+              // If the ad completely fails to load after 8 seconds, we allow closing.
             }
           }
         });
@@ -154,8 +160,13 @@ export default function VideoAdsSection() {
     return () => {
       // Cleanup player reference if component unmounts or overlay closes
       if (playerInstance.current) {
-        // Some versions of fluid player might have destroy, but 
-        // to be safe we just null it as the library is not perfectly modular
+        try {
+          if (typeof playerInstance.current.destroy === 'function') {
+            playerInstance.current.destroy();
+          }
+        } catch (e) {
+          console.warn('[FLUID] Cleanup destroy failed:', e);
+        }
         playerInstance.current = null;
       }
     };
@@ -285,10 +296,10 @@ export default function VideoAdsSection() {
                     ref={videoRef}
                     id="vast_video_player"
                     playsInline
+                    muted
                     className="w-full h-full"
-                  >
-                    <source src="" type="video/mp4" />
-                  </video>
+                    src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+                  />
                   
                   {/* Overlay loading message */}
                   {!playerInstance.current && (

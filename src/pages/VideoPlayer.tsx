@@ -14,6 +14,7 @@ export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022825',
   'https://vast.vstserv.com/vast?spot_id=2022824',
   'https://vast.vstserv.com/vast?spot_id=2022829',
+  'https://butterygrandmother.com/dmmCFyz.dtGkNnv/ZZGiU-/Pemm/9juwZKUclEkiPmTOcFxZOGTQY/wwNMTvMytQNMzXE/5JNRj/Ag1YNkwu',
 ];
 
 export default function VideoPlayer() {
@@ -26,8 +27,8 @@ export default function VideoPlayer() {
   
   const rewardVal = rewardParam ? parseFloat(rewardParam) : (videoParam === 'premium' ? 45.00 : 35.00);
   const videoSrc = videoParam === 'premium' 
-    ? "https://www.w3schools.com/html/movie.mp4"
-    : "https://www.w3schools.com/html/mov_bbb.mp4";
+    ? "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+    : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
     
   const adId = videoParam === 'premium' ? 'video_2' : 'video_1';
   const videoTitle = videoParam === 'premium' ? 'Premium Insight Ad' : 'Standard Reward Video';

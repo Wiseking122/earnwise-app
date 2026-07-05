@@ -26,6 +26,7 @@ export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022825',
   'https://vast.vstserv.com/vast?spot_id=2022824',
   'https://vast.vstserv.com/vast?spot_id=2022829',
+  'https://butterygrandmother.com/dmmCFyz.dtGkNnv/ZZGiU-/Pemm/9juwZKUclEkiPmTOcFxZOGTQY/wwNMTvMytQNMzXE/5JNRj/Ag1YNkwu',
 ];
 
 const isYouTubeUrl = (url: string) => {
