@@ -180,7 +180,7 @@ const PLAN_LIMITS: Record<string, { cap: number; daily: number }> = {
   pro: { cap: 22000, daily: 735 },
   bronze: { cap: 35000, daily: 1170 },
   diamond: { cap: 45000, daily: 1500 },
-  silver: { cap: 9999999, daily: 2500 },
+  silver: { cap: 55000, daily: 2500 },
   platinum: { cap: 9999999, daily: 3000 },
   golden: { cap: 9999999, daily: 4000 }
 };
@@ -1042,38 +1042,86 @@ async function startServer() {
             // Find reward from predefined list if possible, or use default
             rewardAmount = 50; 
           }
-          
-          const multiplier = TIER_MULTIPLIERS[userData.plan || 'free'] || 1.0;
-          const finalReward = rewardAmount * multiplier;
 
-          await userRef.update({
-             balance: admin.firestore.FieldValue.increment(finalReward),
-             withdrawableBalance: admin.firestore.FieldValue.increment(finalReward),
-             taskBalance: admin.firestore.FieldValue.increment(finalReward),
-             taskEarnings: admin.firestore.FieldValue.increment(finalReward),
-             totalEarnings: admin.firestore.FieldValue.increment(finalReward),
-             updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-          
-          // Log task completion in a subcollection
-          await userRef.collection('task_completions').add({
-            taskId,
-            type,
-            reward: finalReward,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'verified'
+          await dbAdmin.runTransaction(async (transaction) => {
+            const freshUserDoc = await transaction.get(userRef);
+            if (!freshUserDoc.exists) throw new Error("User not found");
+            const freshUserData = freshUserDoc.data()!;
+
+            const currentPlan = freshUserData.plan || 'free';
+            const multiplier = TIER_MULTIPLIERS[currentPlan] || 1.0;
+            const finalReward = rewardAmount * multiplier;
+
+            // Enforce Limits for Non-Admins
+            const isAdmin = freshUserData.role === 'admin' || freshUserData.email === 'wiseking7890@gmail.com';
+            if (!isAdmin) {
+              const planLimit = PLAN_LIMITS[currentPlan] || { cap: 0, daily: 0 };
+
+              // 1. Total Task Cap Check
+              const activePlanTaskEarnings = freshUserData.activePlanTaskEarnings || 0;
+              if (activePlanTaskEarnings + finalReward > planLimit.cap) {
+                throw new Error(`Total plan task earning cap reached (₦${planLimit.cap.toLocaleString()}). Upgrade your plan to continue earning.`);
+              }
+
+              // 2. Daily Earning Limit Check
+              const lagosParts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Africa/Lagos',
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric'
+              }).formatToParts(new Date());
+              const lYear = lagosParts.find(p => p.type === 'year')?.value || '';
+              const lMonth = lagosParts.find(p => p.type === 'month')?.value || '';
+              const lDay = lagosParts.find(p => p.type === 'day')?.value || '';
+              const todayStr = `${lYear}-${lMonth.padStart(2, '0')}-${lDay.padStart(2, '0')}`;
+
+              const dailyTracking = freshUserData.dailyTaskEarningsTracking || {};
+              const dailyEarnedToday = dailyTracking.date === todayStr ? (dailyTracking.amount || 0) : 0;
+              if (dailyEarnedToday + finalReward > planLimit.daily) {
+                throw new Error("Daily high-quality task limit reached. Resumes tomorrow!");
+              }
+
+              // Update Limits Tracking fields
+              transaction.update(userRef, {
+                activePlanTaskEarnings: admin.firestore.FieldValue.increment(finalReward),
+                dailyTaskEarningsTracking: {
+                  date: todayStr,
+                  amount: dailyEarnedToday + finalReward
+                }
+              });
+            }
+
+            transaction.update(userRef, {
+               balance: admin.firestore.FieldValue.increment(finalReward),
+               withdrawableBalance: admin.firestore.FieldValue.increment(finalReward),
+               taskBalance: admin.firestore.FieldValue.increment(finalReward),
+               taskEarnings: admin.firestore.FieldValue.increment(finalReward),
+               totalEarnings: admin.firestore.FieldValue.increment(finalReward),
+               updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Log task completion in a subcollection
+            const completionRef = userRef.collection('task_completions').doc();
+            transaction.set(completionRef, {
+              taskId,
+              type,
+              reward: finalReward,
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              status: 'verified'
+            });
+
+            // Record Transaction
+            const txRef = dbAdmin.collection('transactions').doc();
+            transaction.set(txRef, {
+              userId: userId.toString(),
+              amount: finalReward,
+              type: 'earning',
+              description: `Ad Reward: ${type.replace('_', ' ')}`,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
           });
 
-          // Record Transaction
-          await dbAdmin.collection('transactions').add({
-            userId: userId.toString(),
-            amount: finalReward,
-            type: 'earning',
-            description: `Ad Reward: ${type.replace('_', ' ')}`,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-
-          sendPushNotification(userId.toString(), "🎯 Reward Received", `You earned ₦${finalReward} for completing a ${type.replace('_', ' ')} task!`);
+          sendPushNotification(userId.toString(), "🎯 Reward Received", `You earned ₦${rewardAmount * (TIER_MULTIPLIERS[userData.plan || 'free'] || 1.0)} for completing a ${type.replace('_', ' ')} task!`);
         }
       }
 
@@ -2074,6 +2122,11 @@ Please verify if the submission is a plausible and honest completion of a social
         const completionRef = dbAdmin.collection('completions').doc(`${userId}_${taskId}`);
         const userRef = dbAdmin.collection('users').doc(userId);
         
+        // Fetch current user data atomically within the transaction
+        const freshUserDoc = await transaction.get(userRef);
+        if (!freshUserDoc.exists) throw new Error("User account not found");
+        const freshUserData = freshUserDoc.data()!;
+
         // 1. Write Completion Doc
         transaction.set(completionRef, {
             userId,
@@ -2089,8 +2142,48 @@ Please verify if the submission is a plausible and honest completion of a social
             aiReason: verificationResult.reason
         });
 
-        // 2. If approved, add reward to balance
+        // 2. If approved, add reward to balance and handle pacing/plan limits
         if (verificationResult.approved) {
+          const currentPlan = freshUserData.plan || 'free';
+          const isAdmin = freshUserData.role === 'admin' || freshUserData.email === 'wiseking7890@gmail.com';
+          
+          if (!isAdmin) {
+            const planLimit = PLAN_LIMITS[currentPlan] || { cap: 0, daily: 0 };
+
+            // 1. Total Task Cap Check
+            const activePlanTaskEarnings = freshUserData.activePlanTaskEarnings || 0;
+            if (activePlanTaskEarnings + numericReward > planLimit.cap) {
+              throw new Error(`Total plan task earning cap reached (₦${planLimit.cap.toLocaleString()}). Upgrade your plan to continue earning.`);
+            }
+
+            // 2. Daily Earning Limit Check
+            const lagosParts = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'Africa/Lagos',
+              year: 'numeric',
+              month: 'numeric',
+              day: 'numeric'
+            }).formatToParts(new Date());
+            const lYear = lagosParts.find(p => p.type === 'year')?.value || '';
+            const lMonth = lagosParts.find(p => p.type === 'month')?.value || '';
+            const lDay = lagosParts.find(p => p.type === 'day')?.value || '';
+            const todayStr = `${lYear}-${lMonth.padStart(2, '0')}-${lDay.padStart(2, '0')}`;
+
+            const dailyTracking = freshUserData.dailyTaskEarningsTracking || {};
+            const dailyEarnedToday = dailyTracking.date === todayStr ? (dailyTracking.amount || 0) : 0;
+            if (dailyEarnedToday + numericReward > planLimit.daily) {
+              throw new Error("Daily high-quality task limit reached. Resumes tomorrow!");
+            }
+
+            // Update Limits Tracking fields
+            transaction.update(userRef, {
+              activePlanTaskEarnings: admin.firestore.FieldValue.increment(numericReward),
+              dailyTaskEarningsTracking: {
+                date: todayStr,
+                amount: dailyEarnedToday + numericReward
+              }
+            });
+          }
+
           transaction.update(userRef, {
             balance: admin.firestore.FieldValue.increment(numericReward),
             taskBalance: admin.firestore.FieldValue.increment(numericReward),
