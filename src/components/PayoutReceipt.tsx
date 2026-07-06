@@ -170,12 +170,10 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
           backgroundColor: '#ffffff',
           useCORS: true,
           logging: false,
-          width: element.offsetWidth,
-          height: element.offsetHeight,
+          width: 340,
           scrollX: 0,
           scrollY: 0,
-          windowWidth: document.documentElement.clientWidth,
-          windowHeight: document.documentElement.clientHeight,
+          windowWidth: 340,
           onclone: (clonedDoc) => {
             const clonedWin = clonedDoc.defaultView;
             if (clonedWin) {
@@ -212,8 +210,9 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
               (clonedCard as HTMLElement).style.transform = 'none';
               (clonedCard as HTMLElement).style.margin = '0';
               (clonedCard as HTMLElement).style.padding = '0';
-              (clonedCard as HTMLElement).style.width = `${element.offsetWidth}px`;
-              (clonedCard as HTMLElement).style.height = `${element.offsetHeight}px`;
+              (clonedCard as HTMLElement).style.width = '340px';
+              (clonedCard as HTMLElement).style.maxWidth = 'none';
+              (clonedCard as HTMLElement).style.height = 'auto';
             }
           }
         });
@@ -444,7 +443,7 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
       <motion.div
         initial={{ scale: 0.95, y: 15, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
-        className="relative w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[300px] z-10"
+        className="relative w-[340px] max-w-[95vw] z-10 mx-auto"
       >
         {/* Close Icon Button */}
         <button 
@@ -464,7 +463,9 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
             borderColor: '#e2e8f0',
             borderWidth: '1px',
             borderStyle: 'solid',
-            fontFamily: '"Inter", sans-serif'
+            fontFamily: '"Inter", sans-serif',
+            width: '340px',
+            maxWidth: '100%'
           }}
         >
           {/* Top Border Bar */}
@@ -472,7 +473,7 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
 
           {/* Header */}
           <div 
-            className="p-2 sm:p-2.5 flex flex-col items-center justify-center relative"
+            className="p-3.5 flex flex-col items-center justify-center relative"
             style={{
               backgroundColor: '#f8fafc',
               borderBottomColor: '#f1f5f9',
@@ -486,39 +487,39 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
 
             {/* Official Logo Text */}
             <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-[11px] sm:text-xs font-black tracking-tight" style={{ color: '#0f172a' }}>EARN</span>
-              <span className="text-[9px] sm:text-[10px] font-black tracking-tight px-1 py-0.5 rounded text-white" style={{ backgroundColor: '#3b82f6' }}>WISE</span>
+              <span className="text-sm font-black tracking-tight" style={{ color: '#0f172a' }}>EARN</span>
+              <span className="text-[11px] font-black tracking-tight px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: '#3b82f6' }}>WISE</span>
             </div>
 
-            <p className="text-[6.5px] sm:text-[7px] font-black uppercase tracking-widest text-slate-400 mt-0.5">
+            <p className="text-[8.5px] font-black uppercase tracking-widest text-slate-400 mt-1">
               SETTLEMENT TRANSACTION RECEIPT
             </p>
           </div>
 
           {/* Processing Banner */}
-          <div className="py-1.5 px-2 flex items-center justify-center gap-1" style={{ backgroundColor: '#eff6ff' }}>
+          <div className="py-2 px-3 flex items-center justify-center gap-1" style={{ backgroundColor: '#eff6ff' }}>
             <div 
-              className="w-3 h-3 rounded-full flex items-center justify-center animate-pulse"
+              className="w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse"
               style={{ backgroundColor: '#3b82f6' }}
             >
-              <Clock size={7} style={{ color: '#ffffff' }} />
+              <Clock size={8} style={{ color: '#ffffff' }} />
             </div>
-            <span className="text-[7.5px] sm:text-[8px] font-black uppercase tracking-widest" style={{ color: '#1e40af' }}>
+            <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#1e40af' }}>
               SETTLEMENT PROCESSING
             </span>
           </div>
 
           {/* Body */}
-          <div className="p-2.5 sm:p-3 space-y-2.5 sm:space-y-3" style={{ backgroundColor: '#ffffff' }}>
+          <div className="p-4 space-y-3.5" style={{ backgroundColor: '#ffffff' }}>
             {/* Amount */}
-            <div className="text-center py-0.5">
-              <p className="text-[7px] sm:text-[7.5px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#3b82f6' }}>
+            <div className="text-center py-0.5 relative z-10">
+              <p className="text-[9.5px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#3b82f6' }}>
                 ⌛ Queued for Lagos Payout
               </p>
-              <h3 className="text-lg sm:text-xl font-black tracking-tighter" style={{ color: '#0f172a' }}>
+              <h3 className="text-2xl font-black tracking-tight" style={{ color: '#0f172a' }}>
                 ₦{data.netAmount.toLocaleString()}
               </h3>
-              <p className="text-[7.5px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                 NET CREDIT AMOUNT
               </p>
             </div>
@@ -527,11 +528,11 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
             <div style={{ borderTop: '1px dashed #cbd5e1', height: '1px' }} />
 
             {/* Receipt Parameters */}
-            <div className="space-y-1.5 text-[8.5px] sm:text-[9.5px]">
-              <div className="flex justify-between items-start gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap pt-[2px]" style={{ color: '#64748b' }}>Reference ID</span>
+            <div className="space-y-2 text-[10.5px] sm:text-[11px] relative z-10">
+              <div className="flex justify-between items-start gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap pt-[2px]" style={{ color: '#64748b' }}>Reference ID</span>
                 <span 
-                  className="font-black font-mono px-1 py-0.5 rounded text-[7.5px] sm:text-[8px] uppercase break-all text-right max-w-[110px] sm:max-w-[140px]"
+                  className="font-black font-mono px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] uppercase break-all text-right max-w-[150px] sm:max-w-[170px]"
                   style={{
                     color: '#0f172a',
                     backgroundColor: '#f8fafc',
@@ -543,36 +544,36 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
                   {receiptId}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Requested On</span>
-                <span className="font-extrabold text-[8px] sm:text-[9px] text-right" style={{ color: '#0f172a' }}>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Requested On</span>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>
                   {displayDate} • {displayTime}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Withdrawal Type</span>
-                <span className={`font-extrabold text-[8px] sm:text-[9px] text-right uppercase ${data.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Withdrawal Type</span>
+                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase ${data.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
                   {data.withdrawalType === 'referral' ? 'Referral Payout' : 'Task Earnings'}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Recipient Bank</span>
-                <span className="font-extrabold text-[8px] sm:text-[9px] text-right" style={{ color: '#0f172a' }}>{data.bankName || 'N/A'}</span>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Recipient Bank</span>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>{data.bankName || 'N/A'}</span>
               </div>
-              <div className="flex justify-between items-start gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap pt-[1px]" style={{ color: '#64748b' }}>Account Name</span>
-                <span className="font-extrabold text-right break-words text-[8px] sm:text-[9px] leading-tight max-w-[110px] sm:max-w-[140px]" style={{ color: '#0f172a' }}>
+              <div className="flex justify-between items-start gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap pt-[1px]" style={{ color: '#64748b' }}>Account Name</span>
+                <span className="font-extrabold text-right break-words text-[10.5px] sm:text-[11px] leading-tight max-w-[150px] sm:max-w-[170px]" style={{ color: '#0f172a' }}>
                   {data.accountName || 'N/A'}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Account Number</span>
-                <span className="font-extrabold text-[8px] sm:text-[9px] text-right" style={{ color: '#0f172a' }}>{data.accountNumber || 'N/A'}</span>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Account Number</span>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>{data.accountNumber || 'N/A'}</span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Security Check</span>
-                <span className="font-extrabold text-blue-600 flex items-center gap-1 text-[8px] sm:text-[9px]">
-                  <ShieldCheck size={9} className="text-blue-500" />
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Security Check</span>
+                <span className="font-extrabold text-blue-600 flex items-center gap-1 text-[10px] sm:text-[11.5px]">
+                  <ShieldCheck size={11} className="text-blue-500" />
                   Verified Pending
                 </span>
               </div>
@@ -582,7 +583,7 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
             <div style={{ borderTop: '1px dashed #cbd5e1', height: '1px' }} />
 
             {/* Breakdown */}
-            <div className="p-2 sm:p-2.5 rounded-lg space-y-1 text-[8px] sm:text-[9px]" style={{ backgroundColor: '#f8fafc' }}>
+            <div className="p-2.5 rounded-lg space-y-1.5 text-[10.5px] sm:text-[11px] relative z-10" style={{ backgroundColor: '#f8fafc' }}>
               <div className="flex justify-between items-center">
                 <span style={{ color: '#64748b' }} className="font-bold">Gross Amount</span>
                 <span className="font-black" style={{ color: '#334155' }}>₦{data.amount.toLocaleString()}</span>
@@ -595,16 +596,16 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
                   {data.fee > 0 ? `-₦${data.fee.toLocaleString()}` : 'Free'}
                 </span>
               </div>
-              <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '2px', marginBottom: '2px' }} />
+              <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '3px', marginBottom: '3px' }} />
               <div className="flex justify-between items-center pt-0.5">
-                <span style={{ color: '#0f172a' }} className="font-black uppercase tracking-wider text-[7.5px] sm:text-[8px]">Total Settlement</span>
-                <span className="font-black text-[10px] sm:text-[11px]" style={{ color: '#3b82f6' }}>₦{data.netAmount.toLocaleString()}</span>
+                <span style={{ color: '#0f172a' }} className="font-black uppercase tracking-wider text-[9.5px] sm:text-[10px]">Total Settlement</span>
+                <span className="font-black text-[12px] sm:text-[13px]" style={{ color: '#3b82f6' }}>₦{data.netAmount.toLocaleString()}</span>
               </div>
             </div>
 
             {/* Simulated Barcode */}
-            <div className="flex flex-col items-center justify-center pt-0.5 pb-0.5 space-y-0.5">
-              <div className="flex items-center justify-center gap-[1px] h-4 opacity-80">
+            <div className="flex flex-col items-center justify-center pt-1 pb-1 space-y-1 relative z-10">
+              <div className="flex items-center justify-center gap-[1px] h-6 opacity-80">
                 <div style={{ width: '1.5px', height: '100%', backgroundColor: '#0f172a' }} />
                 <div style={{ width: '1px', height: '100%', backgroundColor: '#0f172a' }} />
                 <div style={{ width: '2px', height: '100%', backgroundColor: '#0f172a' }} />
@@ -618,7 +619,7 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
                 <div style={{ width: '1.5px', height: '100%', backgroundColor: '#0f172a' }} />
                 <div style={{ width: '3px', height: '100%', backgroundColor: '#0f172a' }} />
               </div>
-              <span className="text-[6px] sm:text-[6.5px] font-mono uppercase tracking-[0.2em]" style={{ color: '#64748b' }}>
+              <span className="text-[8px] font-mono uppercase tracking-[0.2em]" style={{ color: '#64748b' }}>
                 PAY-PENDING-EW-{receiptId.slice(-8)}
               </span>
             </div>
@@ -626,7 +627,7 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
 
           {/* Footer branding */}
           <div 
-            className="p-2 text-center"
+            className="p-2.5 text-center relative z-10"
             style={{
               backgroundColor: '#f8fafc',
               borderTopColor: '#f1f5f9',
@@ -634,7 +635,7 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
               borderTopStyle: 'solid'
             }}
           >
-            <p className="text-[6.5px] sm:text-[7px] font-black uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+            <p className="text-[8.5px] font-black uppercase tracking-wider" style={{ color: '#94a3b8' }}>
               Earnwise Digital Media Limited • RC 1794021
             </p>
           </div>

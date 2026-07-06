@@ -167,10 +167,10 @@ const PLAN_COSTS: Record<string, number> = {
   starter: 2000,
   pro: 3000,
   bronze: 5000,
-  diamond: 10000,
-  silver: 20000,
-  platinum: 30000,
-  golden: 50000
+  diamond: 7000,
+  silver: 10000,
+  platinum: 15000,
+  golden: 25000
 };
 
 const PLAN_LIMITS: Record<string, { cap: number; daily: number }> = {
@@ -306,55 +306,77 @@ async function startServer() {
     if (!isDbAdminCapable) return;
     try {
       const userRef = dbAdmin.collection('users').doc(userId);
-      
-      await dbAdmin.runTransaction(async (transaction) => {
-        // Read user document INSIDE the transaction for guaranteed atomicity
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) return;
-        const userData = userDoc.data();
-        
-        // Ensure bonus hasn't already been awarded, and they actually have a referrer
-        if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
-          const referrerDoc = await findReferrerDoc(userData.referredBy);
-          
-          if (referrerDoc) {
-            // Calculate exactly 30% of the plan cost
-            const planCost = PLAN_COSTS[planId] || 0;
-            const bonusAmount = Math.floor(planCost * 0.3);
-            
-            if (bonusAmount <= 0) return; // No bonus for free/zero plans
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        console.log(`[REFERRAL] User document ${userId} not found.`);
+        return;
+      }
+      const userData = userDoc.data();
 
-            // Update referrer's balances atomically
-            transaction.update(referrerDoc.ref, {
-              balance: admin.firestore.FieldValue.increment(bonusAmount),
-              referralBalance: admin.firestore.FieldValue.increment(bonusAmount),
-              withdrawableBalance: admin.firestore.FieldValue.increment(bonusAmount),
-              referralEarnings: admin.firestore.FieldValue.increment(bonusAmount),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            
-            // Set flag on referred user within the same transaction to prevent duplicate execution
-            transaction.update(userRef, {
-              hasReceivedReferralBonus: true
-            });
-            
-            // Send notification to referrer
-            const notifRef = dbAdmin.collection('notifications').doc();
-            transaction.set(notifRef, {
-              userId: referrerDoc.id,
-              title: '🎁 Referral Upgrade Commission!',
-              message: `Your friend upgraded to ${planId}! You have received a 30% commission of ₦${bonusAmount}.`,
-              type: 'reward',
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              readBy: []
-            });
-
-            console.log(`[REFERRAL] Awarded ₦${bonusAmount} (30% of ${planId}) bonus to referrer ${referrerDoc.id} for user ${userId}`);
-          }
-        } else {
-          console.log(`[REFERRAL] Skip award for user ${userId}: already awarded or no referrer found.`);
+      if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
+        // Find referrer document BEFORE the transaction
+        const referrerDocBrief = await findReferrerDoc(userData.referredBy);
+        if (!referrerDocBrief) {
+          console.log(`[REFERRAL] Referrer not found for code/username: ${userData.referredBy}`);
+          return;
         }
-      });
+
+        const referrerRef = referrerDocBrief.ref;
+
+        await dbAdmin.runTransaction(async (transaction) => {
+          // Read both docs inside transaction to be transactional & atomic
+          const userSnap = await transaction.get(userRef);
+          const referrerSnap = await transaction.get(referrerRef);
+
+          if (!userSnap.exists || !referrerSnap.exists) {
+            console.log(`[REFERRAL] Transaction documents do not exist.`);
+            return;
+          }
+
+          const currentUserData = userSnap.data()!;
+          if (currentUserData.hasReceivedReferralBonus) {
+            console.log(`[REFERRAL] Bonus already received for user ${userId}. Skipping.`);
+            return;
+          }
+
+          // Calculate exactly 30% of the plan cost
+          const planCost = PLAN_COSTS[planId] || 0;
+          const bonusAmount = Math.floor(planCost * 0.3);
+          if (bonusAmount <= 0) {
+            console.log(`[REFERRAL] Bonus amount for ${planId} is ₦0. Skipping.`);
+            return;
+          }
+
+          // Update referrer's balances atomically
+          transaction.update(referrerRef, {
+            balance: admin.firestore.FieldValue.increment(bonusAmount),
+            referralBalance: admin.firestore.FieldValue.increment(bonusAmount),
+            withdrawableBalance: admin.firestore.FieldValue.increment(bonusAmount),
+            referralEarnings: admin.firestore.FieldValue.increment(bonusAmount),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          // Set flag on referred user within the same transaction to prevent duplicate execution
+          transaction.update(userRef, {
+            hasReceivedReferralBonus: true
+          });
+
+          // Set notification for referrer
+          const notifRef = dbAdmin.collection('notifications').doc();
+          transaction.set(notifRef, {
+            userId: referrerSnap.id,
+            title: '🎁 Referral Upgrade Commission!',
+            message: `Your friend upgraded to ${planId}! You have received a 30% commission of ₦${bonusAmount}.`,
+            type: 'reward',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            readBy: []
+          });
+
+          console.log(`[REFERRAL] Successfully awarded ₦${bonusAmount} (30% of ${planId}) bonus to referrer ${referrerSnap.id} for user ${userId}`);
+        });
+      } else {
+        console.log(`[REFERRAL] Skip award for user ${userId}: already awarded or no referrer found.`);
+      }
     } catch (err) {
       console.error("[REFERRAL] FAILED to award upgrade bonus:", err);
     }
@@ -2827,7 +2849,7 @@ Please verify if the submission is a plausible and honest completion of a social
           });
 
           // Award referral bonus if applicable
-          handleReferralUpgradeBonus(metadata.userId, metadata.planId);
+          await handleReferralUpgradeBonus(metadata.userId, metadata.planId);
         }
 
         if (metadata?.type === 'advertiser_task') {
@@ -3199,11 +3221,11 @@ Please verify if the submission is a plausible and honest completion of a social
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             reference
           });
-
-          // Award referral bonus in background
-          handleReferralUpgradeBonus(userId, planId);
-          sendPushNotification(userId, "⚡ Upgrade Successful", `Your account has been upgraded to the ${planId} plan.`);
         });
+
+        // Award referral bonus and notify user outside the transaction to prevent nested transaction issues
+        await handleReferralUpgradeBonus(userId, planId);
+        await sendPushNotification(userId, "⚡ Upgrade Successful", `Your account has been upgraded to the ${planId} plan.`);
 
         return res.json({ status: "success", message: "Plan activated via wallet" });
       }
@@ -3241,8 +3263,8 @@ Please verify if the submission is a plausible and honest completion of a social
           readBy: []
         });
 
-        // Award referral bonus in background
-        handleReferralUpgradeBonus(userId, planId);
+        // Award referral bonus and wait for completion
+        await handleReferralUpgradeBonus(userId, planId);
 
         return res.json({ status: "success", message: `Upgraded to ${planId} successfully (Simulated)` });
       }
@@ -3318,9 +3340,9 @@ Please verify if the submission is a plausible and honest completion of a social
           reference
         });
 
-        // Award referral bonus in background
-        handleReferralUpgradeBonus(userId, planId);
-        sendPushNotification(userId, "⚡ Upgrade Successful", `Your account has been upgraded to the ${planId} plan.`);
+        // Award referral bonus and wait for completion
+        await handleReferralUpgradeBonus(userId, planId);
+        await sendPushNotification(userId, "⚡ Upgrade Successful", `Your account has been upgraded to the ${planId} plan.`);
 
         console.log(`[PAYMENT] SUCCESS: User ${userId} upgraded to ${planId}`);
         res.json({ status: "success", message: "Plan upgraded successfully" });

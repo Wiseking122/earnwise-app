@@ -195,12 +195,10 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
           backgroundColor: '#ffffff',
           useCORS: true,
           logging: false,
-          width: element.offsetWidth,
-          height: element.offsetHeight,
+          width: 340,
           scrollX: 0,
           scrollY: 0,
-          windowWidth: document.documentElement.clientWidth,
-          windowHeight: document.documentElement.clientHeight,
+          windowWidth: 340,
           onclone: (clonedDoc) => {
             // Intercept cloned iframe window getComputedStyle
             const clonedWin = clonedDoc.defaultView;
@@ -286,8 +284,9 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
               (clonedCard as HTMLElement).style.transform = 'none';
               (clonedCard as HTMLElement).style.margin = '0';
               (clonedCard as HTMLElement).style.padding = '0';
-              (clonedCard as HTMLElement).style.width = `${element.offsetWidth}px`;
-              (clonedCard as HTMLElement).style.height = `${element.offsetHeight}px`;
+              (clonedCard as HTMLElement).style.width = '340px';
+              (clonedCard as HTMLElement).style.maxWidth = 'none';
+              (clonedCard as HTMLElement).style.height = 'auto';
             }
           }
         });
@@ -541,7 +540,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
       <motion.div
         initial={{ scale: 0.95, y: 15, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
-        className="relative w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[300px] z-10"
+        className="relative w-[340px] max-w-[95vw] z-10 mx-auto"
       >
         {/* Close Button */}
         <button 
@@ -551,7 +550,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
           <X size={14} />
         </button>
 
-        {/* The Receipt Wrapper - Reduced sizing and padding for flawless mobile fit */}
+        {/* The Receipt Wrapper - Optimized size and standard readable fonts for flawless layout across all platforms */}
         <div 
           ref={receiptRef}
           id="earnwise-receipt-card"
@@ -561,7 +560,9 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
             borderColor: '#e2e8f0',
             borderWidth: '1px',
             borderStyle: 'solid',
-            fontFamily: '"Inter", sans-serif'
+            fontFamily: '"Inter", sans-serif',
+            width: '340px',
+            maxWidth: '100%'
           }}
         >
           {/* Top Decorative Payout Bar */}
@@ -569,7 +570,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
 
           {/* Header Area */}
           <div 
-            className="p-2 sm:p-2.5 flex flex-col items-center justify-center relative"
+            className="p-3.5 flex flex-col items-center justify-center relative"
             style={{
               backgroundColor: '#f8fafc',
               borderBottomColor: '#f1f5f9',
@@ -583,30 +584,30 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
 
             {/* Official Logo Text */}
             <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-[11px] sm:text-xs font-black tracking-tight" style={{ color: '#0f172a' }}>EARN</span>
-              <span className="text-[9px] sm:text-[10px] font-black tracking-tight px-1 py-0.5 rounded text-white" style={{ backgroundColor: '#10b981' }}>WISE</span>
+              <span className="text-sm font-black tracking-tight" style={{ color: '#0f172a' }}>EARN</span>
+              <span className="text-[11px] font-black tracking-tight px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: '#10b981' }}>WISE</span>
             </div>
 
-            <p className="text-[6.5px] sm:text-[7px] font-black uppercase tracking-widest text-slate-400 mt-0.5">
+            <p className="text-[8.5px] font-black uppercase tracking-widest text-slate-400 mt-1">
               OFFICIAL DISBURSEMENT RECEIPT
             </p>
           </div>
 
           {/* Success Status Banner */}
-          <div className="py-1.5 px-2 flex items-center justify-center gap-1" style={{ backgroundColor: '#f0fdf4' }}>
+          <div className="py-2 px-3 flex items-center justify-center gap-1" style={{ backgroundColor: '#f0fdf4' }}>
             <div 
-              className="w-3 h-3 rounded-full flex items-center justify-center"
+              className="w-3.5 h-3.5 rounded-full flex items-center justify-center"
               style={{ backgroundColor: '#10b981' }}
             >
-              <Check size={7} style={{ color: '#ffffff' }} />
+              <Check size={8} style={{ color: '#ffffff' }} />
             </div>
-            <span className="text-[7.5px] sm:text-[8px] font-black uppercase tracking-widest" style={{ color: '#166534' }}>
+            <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#166534' }}>
               TRANSACTION SUCCESSFUL
             </span>
           </div>
 
           {/* Body Details */}
-          <div className="p-2.5 sm:p-3 space-y-2.5 sm:space-y-3 relative overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
+          <div className="p-4 space-y-3.5 relative overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
             {/* Elegant Background Diagonal Watermark */}
             <div 
               className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-[0.035]"
@@ -616,7 +617,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                 className="font-black text-center tracking-[0.25em] uppercase whitespace-nowrap rotate-[-25deg] select-none pointer-events-none"
                 style={{ 
                   color: '#0f172a',
-                  fontSize: '13px',
+                  fontSize: '15px',
                   lineHeight: '1.7'
                 }}
               >
@@ -629,14 +630,14 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
               </div>
             </div>
             {/* Net Amount Display */}
-            <div className="text-center py-0.5">
-              <p className="text-[7px] sm:text-[7.5px] font-bold uppercase tracking-widest mb-0.5 animate-pulse" style={{ color: '#10b981' }}>
+            <div className="text-center py-0.5 relative z-10">
+              <p className="text-[9.5px] font-bold uppercase tracking-widest mb-0.5 animate-pulse" style={{ color: '#10b981' }}>
                 🟢 Disbursed Successfully
               </p>
-              <h3 className="text-lg sm:text-xl font-black tracking-tighter" style={{ color: '#0f172a' }}>
+              <h3 className="text-2xl font-black tracking-tight" style={{ color: '#0f172a' }}>
                 ₦{receipt.netPayout.toLocaleString()}
               </h3>
-              <p className="text-[7.5px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                 NET PAYOUT AMOUNT
               </p>
             </div>
@@ -645,11 +646,11 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
             <div style={{ borderTop: '1px dashed #cbd5e1', height: '1px' }} />
 
             {/* Transaction Data Table */}
-            <div className="space-y-1.5 text-[8.5px] sm:text-[9.5px]">
-              <div className="flex justify-between items-start gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap pt-[2px]" style={{ color: '#64748b' }}>Reference ID</span>
+            <div className="space-y-2 text-[10.5px] sm:text-[11px] relative z-10">
+              <div className="flex justify-between items-start gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap pt-[2px]" style={{ color: '#64748b' }}>Reference ID</span>
                 <span 
-                  className="font-black font-mono px-1 py-0.5 rounded text-[7.5px] sm:text-[8px] uppercase break-all text-right max-w-[110px] sm:max-w-[140px]"
+                  className="font-black font-mono px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] uppercase break-all text-right max-w-[150px] sm:max-w-[170px]"
                   style={{
                     color: '#0f172a',
                     backgroundColor: '#f8fafc',
@@ -661,32 +662,32 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                   EW-{receipt.id.toUpperCase().slice(0, 10)}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Date & Time</span>
-                <span className="font-extrabold text-[8px] sm:text-[9px] text-right" style={{ color: '#0f172a' }}>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Date & Time</span>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>
                   {displayDate} • {displayTime}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payout Type</span>
-                <span className={`font-extrabold text-[8px] sm:text-[9px] text-right uppercase ${receipt.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payout Type</span>
+                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase ${receipt.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
                   {receipt.withdrawalType === 'referral' ? 'Referral Payout' : 'Video Task Payout'}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Recipient Bank</span>
-                <span className="font-extrabold text-[8px] sm:text-[9px] text-right" style={{ color: '#0f172a' }}>{receipt.bankName || 'N/A'}</span>
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Recipient Bank</span>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>{receipt.bankName || 'N/A'}</span>
               </div>
-              <div className="flex justify-between items-start gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap pt-[1px]" style={{ color: '#64748b' }}>Account Name</span>
-                <span className="font-extrabold text-right break-words text-[8px] sm:text-[9px] leading-tight max-w-[110px] sm:max-w-[140px]" style={{ color: '#0f172a' }}>
+              <div className="flex justify-between items-start gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap pt-[1px]" style={{ color: '#64748b' }}>Account Name</span>
+                <span className="font-extrabold text-right break-words text-[10.5px] sm:text-[11px] leading-tight max-w-[150px] sm:max-w-[170px]" style={{ color: '#0f172a' }}>
                   {receipt.accountName || 'N/A'}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-1.5">
-                <span className="font-bold uppercase tracking-wide text-[7px] sm:text-[7.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payment Engine</span>
-                <span className="font-extrabold text-emerald-600 flex items-center gap-1 text-[8px] sm:text-[9px]">
-                  <ShieldCheck size={9} className="text-emerald-500" />
+              <div className="flex justify-between items-center gap-2">
+                <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payment Engine</span>
+                <span className="font-extrabold text-emerald-600 flex items-center gap-1 text-[10px] sm:text-[11.5px]">
+                  <ShieldCheck size={11} className="text-emerald-500" />
                   Paystack Secure
                 </span>
               </div>
@@ -696,7 +697,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
             <div style={{ borderTop: '1px dashed #cbd5e1', height: '1px' }} />
 
             {/* Financial Calculations breakdown */}
-            <div className="p-2 sm:p-2.5 rounded-lg space-y-1 text-[8px] sm:text-[9px]" style={{ backgroundColor: '#f8fafc' }}>
+            <div className="p-2.5 rounded-lg space-y-1.5 text-[10.5px] sm:text-[11px] relative z-10" style={{ backgroundColor: '#f8fafc' }}>
               <div className="flex justify-between items-center">
                 <span style={{ color: '#64748b' }} className="font-bold">Gross Amount</span>
                 <span className="font-black" style={{ color: '#334155' }}>₦{receipt.amount.toLocaleString()}</span>
@@ -709,16 +710,16 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                   {receipt.fee > 0 ? `-₦${receipt.fee.toLocaleString()}` : 'Free'}
                 </span>
               </div>
-              <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '2px', marginBottom: '2px' }} />
+              <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '3px', marginBottom: '3px' }} />
               <div className="flex justify-between items-center pt-0.5">
-                <span style={{ color: '#0f172a' }} className="font-black uppercase tracking-wider text-[7.5px] sm:text-[8px]">Total Disbursed</span>
-                <span className="font-black text-[10px] sm:text-[11px]" style={{ color: '#10b981' }}>₦{receipt.netPayout.toLocaleString()}</span>
+                <span style={{ color: '#0f172a' }} className="font-black uppercase tracking-wider text-[9.5px] sm:text-[10px]">Total Disbursed</span>
+                <span className="font-black text-[12px] sm:text-[13px]" style={{ color: '#10b981' }}>₦{receipt.netPayout.toLocaleString()}</span>
               </div>
             </div>
 
             {/* Simulated Secure Barcode Element for realistic official appearance */}
-            <div className="flex flex-col items-center justify-center pt-0.5 pb-0.5 space-y-0.5">
-              <div className="flex items-center justify-center gap-[1px] h-4 opacity-80">
+            <div className="flex flex-col items-center justify-center pt-1 pb-1 space-y-1 relative z-10">
+              <div className="flex items-center justify-center gap-[1px] h-6 opacity-80">
                 <div style={{ width: '1.5px', height: '100%', backgroundColor: '#0f172a' }} />
                 <div style={{ width: '1px', height: '100%', backgroundColor: '#0f172a' }} />
                 <div style={{ width: '2px', height: '100%', backgroundColor: '#0f172a' }} />
@@ -734,20 +735,20 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                 <div style={{ width: '1px', height: '100%', backgroundColor: '#0f172a' }} />
                 <div style={{ width: '3px', height: '100%', backgroundColor: '#0f172a' }} />
               </div>
-              <span className="text-[6px] sm:text-[6.5px] font-mono uppercase tracking-[0.2em]" style={{ color: '#64748b' }}>
+              <span className="text-[8px] font-mono uppercase tracking-[0.2em]" style={{ color: '#64748b' }}>
                 SECURE-PAY-EW-{receipt.id.toUpperCase().slice(0, 8)}
               </span>
             </div>
 
             {/* Verified Indicator Badge */}
-            <div className="flex flex-col items-center gap-1.5 pt-0.5">
-              <div className="flex items-center gap-1 py-0.5 px-2 rounded-full" style={{ backgroundColor: '#f0fdf4' }}>
-                <ShieldCheck size={9} style={{ color: '#10b981' }} />
-                <span className="text-[6.5px] sm:text-[7px] uppercase tracking-widest font-black" style={{ color: '#15803d' }}>
+            <div className="flex flex-col items-center gap-1.5 pt-0.5 relative z-10">
+              <div className="flex items-center gap-1 py-0.5 px-2.5 rounded-full" style={{ backgroundColor: '#f0fdf4' }}>
+                <ShieldCheck size={11} style={{ color: '#10b981' }} />
+                <span className="text-[8.5px] uppercase tracking-widest font-black" style={{ color: '#15803d' }}>
                   Secured & Escrow Verified
                 </span>
               </div>
-              <span className="text-[6px] sm:text-[6.5px] text-slate-400 font-extrabold tracking-[0.2em] uppercase select-none pointer-events-none">
+              <span className="text-[8px] text-slate-400 font-extrabold tracking-[0.2em] uppercase select-none pointer-events-none">
                 ★ GROWING SECURE WEALTH ★
               </span>
             </div>
@@ -755,7 +756,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
 
           {/* Footer Branding Area */}
           <div 
-            className="p-2 text-center"
+            className="p-2.5 text-center relative z-10"
             style={{
               backgroundColor: '#f8fafc',
               borderTopColor: '#f1f5f9',
@@ -763,7 +764,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
               borderTopStyle: 'solid'
             }}
           >
-            <p className="text-[6.5px] sm:text-[7px] font-black uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+            <p className="text-[8.5px] font-black uppercase tracking-wider" style={{ color: '#94a3b8' }}>
               Earnwise Digital Media Limited • RC 1794021
             </p>
           </div>

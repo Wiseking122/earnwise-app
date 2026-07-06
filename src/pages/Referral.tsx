@@ -367,7 +367,7 @@ export default function Referral() {
                         {ref.plan && ref.plan !== 'free' ? ref.plan : 'Inactive'}
                       </div>
                       {ref.plan && ref.plan !== 'free' && (
-                        <span className="text-[10px] font-black text-emerald-600 mt-1">₦{((PLANS.find(p => p.id === ref.plan)?.cost || 0) * 0.2).toLocaleString()} Earned</span>
+                        <span className="text-[10px] font-black text-emerald-600 mt-1">₦{((PLANS.find(p => p.id === ref.plan)?.cost || 0) * 0.3).toLocaleString()} Earned</span>
                       )}
                     </div>
                   </div>

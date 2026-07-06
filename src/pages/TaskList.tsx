@@ -24,8 +24,6 @@ import {
 import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
 import { AdsterraBanner } from '../components/AdsterraBanner';
-import { WannadsWalls } from '../components/WannadsWalls';
-import { RapidoReachWall } from '../components/RapidoReachWall';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
 import VideoAdsSection from '../components/VideoAdsSection';
@@ -268,9 +266,6 @@ export default function TaskList() {
                    <p className="text-white/80 text-[10px] font-black uppercase tracking-widest leading-none">Complete surveys & upload proof to earn Wise Coins</p>
                  </div>
                </Link>
-
-               <WannadsWalls />
-               <RapidoReachWall />
             </div>
           )}
 

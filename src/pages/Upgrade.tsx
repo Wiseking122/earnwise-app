@@ -323,79 +323,6 @@ export default function Upgrade() {
               </div>
             </div>
 
-            {/* VIP Tiers Highlight Block */}
-            <div className="bg-slate-950 bg-[#020617] rounded-2xl p-6 md:p-8 text-white relative overflow-hidden border border-white/10 shadow-3xl space-y-6" style={{ backgroundColor: '#020617' }}>
-              <div className="absolute top-0 right-0 w-64 h-64 rounded-full -mr-24 -mt-24 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)' }} />
-              <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full -ml-24 -mb-24 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%)' }} />
-
-              <div className="text-center md:text-left relative z-10 space-y-2">
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/25 text-amber-300 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-amber-500/30">
-                  <Sparkles size={10} /> Ultimate Prestige Tiers
-                </span>
-                <h3 className="text-2xl font-display font-black tracking-tighter uppercase italic text-white">Institutional High-Yield plans</h3>
-                <p className="text-slate-400 text-xs font-semibold leading-relaxed max-w-xl">
-                  Unlock the full power of the Earnwise network. Platinum & Golden members receive maximum multipliers, priority payout settlements, and personal mentoring.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-                {/* Platinum highlight card */}
-                <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col justify-between space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-full uppercase tracking-wider">₦15,000 Tier</span>
-                      <span className="text-[10px] font-black text-indigo-400">7.5x MULTIPLIER</span>
-                    </div>
-                    <h4 className="text-lg font-display font-black tracking-tight mt-2 uppercase italic text-white">Platinum Elite</h4>
-                    <p className="text-[11px] text-slate-400">Accelerated path for high-volume network participation.</p>
-                    
-                    <ul className="mt-3 space-y-1.5 border-t border-white/5 pt-3">
-                      <li className="flex items-center gap-2 text-xs text-slate-300">
-                        <CheckCircle2 size={12} className="text-indigo-400 shrink-0" />
-                        <span>Dedicated WhatsApp Account Manager</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-xs text-slate-300">
-                        <CheckCircle2 size={12} className="text-indigo-400 shrink-0" />
-                        <span>Instant Auto-Approvals (within 30m)</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-xs text-slate-300">
-                        <CheckCircle2 size={12} className="text-indigo-400 shrink-0" />
-                        <span>Unlimited Wise AI Assistance</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Golden highlight card */}
-                <div className="bg-white/5 border border-amber-500/30 p-5 rounded-2xl flex flex-col justify-between space-y-4 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)' }} />
-                  <div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full uppercase tracking-wider">₦25,000 Tier</span>
-                      <span className="text-[10px] font-black text-amber-400">10x MULTIPLIER</span>
-                    </div>
-                    <h4 className="text-lg font-display font-black tracking-tight mt-2 uppercase italic text-white">Golden Apex</h4>
-                    <p className="text-[11px] text-slate-400">Our highest-earning institutional plan with a massive 1,000% boost.</p>
-                    
-                    <ul className="mt-3 space-y-1.5 border-t border-white/5 pt-3">
-                      <li className="flex items-center gap-2 text-xs text-slate-300">
-                        <CheckCircle2 size={12} className="text-amber-400 shrink-0" />
-                        <span>Golden Monthly Revenue Split</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-xs text-slate-300">
-                        <CheckCircle2 size={12} className="text-amber-400 shrink-0" />
-                        <span>Zero-Wait Automated Withdrawals</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-xs text-slate-300">
-                        <CheckCircle2 size={12} className="text-amber-400 shrink-0" />
-                        <span>Elite Concierge & Mentor Channels</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Plans Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
               {PLANS.filter(p => p.id !== 'free').map((plan) => (
@@ -427,8 +354,21 @@ export default function Upgrade() {
                         <span className="text-blue-600 font-display font-black text-2xl tracking-tighter">₦{plan.cost.toLocaleString()}</span>
                         <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">/ Lifetime</span>
                       </div>
+
+                      {/* Earnings Summary Bento Badge */}
+                      <div className="mt-3 grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <div className="text-left">
+                          <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">Daily Limit</div>
+                          <div className="text-xs font-black text-slate-800">{plan.dailyLimit}</div>
+                        </div>
+                        <div className="text-left border-l border-slate-200 pl-2.5">
+                          <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">Total Cap</div>
+                          <div className="text-xs font-black text-blue-600">{plan.maxEarnings}</div>
+                        </div>
+                      </div>
+
                       {plan.description && (
-                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-2 text-left bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-3 text-left bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
                           {plan.description}
                         </p>
                       )}

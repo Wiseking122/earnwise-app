@@ -169,6 +169,42 @@
   <body>
     <div id="root"></div>
     
+    <!-- Adsterra 160x300 Desktop Sidebar Banner -->
+    <style>
+      #adsterra-desktop-sidebar {
+        display: none;
+      }
+      @media (min-width: 1280px) {
+        #adsterra-desktop-sidebar {
+          display: block !important;
+          position: fixed;
+          top: 100px;
+          right: 24px;
+          z-index: 50;
+          background: #020617;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          padding: 10px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+          width: 180px;
+          text-align: center;
+        }
+      }
+    </style>
+    <div id="adsterra-desktop-sidebar">
+      <div style="font-size: 8px; color: #64748b; text-align: center; margin-bottom: 6px; font-weight: 900; letter-spacing: 0.15em; text-transform: uppercase;">Sponsored</div>
+      <script>
+        atOptions = {
+          'key' : 'dde86cd45f7bfcfcc96137effdc5cb39',
+          'format' : 'iframe',
+          'height' : 300,
+          'width' : 160,
+          'params' : {}
+        };
+      </script>
+      <script src="https://sturgeonvelocity.com/dde86cd45f7bfcfcc96137effdc5cb39/invoke.js"></script>
+    </div>
+    
     <script type="module" src="/src/main.tsx"></script>
     <script>
       window.addEventListener('unhandledrejection', function(e) {
