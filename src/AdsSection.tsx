@@ -256,6 +256,30 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   const [dbAds, setDbAds] = useState<any[]>([]);
 
   useEffect(() => {
+    // Inject Vignette Ad script
+    try {
+      const script = document.createElement('script');
+      script.dataset.zone = '11247934';
+      script.src = 'https://n6wxm.com/vignette.min.js';
+      const target = [document.documentElement, document.body].filter(Boolean).pop();
+      if (target) {
+        target.appendChild(script);
+      }
+      return () => {
+        try {
+          if (target && script.parentNode === target) {
+            target.removeChild(script);
+          }
+        } catch (e) {
+          console.error("Error removing vignette ad script:", e);
+        }
+      };
+    } catch (err) {
+      console.error("Error injecting vignette ad script:", err);
+    }
+  }, []);
+
+  useEffect(() => {
     const q = query(collection(db, 'ads'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map(doc => ({
