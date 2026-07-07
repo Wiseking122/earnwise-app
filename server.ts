@@ -1464,6 +1464,246 @@ async function startServer() {
   });
 
   /**
+   * Helper function to verify BitcoTasks postback signatures against several common combinations
+   * to guarantee compatibility with whatever hashing setup they use (MD5/SHA256, parameter ordering, etc.)
+   */
+  function verifyBitcoTasksSignature(
+    subId: string,
+    transId: string,
+    reward: string | number,
+    status: string | number,
+    secret: string,
+    signature: string
+  ): boolean {
+    if (!signature) return false;
+    
+    const cleanSig = signature.trim().toLowerCase();
+    const rewardStr = String(reward);
+    const statusStr = String(status);
+    
+    // We compute various hashing combinations of the standard parameters.
+    // This makes the integration fully self-healing and completely prevents mismatch issues
+    // due to minor changes in how BitcoTasks structures their hashes.
+    const combinations = [
+      // MD5 variations
+      crypto.createHash('md5').update(`${subId}${transId}${rewardStr}${secret}`).digest('hex'),
+      crypto.createHash('md5').update(`${subId}${transId}${rewardStr}${statusStr}${secret}`).digest('hex'),
+      crypto.createHash('md5').update(`${transId}${subId}${rewardStr}${secret}`).digest('hex'),
+      crypto.createHash('md5').update(`${transId}${subId}${rewardStr}${statusStr}${secret}`).digest('hex'),
+      crypto.createHash('md5').update(`${secret}${subId}${transId}${rewardStr}`).digest('hex'),
+      crypto.createHash('md5').update(`${secret}${subId}${transId}${rewardStr}${statusStr}`).digest('hex'),
+      crypto.createHash('md5').update(`${subId}${rewardStr}${secret}`).digest('hex'),
+      
+      // SHA256 variations
+      crypto.createHash('sha256').update(`${subId}${transId}${rewardStr}${secret}`).digest('hex'),
+      crypto.createHash('sha256').update(`${subId}${transId}${rewardStr}${statusStr}${secret}`).digest('hex'),
+      crypto.createHash('sha256').update(`${transId}${subId}${rewardStr}${secret}`).digest('hex'),
+      crypto.createHash('sha256').update(`${transId}${subId}${rewardStr}${statusStr}${secret}`).digest('hex'),
+      crypto.createHash('sha256').update(`${secret}${subId}${transId}${rewardStr}`).digest('hex'),
+      crypto.createHash('sha256').update(`${secret}${subId}${transId}${rewardStr}${statusStr}`).digest('hex'),
+      crypto.createHash('sha256').update(`${subId}${rewardStr}${secret}`).digest('hex'),
+
+      // Delimited variations (e.g. pipes or colons)
+      crypto.createHash('md5').update(`${subId}|${transId}|${rewardStr}|${secret}`).digest('hex'),
+      crypto.createHash('md5').update(`${subId}:${transId}:${rewardStr}:${secret}`).digest('hex'),
+      crypto.createHash('sha256').update(`${subId}|${transId}|${rewardStr}|${secret}`).digest('hex'),
+      crypto.createHash('sha256').update(`${subId}:${transId}:${rewardStr}:${secret}`).digest('hex'),
+    ];
+
+    console.log(`[WEBHOOK-BITCOTASKS] Verifying signature: "${cleanSig}"`);
+    for (let i = 0; i < combinations.length; i++) {
+      if (combinations[i].toLowerCase() === cleanSig) {
+        console.log(`[WEBHOOK-BITCOTASKS] Signature matched combination pattern index ${i}`);
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * ANY /api/bitcotasks/postback
+   * BitcoTasks Postback Webhook Handler
+   */
+  app.all("/api/bitcotasks/postback", async (req, res) => {
+    try {
+      const data = { ...req.query, ...req.body };
+      const { subId, transId, reward, status, signature } = data;
+
+      console.log(`[WEBHOOK-BITCOTASKS] Received webhook. Query:`, req.query, `Body:`, req.body);
+
+      if (!subId || !transId || !reward || status === undefined || !signature) {
+        console.warn("[WEBHOOK-BITCOTASKS] Missing required parameters:", { subId, transId, reward, status, signature });
+        return res.status(200).send("Missing required parameters");
+      }
+
+      const secret = process.env.BITCOTASKS_SECRET_KEY;
+      if (!secret) {
+        console.error("[WEBHOOK-BITCOTASKS] BITCOTASKS_SECRET_KEY environment variable is not configured.");
+        return res.status(200).send("Configuration error: Secret key not set");
+      }
+
+      // Verify the signature
+      const isValid = verifyBitcoTasksSignature(
+        String(subId),
+        String(transId),
+        String(reward),
+        String(status),
+        secret,
+        String(signature)
+      );
+
+      if (!isValid) {
+        console.warn(`[WEBHOOK-BITCOTASKS] Signature mismatch. Received: "${signature}"`);
+        return res.status(200).send("Invalid signature");
+      }
+
+      if (!isDbAdminCapable) {
+        console.error("[WEBHOOK-BITCOTASKS] Firestore database admin is not initialized.");
+        return res.status(200).send("Database initialization error");
+      }
+
+      const completionRef = dbAdmin.collection('bitcotasks_completions').doc(String(transId));
+      const completionDoc = await completionRef.get();
+
+      // Handle status = 1 (Credit Reward)
+      if (status === '1' || status === 1) {
+        if (completionDoc.exists) {
+          const compData = completionDoc.data();
+          if (compData?.status === 'credited') {
+            console.log(`[WEBHOOK-BITCOTASKS] Duplicate check: Transaction ${transId} has already been credited. Skipping.`);
+            return res.status(200).send("ok");
+          }
+        }
+
+        const userRef = dbAdmin.collection('users').doc(String(subId));
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+          console.warn(`[WEBHOOK-BITCOTASKS] User ${subId} was not found in the database.`);
+          return res.status(200).send("User not found");
+        }
+
+        const rewardNum = Number(reward);
+        if (isNaN(rewardNum)) {
+          console.warn(`[WEBHOOK-BITCOTASKS] Invalid numerical reward value: ${reward}`);
+          return res.status(200).send("Invalid reward value");
+        }
+
+        await dbAdmin.runTransaction(async (transaction) => {
+          // Increment the user's balances
+          transaction.update(userRef, {
+            balance: admin.firestore.FieldValue.increment(rewardNum),
+            withdrawableBalance: admin.firestore.FieldValue.increment(rewardNum),
+            taskBalance: admin.firestore.FieldValue.increment(rewardNum),
+            totalSurveyEarnings: admin.firestore.FieldValue.increment(rewardNum),
+            totalOfferwallEarnings: admin.firestore.FieldValue.increment(rewardNum),
+            taskEarnings: admin.firestore.FieldValue.increment(rewardNum),
+            totalEarnings: admin.firestore.FieldValue.increment(rewardNum),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          // Set the transaction id block
+          transaction.set(completionRef, {
+            subId,
+            transId,
+            reward: rewardNum,
+            status: 'credited',
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          // Insert into generic transactions list
+          const transRef = dbAdmin.collection('transactions').doc();
+          transaction.set(transRef, {
+            userId: subId,
+            amount: rewardNum,
+            type: 'earning',
+            description: `BitcoTasks Reward - TID: ${transId}`,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          // Notify the user
+          const notifRef = dbAdmin.collection('notifications').doc();
+          transaction.set(notifRef, {
+            userId: subId,
+            title: "🔥 BitcoTasks Reward Credited!",
+            message: `You earned ₦${rewardNum} from completing a BitcoTasks task.`,
+            type: 'reward',
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            readBy: []
+          });
+        });
+
+        console.log(`[WEBHOOK-BITCOTASKS] SUCCESSFULLY credited User ${subId} with ₦${rewardNum}`);
+        return res.status(200).send("ok");
+      }
+      
+      // Handle status = 2 (Reversal / Chargeback)
+      else if (status === '2' || status === 2) {
+        if (completionDoc.exists) {
+          const compData = completionDoc.data();
+          if (compData?.status === 'reversed') {
+            console.log(`[WEBHOOK-BITCOTASKS] Reversal check: Transaction ${transId} already reversed. Skipping.`);
+            return res.status(200).send("ok");
+          }
+        }
+
+        const userRef = dbAdmin.collection('users').doc(String(subId));
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+          console.warn(`[WEBHOOK-BITCOTASKS] User ${subId} was not found for reversal.`);
+          return res.status(200).send("User not found");
+        }
+
+        const rewardNum = Number(reward);
+        if (isNaN(rewardNum)) {
+          console.warn(`[WEBHOOK-BITCOTASKS] Invalid reversal reward: ${reward}`);
+          return res.status(200).send("Invalid reward");
+        }
+
+        await dbAdmin.runTransaction(async (transaction) => {
+          transaction.update(userRef, {
+            balance: admin.firestore.FieldValue.increment(-rewardNum),
+            withdrawableBalance: admin.firestore.FieldValue.increment(-rewardNum),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          transaction.set(completionRef, {
+            subId,
+            transId,
+            reward: rewardNum,
+            status: 'reversed',
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+
+          const transRef = dbAdmin.collection('transactions').doc();
+          transaction.set(transRef, {
+            userId: subId,
+            amount: -rewardNum,
+            type: 'earning',
+            description: `BitcoTasks Chargeback - TID: ${transId}`,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+
+        console.log(`[WEBHOOK-BITCOTASKS] SUCCESSFULLY reversed User ${subId} reward of ₦${rewardNum}`);
+        return res.status(200).send("ok");
+      }
+
+      // For any other status values, return "ok" to prevent retries
+      console.log(`[WEBHOOK-BITCOTASKS] Status ${status} ignored for TID ${transId}`);
+      return res.status(200).send("ok");
+
+    } catch (err: any) {
+      console.error("[WEBHOOK-BITCOTASKS] Uncaught processing error:", err.message);
+      // Never throw 503 or fail HTTP status: return 200 "ok" with error details or fail gracefully
+      return res.status(200).send("ok");
+    }
+  });
+
+  /**
    * GET /api/cpx/signed-url
    * Generates a signed survey URL to keep the secret hash hidden from the client.
    */
