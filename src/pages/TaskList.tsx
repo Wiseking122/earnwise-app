@@ -26,6 +26,7 @@ import { MonetagBanner } from '../components/MonetagBanner';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import AdsSection from '../AdsSection';
 import { CpxOfferwall } from '../components/CpxOfferwall';
+import { BitcoTasksWall } from '../components/BitcoTasksWall';
 import VideoAdsSection from '../components/VideoAdsSection';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { MaintenanceModal } from '../components/MaintenanceModal';
@@ -252,6 +253,7 @@ export default function TaskList() {
           {activeCategory === 'survey' && user && (
             <div className="space-y-6">
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
+               <BitcoTasksWall userId={user.uid} />
 
                <Link 
                  to="/submit-survey"

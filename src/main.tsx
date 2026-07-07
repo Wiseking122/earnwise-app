@@ -3,6 +3,33 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Intercept console.error to filter out benign cross-origin script errors and Firestore connection warnings
+const originalConsoleError = console.error;
+console.error = function (...args) {
+  try {
+    const message = args.map(arg => {
+      if (arg instanceof Error) {
+        return arg.stack || arg.message;
+      }
+      return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+    }).join(' ');
+
+    if (
+      message.toLowerCase().includes('script error') ||
+      message.includes('Could not reach Cloud Firestore backend') ||
+      message.includes("Backend didn't respond within 10 seconds") ||
+      message.includes('@firebase/firestore') ||
+      message.includes('Firestore (12.13.0)')
+    ) {
+      console.warn('[Filtered Log]:', ...args);
+      return;
+    }
+  } catch (e) {
+    // Avoid circular or crash errors inside the interceptor
+  }
+  originalConsoleError.apply(console, args);
+};
+
 // Silence benign cross-origin script errors which are common with third-party iframe providers
 window.addEventListener('error', (event) => {
   if (event.message === 'Script error.' || event.message?.includes('Script error') || !event.filename) {
@@ -15,7 +42,7 @@ window.addEventListener('error', (event) => {
 
 window.addEventListener('unhandledrejection', (event) => {
   const msg = event.reason?.message || '';
-  if (msg === 'Script error.' || msg.includes('Script error')) {
+  if (msg === 'Script error.' || msg.includes('Script error') || msg.includes('Could not reach Cloud Firestore backend')) {
     event.preventDefault();
     event.stopPropagation();
     console.warn('Silenced cross-origin third-party unhandled rejection.');
