@@ -1,190 +1,84 @@
-import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { getApiUrl } from '../lib/config';
-import { getOrGenerateDeviceFingerprint } from '../lib/security';
-import { motion, AnimatePresence } from 'motion/react';
-import { Play, Clock, Coins, Tv, CheckCircle, X, Sparkles, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
+import { ShieldCheck, Sparkles, Loader2, ExternalLink, Flame, Layers, AlertCircle } from 'lucide-react';
 
-declare global {
-  interface Window {
-    fluidPlayer: any;
-  }
+interface VideoAdsSectionProps {
+  userId?: string;
 }
 
-interface VideoTask {
-  id: string;
-  title: string;
-  reward: number; // in Points
-  duration: string;
-  seconds: number;
-  subtitle: string;
-}
-
-const VIDEO_TASKS: VideoTask[] = [
-  {
-    id: 'video-1',
-    title: 'Premium Video Ad #1',
-    reward: 50,
-    duration: '30 Sec',
-    seconds: 30,
-    subtitle: 'High-yield sponsor video campaign'
-  },
-  {
-    id: 'video-2',
-    title: 'Golden Partner Video',
-    reward: 80,
-    duration: '45 Sec',
-    seconds: 45,
-    subtitle: 'Earnwise VIP premium rewards'
-  },
-  {
-    id: 'video-3',
-    title: 'TikTok Page Promoter',
-    reward: 30,
-    duration: '15 Sec',
-    seconds: 15,
-    subtitle: 'Creator trending viral video boost'
-  },
-  {
-    id: 'video-4',
-    title: 'Global High-Yield Ad',
-    reward: 100,
-    duration: '60 Sec',
-    seconds: 60,
-    subtitle: 'Exclusive worldwide network offer'
-  }
-];
-
-export default function VideoAdsSection() {
-  const { user } = useAuth();
-  const [pointsToday, setPointsToday] = useState<number>(() => {
-    const saved = localStorage.getItem('earnwise_video_points_today');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-
-  const [activeAd, setActiveAd] = useState<VideoTask | null>(null);
-  const [showOverlay, setShowOverlay] = useState<boolean>(false);
-  const [showSuccess, setShowSuccess] = useState<boolean>(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const playerInstance = useRef<any>(null);
+export default function VideoAdsSection({ userId = '' }: VideoAdsSectionProps) {
+  const [scriptLoaded, setScriptLoaded] = useState<boolean>(false);
+  const [isBlocked, setIsBlocked] = useState<boolean>(false);
 
   useEffect(() => {
-    localStorage.setItem('earnwise_video_points_today', pointsToday.toString());
-  }, [pointsToday]);
+    console.log(`[QuartzFiles] Initializing Offer Locker for User ID: "${userId}"`);
+    
+    // Set the global lock flag to false as required by the script
+    const win = window as any;
+    win.lck = false;
 
-  const rewardUser = async (userId: string | number, taskId: string) => {
-    console.log(`[REWARD] Crediting user ${userId} for task ${taskId}`);
-    try {
-      const deviceFingerprint = getOrGenerateDeviceFingerprint();
-      // Placeholder fetch request to secure backend endpoint
-      const response = await fetch(getApiUrl('/api/rewards/verify'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, taskId, type: 'video_ad', deviceFingerprint }),
-      });
-      const data = await response.json();
-      console.log('[REWARD_RESPONSE]', data);
-    } catch (err) {
-      console.error('[REWARD_ERROR]', err);
-    }
-  };
+    // Create the script element with the specific user ID tracking
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = `https://quartzfiles.com/script_include.php?id=1903903&tracking_id=${encodeURIComponent(userId)}`;
+    script.async = true;
+    script.id = 'quartz-locker-script';
+    
+    script.onload = () => {
+      console.log("[QuartzFiles] Offer Locker script loaded successfully. win.lck status:", win.lck);
+      setScriptLoaded(true);
+    };
 
-  const handleStartWatching = (ad: VideoTask) => {
-    setActiveAd(ad);
-    setShowOverlay(true);
-    setShowSuccess(false);
-  };
+    script.onerror = (err) => {
+      console.error("[QuartzFiles] Failed to load Offer Locker script (possibly blocked by Adblocker):", err);
+    };
 
-  useEffect(() => {
-    if (showOverlay && activeAd && videoRef.current && window.fluidPlayer) {
-      const userId = user?.uid || 'guest_user';
-      const vastBaseUrl = 'https://runative-syndicate.com/do2/a76028f599d54130a11dff96118b3b3f/vast?';
-      let dynamicVastUrl = `${vastBaseUrl}&subid=${userId}`;
-      
-      // Use the custom premium ad link provided by the user for premium and golden partner campaigns
-      if (activeAd.id === 'video-2' || activeAd.id === 'video-4') {
-        dynamicVastUrl = 'https://butterygrandmother.com/dmmCFyz.dtGkNnv/ZZGiU-/Pemm/9juwZKUclEkiPmTOcFxZOGTQY/wwNMTvMytQNMzXE/5JNRj/Ag1YNkwu';
-      }
+    document.body.appendChild(script);
 
-      // Initialize Fluid Player
-      try {
-        playerInstance.current = window.fluidPlayer(videoRef.current, {
-          layoutControls: {
-            fillToContainer: true,
-            primaryColor: '#3b82f6',
-            autoPlay: true,
-            mute: true, // Muting initially is highly recommended to guarantee autoplay works flawlessly
-            allowTheatre: false,
-            playPauseAnimation: true,
-            playbackRateControl: false,
-            allowDownload: false,
-            logo: {
-              imageUrl: null,
-              position: 'top left',
-              clickUrl: null,
-              opacity: 1
-            },
-            controlBar: {
-              autoHide: true,
-              autoHideTimeout: 3,
-              animated: true
-            }
-          },
-          vastOptions: {
-            adList: [
-              {
-                roll: 'preRoll',
-                vastTag: dynamicVastUrl
-              }
-            ],
-            adFinishedCallback: () => {
-              console.log('[VAST] Ad Completed');
-              rewardUser(userId, activeAd.id);
-              setPointsToday(prev => prev + activeAd.reward);
-              setShowOverlay(false);
-              setShowSuccess(true);
-            },
-            adErrorCallback: (error: any) => {
-              console.error('[VAST] Ad Error:', error);
-              // Handle error gracefully; log it but don't crash instantly on minor warnings
-              // If the ad completely fails to load after 8 seconds, we allow closing.
-            }
+    // Timeout check to verify if the locker was blocked / lck is still false (Standard Adblock detection)
+    const checkTimeout = setTimeout(() => {
+      if (!win.lck) {
+        console.warn("[QuartzFiles] Adblock or script block detected! (win.lck is false)");
+        setIsBlocked(true);
+
+        // Safeguard to prevent locking developers out of local development or the AI Studio preview environment
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1');
+        const isAiStudio = window.location.hostname.includes('run.app') || window.location.hostname.includes('aistudio');
+
+        if (!isLocalhost && !isAiStudio) {
+          console.log("[QuartzFiles] Redirecting to helper page...");
+          try {
+            win.top.location = 'https://quartzfiles.com/help/ablk.php?lkt=4';
+          } catch (e) {
+            win.location.href = 'https://quartzfiles.com/help/ablk.php?lkt=4';
           }
-        });
-      } catch (err) {
-        console.error('[FLUID_PLAYER_INIT_ERROR]', err);
-        setShowOverlay(false);
+        } else {
+          console.log("[QuartzFiles] Redirection bypassed on Development/AI Studio host to allow seamless developer testing.");
+        }
+      } else {
+        console.log("[QuartzFiles] Verification succeeded: win.lck is true.");
       }
-    }
+    }, 2500);
 
     return () => {
-      // Cleanup player reference if component unmounts or overlay closes
-      if (playerInstance.current) {
-        try {
-          if (typeof playerInstance.current.destroy === 'function') {
-            playerInstance.current.destroy();
-          }
-        } catch (e) {
-          console.warn('[FLUID] Cleanup destroy failed:', e);
-        }
-        playerInstance.current = null;
+      console.log("[QuartzFiles] Cleaning up Offer Locker script and timeout.");
+      clearTimeout(checkTimeout);
+      const existingScript = document.getElementById('quartz-locker-script');
+      if (existingScript) {
+        document.body.removeChild(existingScript);
       }
     };
-  }, [showOverlay, activeAd, user]);
+  }, [userId]);
 
-  const handleClosePlayer = () => {
-    setShowOverlay(false);
-    setActiveAd(null);
-  };
-
-  const handleCloseSuccess = () => {
-    setShowSuccess(false);
-    setActiveAd(null);
+  const handleLaunchLocker = () => {
+    console.log("[QuartzFiles] Opening direct standalone offer wall...");
+    const url = `/api/quartz-offerwall?userId=${encodeURIComponent(userId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
-    <div className="space-y-6 relative z-10">
-      {/* Top Points Balance Card */}
+    <div className="space-y-6 relative z-10" id="offerwall-section">
+      {/* Top Banner Card */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -193,189 +87,93 @@ export default function VideoAdsSection() {
         <div className="absolute top-0 right-0 w-44 h-44 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%)' }} />
         <div className="flex justify-between items-center relative z-10">
           <div className="space-y-2">
-            <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none flex items-center gap-1.5">
-              <Sparkles size={12} className="text-blue-400 animate-spin-slow" />
-              WATCH & MULTIPLY
+            <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest leading-none flex items-center gap-1.5">
+              <Sparkles size={12} className="text-amber-400 animate-pulse" />
+              PREMIUM SPONSOR
             </span>
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-tight">
-              Video Points Earned Today
+            <h2 className="text-xl font-display font-black uppercase tracking-tight italic">
+              Premium Offer Wall
             </h2>
-            <div className="flex items-baseline gap-2 mt-1">
-              <p className="text-3xl font-display font-black tracking-tighter text-white">
-                +{pointsToday.toLocaleString()} <span className="text-sm font-black text-blue-400">PTS</span>
-              </p>
-            </div>
+            <p className="text-slate-400 text-xs">
+              Complete quick surveys, app downloads, and interactive tasks to unlock premium rewards.
+            </p>
           </div>
-          <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center border border-blue-500/20 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.2)]">
-            <Tv size={24} className="animate-pulse" />
+          <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+            <Layers size={24} className="animate-pulse" />
           </div>
         </div>
       </motion.div>
 
-      {/* Video Tasks List */}
-      <div className="space-y-4">
-        {VIDEO_TASKS.map((ad) => (
-          <motion.div
-            key={ad.id}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="group relative overflow-hidden bg-white border border-slate-100 p-5 rounded-[2.2rem] shadow-sm hover:shadow-xl hover:border-emerald-100 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-950 rounded-2xl flex items-center justify-center text-white border border-slate-900 transition-transform group-hover:scale-105 duration-300">
-                <Play size={20} className="fill-white" />
-              </div>
-              <div className="space-y-1">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block leading-none">
-                  {ad.subtitle}
-                </span>
-                <h4 className="font-display font-black text-slate-900 text-base uppercase leading-tight italic">
-                  {ad.title}
-                </h4>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
-                    <Clock size={10} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter">{ad.duration}</span>
-                  </div>
-                  <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100 font-bold">
-                    <Coins size={10} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter">+{ad.reward} Points</span>
-                  </div>
-                </div>
+      {/* Main Empty Interactive Area with Script Locker Display */}
+      <motion.div 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white border border-slate-100 rounded-[2.5rem] p-8 md:p-12 text-center shadow-sm relative overflow-hidden"
+      >
+        {/* Background decorative pattern */}
+        <div className="absolute -top-10 -left-10 opacity-5">
+          <Flame className="w-32 h-32 text-amber-500 rotate-12" />
+        </div>
+
+        <div className="max-w-md mx-auto space-y-6">
+          {/* Visual Status Indicator */}
+          <div className="flex items-center justify-center gap-2 mx-auto px-4 py-1.5 bg-slate-100 rounded-full w-fit border border-slate-200">
+            {scriptLoaded ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">Locker System Active</span>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">Connecting Securely...</span>
+              </>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-display font-black text-2xl text-slate-900 uppercase italic tracking-tight">
+              Premium Offer Locker
+            </h3>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              Our advanced premium offers locker matches high-paying campaign tasks to your region. Complete any simple task to unlock and receive instant wallet coins.
+            </p>
+          </div>
+
+          {/* AdBlock Detected Banner */}
+          {isBlocked && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 text-xs text-left flex gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+              <div>
+                <span className="font-bold block text-rose-800 mb-0.5">⚠️ AdBlocker Detected</span>
+                Our security verification system noticed that scripts are being blocked. Please disable AdBlocker to view offers correctly and ensure reward tracking works.
               </div>
             </div>
+          )}
 
+          {/* Action button to trigger/re-launch locker */}
+          <div className="pt-2">
             <button
-              onClick={() => handleStartWatching(ad)}
-              className="w-full md:w-auto bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white font-display font-black text-xs uppercase tracking-widest py-3.5 px-6 rounded-2xl flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/10 transition-all"
+              onClick={handleLaunchLocker}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-display font-bold text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.03] active:scale-[0.98]"
             >
-              <Play size={14} className="fill-white" />
-              Watch Now
+              <ExternalLink className="w-4 h-4" />
+              Access Offer Wall
             </button>
-          </motion.div>
-        ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Security Guidance Note */}
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-3xl flex gap-3 text-left">
+        <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+        <div>
+          <span className="font-bold text-[10px] text-slate-700 block uppercase tracking-wider">🔒 Auto-Credit Protection</span>
+          <p className="text-[9px] text-slate-500 uppercase tracking-wide leading-relaxed mt-0.5">
+            Do not refresh the browser or disconnect your internet during offer completion. Our verified postback script is encrypted and automatically synchronizes with your wallet balance once completed.
+          </p>
+        </div>
       </div>
-
-      {/* Bottom Guideline Note */}
-      <div className="bg-slate-50 border border-slate-200 p-4 rounded-3xl text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-        ⚠️ Make sure to watch the entire video to secure your points reward.
-      </div>
-
-      {/* Real VAST Video Player Overlay */}
-      <AnimatePresence>
-        {showOverlay && activeAd && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950"
-          >
-            <div className="relative w-full h-full flex flex-col bg-slate-950">
-              {/* Header */}
-              <div className="p-6 flex justify-between items-center bg-slate-900 border-b border-slate-800">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] block">
-                    SPONSOR AD CONTENT
-                  </span>
-                  <h3 className="text-white font-display font-black text-lg uppercase tracking-tight italic">
-                    {activeAd.title}
-                  </h3>
-                </div>
-                <button
-                  onClick={handleClosePlayer}
-                  className="w-10 h-10 rounded-full bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition border border-white/5"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Player Area */}
-              <div className="flex-1 flex items-center justify-center p-4">
-                <div className="w-full max-w-2xl aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/5 relative">
-                  <video 
-                    ref={videoRef}
-                    id="vast_video_player"
-                    playsInline
-                    muted
-                    className="w-full h-full"
-                    src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
-                  />
-                  
-                  {/* Overlay loading message */}
-                  {!playerInstance.current && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-center p-6 space-y-4">
-                       <Loader2 size={40} className="text-blue-500 animate-spin" />
-                       <div className="space-y-1">
-                         <p className="text-xs font-display font-black text-white uppercase tracking-widest">Initialising Secure Ad Stream</p>
-                         <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wide">Contacting Runative Network...</p>
-                       </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer Warning */}
-              <div className="p-8 text-center bg-slate-900/50">
-                <div className="max-w-xs mx-auto space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full">
-                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                    <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">Do Not Close Player</span>
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-wider">
-                    Points will only be credited after the advertisement finishes processing completely.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* SUCCESS MODAL TRIGGER */}
-      <AnimatePresence>
-        {showSuccess && activeAd && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 max-w-sm w-full text-center space-y-6 relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%)' }} />
-              
-              <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto shadow-2xl relative">
-                <CheckCircle size={40} />
-                <motion.div
-                   animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.2, 0.5] }}
-                   transition={{ repeat: Infinity, duration: 2 }}
-                   className="absolute inset-0 bg-emerald-500 rounded-3xl -z-10"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-white font-display font-black text-2xl uppercase tracking-tighter italic">
-                  Points Secured!
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Congratulations! You've successfully completed the video task and earned <strong className="text-emerald-400">+{activeAd.reward} PTS</strong>.
-                </p>
-              </div>
-
-              <button
-                onClick={handleCloseSuccess}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.95] text-white font-display font-black text-sm uppercase tracking-widest py-4 px-6 rounded-2xl shadow-xl shadow-emerald-500/20 transition-all"
-              >
-                Claim Rewards
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

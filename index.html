@@ -1,6 +1,53 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Global High-Priority Script Error and Rejection Interceptor (Executed First)
+      (function() {
+        function silenceEvent(e) {
+          const msg = e.message || (e.reason && e.reason.message) || '';
+          const filename = e.filename || '';
+          
+          const isScriptError = msg === 'Script error.' || msg.toLowerCase().includes('script error');
+          const isAdUrl = filename && (
+            filename.includes('vignette') || 
+            filename.includes('n6wxm') || 
+            filename.includes('sturgeonvelocity') ||
+            filename.includes('adsterra') || 
+            filename.includes('monetag') ||
+            filename.includes('dde86cd45f7bfcfcc96137effdc5cb39') ||
+            filename.includes('676b0b6eb3c82b512b4b9ca2349ac3e7') ||
+            filename.includes('6ed51d6a0308b91327d83ade173f1aa5') ||
+            filename.includes('rm358') ||
+            filename.includes('nap5k') ||
+            filename.includes('quartzfiles')
+          );
+
+          if (isScriptError || isAdUrl || msg.includes('Failed to fetch') || msg.includes('Could not reach Cloud Firestore')) {
+            try {
+              e.preventDefault();
+              e.stopPropagation();
+            } catch (err) {}
+            return true;
+          }
+          return false;
+        }
+
+        window.addEventListener('error', silenceEvent, true);
+        window.addEventListener('unhandledrejection', silenceEvent, true);
+
+        const originalOnError = window.onerror;
+        window.onerror = function(message, source, lineno, colno, error) {
+          if (String(message).toLowerCase().includes('script error') || (source && source.includes('sturgeonvelocity'))) {
+            return true; // prevent default behavior
+          }
+          if (originalOnError) {
+            return originalOnError.apply(this, arguments);
+          }
+          return false;
+        };
+      })();
+    </script>
     <script>(function(s){s.dataset.zone='11243165',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
     <script src="https://telegram.org/js/telegram-web-app.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.css" type="text/css"/>
@@ -209,36 +256,6 @@
     
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      window.addEventListener('unhandledrejection', function(e) {
-        if (e.reason && e.reason.message === 'Failed to fetch') {
-          console.warn('Suppressed Failed to fetch unhandled rejection');
-          e.preventDefault();
-        }
-      });
-
-      window.addEventListener('error', function(e) {
-        // Suppress browser-masked cross-origin "Script error." from ad scripts
-        const isScriptError = e.message === 'Script error.';
-        const isAdUrl = e.filename && (
-          e.filename.includes('vignette') || 
-          e.filename.includes('n6wxm') || 
-          e.filename.includes('sturgeonvelocity') ||
-          e.filename.includes('adsterra') || 
-          e.filename.includes('monetag') ||
-          e.filename.includes('dde86cd45f7bfcfcc96137effdc5cb39') ||
-          e.filename.includes('676b0b6eb3c82b512b4b9ca2349ac3e7') ||
-          e.filename.includes('6ed51d6a0308b91327d83ade173f1aa5') ||
-          e.filename.includes('rm358') ||
-          e.filename.includes('nap5k')
-        );
-        if (isScriptError || isAdUrl) {
-          // Silent suppression to avoid cluttering reporting tools
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-      }, true);
-
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           const sw_version_flag = 'sw_force_clean_v6';

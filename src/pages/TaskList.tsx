@@ -33,9 +33,8 @@ import { MaintenanceModal } from '../components/MaintenanceModal';
 
 const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string, subtext?: string }[] = [
   { id: 'all', label: 'All Jobs', icon: SlidersHorizontal, color: 'bg-slate-900' },
-  { id: 'survey', label: 'Surveys', icon: Search, color: 'bg-orange-500' },
+  { id: 'survey', label: 'Surveys and Offer', icon: Search, color: 'bg-orange-500' },
   { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500' },
-  { id: 'video', label: 'WATCH VIDEOS', icon: Video, color: 'bg-blue-500', subtext: 'WATCH & EARN' },
   { id: 'referral', label: 'Banner Ads', icon: ShieldCheck, color: 'bg-purple-500' },
 ];
 
@@ -111,7 +110,6 @@ export default function TaskList() {
   const taskCounts = {
     survey: 'LIVE', 
     ad: 'LIVE', 
-    video: tasks.filter(t => t.type === 'video').length,
     referral: tasks.filter(t => t.type === 'referral').length,
   };
 
@@ -249,9 +247,10 @@ export default function TaskList() {
         {/* Task List */}
         <div className="space-y-3.5">
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
-          {activeCategory === 'video' && <VideoAdsSection />}
           {activeCategory === 'survey' && user && (
             <div className="space-y-6">
+               <VideoAdsSection userId={user.uid} />
+               
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
                <BitcoTasksWall userId={user.uid} />
 
@@ -264,8 +263,8 @@ export default function TaskList() {
                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white mb-1">
                      <ImageIcon size={24} className="group-hover:rotate-12 transition-transform duration-500" />
                    </div>
-                   <h3 className="text-xl font-display font-black text-white uppercase italic tracking-tight">Submit Survey Proof</h3>
-                   <p className="text-white/80 text-[10px] font-black uppercase tracking-widest leading-none">Complete surveys & upload proof to earn Wise Coins</p>
+                   <h3 className="text-xl font-display font-black text-white uppercase italic tracking-tight">Submit Survey / Offer Proof</h3>
+                   <p className="text-white/80 text-[10px] font-black uppercase tracking-widest leading-none">Complete surveys & premium offers, then upload screenshot proof to earn Wise Coins</p>
                  </div>
                </Link>
             </div>

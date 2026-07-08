@@ -1727,6 +1727,135 @@ async function startServer() {
   });
 
   /**
+   * GET /api/quartz-offerwall
+   * Renders a dedicated standalone HTML page for the QuartzFiles Offer Locker
+   * to bypass React lifecycle, iframe sandbox, and cross-origin redirection blocks.
+   */
+  app.get("/api/quartz-offerwall", (req, res) => {
+    const userId = String(req.query.userId || '').trim();
+    
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earnwise Premium Offerwall</title>
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background-color: #0b1329;
+            border: 1px solid #1e293b;
+            border-radius: 24px;
+            padding: 40px 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            box-sizing: border-box;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 0 12px 0;
+            text-transform: uppercase;
+            letter-spacing: -0.025em;
+            color: #f59e0b;
+        }
+        p {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin: 0 0 24px 0;
+        }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #1e293b;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #38bdf8;
+            margin-bottom: 10px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">💎</div>
+        <h1>Premium Offer Wall</h1>
+        <p>Loading your secure high-paying campaign locker...</p>
+        <div class="status">
+            <span class="status-dot"></span>
+            Locker system loading
+        </div>
+    </div>
+
+    <!-- QuartzFiles script block requested by user -->
+    <script type="text/javascript">var lck = false;</script>
+    <script type="text/javascript" src="https://quartzfiles.com/script_include.php?id=1903903&tracking_id=${encodeURIComponent(userId)}"></script>
+    <script type="text/javascript">
+        setTimeout(function() {
+            if (!window.lck && !lck) {
+                console.log("Locker script blocked or failed. Redirecting to backup/adblock helper...");
+                // Prevent locking out local preview environments from testing
+                const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1') || window.location.hostname.includes('run.app');
+                if (!isLocal) {
+                    top.location = 'https://quartzfiles.com/help/ablk.php?lkt=4';
+                } else {
+                    console.log("Bypassed backup helper redirection in development/preview mode.");
+                    document.querySelector('p').innerHTML = "Script blocked by an AdBlocker. Please disable your AdBlocker to load the offers correctly.";
+                    document.querySelector('.status').style.color = '#ef4444';
+                    document.querySelector('.status-dot').style.backgroundColor = '#ef4444';
+                    document.querySelector('.status-dot').style.boxShadow = '0 0 8px #ef4444';
+                    document.querySelector('.status').childNodes[2].textContent = "Blocked by AdBlocker";
+                }
+            } else {
+                console.log("Locker loaded successfully!");
+                document.querySelector('p').innerHTML = "The Premium Offer Wall has loaded successfully. If the overlay is not visible, please click anywhere on the page to display it.";
+                document.querySelector('.status').childNodes[2].textContent = "Locker system active";
+            }
+        }, 1500);
+    </script>
+</body>
+</html>`;
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  });
+
+  /**
    * GET /api/rapidoreach/signed-url
    * Generates a secure RapidoReach Offerwall URL using the server-side App Key.
    * Signature is generated exactly as: md5(internalUserId-appId-appKey)
