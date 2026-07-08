@@ -44,7 +44,6 @@ import {
 import { DailyCheckIn } from '../components/DailyCheckIn';
 import { useLiveActivities } from '../hooks/useLiveActivities';
 import { DailyGoal } from './DailyGoal';
-import { CpxWidget } from '../components/CpxWidget';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import { MaintenanceModal } from '../components/MaintenanceModal';
 import { AnnouncementEngine, ScrollingBanner } from '../components/AnnouncementEngine';

@@ -25,9 +25,8 @@ import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import AdsSection from '../AdsSection';
+import { AoycoOfferwall } from '../components/AoycoOfferwall';
 import { CpxOfferwall } from '../components/CpxOfferwall';
-import { BitcoTasksWall } from '../components/BitcoTasksWall';
-import VideoAdsSection from '../components/VideoAdsSection';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { MaintenanceModal } from '../components/MaintenanceModal';
 
@@ -249,10 +248,9 @@ export default function TaskList() {
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
           {activeCategory === 'survey' && user && (
             <div className="space-y-6">
-               <VideoAdsSection userId={user.uid} />
+               <AoycoOfferwall userId={user.uid} />
                
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
-               <BitcoTasksWall userId={user.uid} />
 
                <Link 
                  to="/submit-survey"

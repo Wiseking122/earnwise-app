@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getApiUrl } from '../lib/config';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, ExternalLink, ShieldCheck, ChevronRight, Loader2, Award } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface CpxOfferwallProps {
   userId: string;
@@ -10,146 +8,112 @@ interface CpxOfferwallProps {
 }
 
 export const CpxOfferwall: React.FC<CpxOfferwallProps> = ({ userId, userName, userEmail }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [signedUrl, setSignedUrl] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !userId) return;
+    if (!userId) return;
 
-    let active = true;
-    
-    async function fetchSignedUrl() {
+    let isMounted = true;
+    const fetchSignedUrl = async () => {
       try {
         setLoading(true);
         const queryParams = new URLSearchParams({
           user_id: userId,
           username: userName || '',
-          email: userEmail || ''
+          email: userEmail || '',
         });
-        
-        const response = await fetch(getApiUrl(`/api/cpx/signed-url?${queryParams.toString()}`));
-        if (!response.ok) {
-          throw new Error('Failed to fetch signed URL');
+
+        const res = await fetch(`/api/cpx/signed-url?${queryParams.toString()}`);
+        if (!res.ok) {
+          throw new Error('Failed to generate secure survey path.');
         }
-        const data = await response.json();
-        if (active && data.url) {
-          setSignedUrl(data.url);
+
+        const data = await res.json();
+        if (isMounted) {
+          if (data.url) {
+            setUrl(data.url);
+          } else {
+            throw new Error('Survey wall link was not generated.');
+          }
         }
-      } catch (err) {
-        console.error("Error loading CPX signed URL:", err);
-        // Fallback to unsigned URL if backend has issues or config is blank
-        const appId = '33341';
-        const fallbackUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${userId}&username=${encodeURIComponent(userName || '')}&email=${encodeURIComponent(userEmail || '')}&subid_1=&subid_2=`;
-        if (active) {
-          setSignedUrl(fallbackUrl);
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err.message || 'An error occurred while loading surveys.');
         }
       } finally {
-        if (active) {
+        if (isMounted) {
           setLoading(false);
         }
       }
-    }
+    };
 
     fetchSignedUrl();
-    
+
     return () => {
-      active = false;
+      isMounted = false;
     };
-  }, [isOpen, userId, userName, userEmail]);
+  }, [userId, userName, userEmail]);
+
+  if (!userId) {
+    return (
+      <div className="bg-slate-900/50 border border-red-500/20 rounded-[2rem] p-8 text-center">
+        <AlertCircle className="mx-auto text-red-500 mb-2" size={32} />
+        <h3 className="text-lg font-bold text-white">Authentication Required</h3>
+        <p className="text-slate-400 text-sm">Please log in to your account to view surveys.</p>
+      </div>
+    );
+  }
 
   return (
-    <>
-      {/* Dashboard Card matching other Offerwalls */}
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => setIsOpen(true)}
-        className="w-full relative overflow-hidden group flex items-center p-5 rounded-[2rem] bg-white border border-slate-100 shadow-sm text-left transition-all hover:shadow-md hover:border-orange-200"
-      >
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg relative overflow-hidden">
-          <ShieldCheck className="w-6 h-6 relative z-10" />
-          <div className="absolute inset-0 bg-white/20 animate-pulse" />
-        </div>
-        
-        <div className="ml-4 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-display font-bold text-slate-900 leading-tight">⭐ CPX Premium Surveys</h3>
-            <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-600 text-[8px] font-black uppercase tracking-tighter">High Yield</span>
+    <div className="w-full bg-slate-950/60 border border-slate-800/80 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+      {/* Aesthetic Top Banner */}
+      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.7)]" />
+          <div>
+            <span className="text-xs font-black uppercase tracking-widest text-slate-500">Global Survey Partner</span>
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider">CPX Research Surveys</h4>
           </div>
-          <p className="text-slate-500 text-xs mt-1">Unlock international research tasks • High payouts</p>
         </div>
-
-        <div className="ml-2 p-2 bg-slate-50 rounded-full group-hover:bg-blue-50 transition-colors">
-          <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500" />
+        <div className="text-center sm:text-right">
+          <span className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-black rounded-full uppercase tracking-wider">
+            HIGH PAYING
+          </span>
         </div>
+      </div>
 
-        {/* Background Decorative Element */}
-        <div className="absolute top-1 right-8 opacity-10 group-hover:opacity-30 transition-opacity">
-          <Award className="w-12 h-12 text-blue-500 rotate-12" />
-        </div>
-      </motion.button>
-
-      {/* Fullscreen Iframe Modal */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 backdrop-blur-md p-4 md:p-8"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-white font-display font-bold text-lg leading-none">CPX Research Surveys</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Verified Global Connection</p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-                aria-label="Close Wall"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="flex-1 w-full bg-white rounded-3xl overflow-hidden shadow-2xl relative flex items-center justify-center">
-              {loading ? (
-                <div className="flex flex-col items-center gap-3 text-slate-400">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Connecting to Research Hub...</p>
-                </div>
-              ) : signedUrl ? (
-                <iframe
-                  src={signedUrl}
-                  className="w-full h-full border-none"
-                  title="CPX Research Survey Wall"
-                  allow="geolocation"
-                />
-              ) : (
-                <div className="p-6 text-center">
-                  <p className="text-rose-500 font-bold">Failed to load surveys. Please try again.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-center gap-2 text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-              <ExternalLink className="w-3 h-3" />
-              UID: {userId?.substring(0, 8)}... • Encrypted Secure Tunnel
-            </div>
-          </motion.div>
+      {/* Main Container */}
+      <div className="relative min-h-[600px] w-full bg-[#1e293b]">
+        {loading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 z-20">
+            <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
+            <h3 className="text-lg font-bold text-white">Generating Secure Session</h3>
+            <p className="text-slate-400 text-sm max-w-xs text-center mt-1">
+              Connecting to CPX Survey Router. Please wait...
+            </p>
+          </div>
         )}
-      </AnimatePresence>
-    </>
+
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 z-20 text-center">
+            <AlertCircle className="text-red-500 mb-2 animate-bounce" size={40} />
+            <h3 className="text-lg font-bold text-white">Connection Interrupted</h3>
+            <p className="text-red-400/80 text-sm max-w-md mt-1">{error}</p>
+          </div>
+        )}
+
+        {url && (
+          <iframe
+            title="CPX Research surveys"
+            src={url}
+            className="w-full h-[600px] border-none bg-slate-900 relative z-10 block"
+            allow="geolocation"
+            style={{ display: 'block', width: '100%', height: '600px', border: 'none' }}
+          />
+        )}
+      </div>
+    </div>
   );
 };
-

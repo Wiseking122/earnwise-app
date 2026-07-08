@@ -20,8 +20,6 @@ import {
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import DepositTab from '../components/DepositTab';
-import { CpxWidget } from '../components/CpxWidget';
-import { CpxOfferwall } from '../components/CpxOfferwall';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import AnimatedNumber from '../components/AnimatedNumber';
 import TransactionReceipt from '../components/TransactionReceipt';

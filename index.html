@@ -5,10 +5,12 @@
       // Global High-Priority Script Error and Rejection Interceptor (Executed First)
       (function() {
         function silenceEvent(e) {
+          if (!e) return;
           const msg = e.message || (e.reason && e.reason.message) || '';
           const filename = e.filename || '';
+          const target = e.target || {};
           
-          const isScriptError = msg === 'Script error.' || msg.toLowerCase().includes('script error');
+          const isScriptError = !msg || msg === 'Script error.' || msg.toLowerCase().includes('script error');
           const isAdUrl = filename && (
             filename.includes('vignette') || 
             filename.includes('n6wxm') || 
@@ -20,13 +22,18 @@
             filename.includes('6ed51d6a0308b91327d83ade173f1aa5') ||
             filename.includes('rm358') ||
             filename.includes('nap5k') ||
-            filename.includes('quartzfiles')
+            filename.includes('quartzfiles') ||
+            filename.includes('aoyco') ||
+            filename.includes('pagead')
           );
+          
+          const isScriptElementError = target.tagName === 'SCRIPT' || target.tagName === 'IFRAME';
 
-          if (isScriptError || isAdUrl || msg.includes('Failed to fetch') || msg.includes('Could not reach Cloud Firestore')) {
+          if (isScriptError || isAdUrl || isScriptElementError || msg.includes('Failed to fetch') || msg.includes('Could not reach Cloud Firestore')) {
             try {
               e.preventDefault();
               e.stopPropagation();
+              e.stopImmediatePropagation();
             } catch (err) {}
             return true;
           }
@@ -38,7 +45,9 @@
 
         const originalOnError = window.onerror;
         window.onerror = function(message, source, lineno, colno, error) {
-          if (String(message).toLowerCase().includes('script error') || (source && source.includes('sturgeonvelocity'))) {
+          const msgStr = String(message || '');
+          const srcStr = String(source || '');
+          if (!message || msgStr.toLowerCase().includes('script error') || srcStr.includes('sturgeonvelocity') || srcStr.includes('aoyco') || srcStr.includes('pagead')) {
             return true; // prevent default behavior
           }
           if (originalOnError) {
