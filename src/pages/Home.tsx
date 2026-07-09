@@ -705,37 +705,19 @@ export default function Home() {
         </section>
 
         {/* Quick Links Section */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <Link to="/lucky-spin" className="dark-glass-card p-3 rounded-xl text-white group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm">
-            <div className="absolute inset-0 bg-linear-to-br from-emerald-500/20 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8.5 h-8.5 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
-                  <Play size={14} className="fill-white" />
-                </div>
-                <div>
-                  <h4 className="font-display font-black text-sm text-white">Daily Spin</h4>
-                  <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5">Reset: 4h</p>
-                </div>
-              </div>
-              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform" size={14} />
-            </div>
-          </Link>
-
-          <Link to="/outline" className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-3 rounded-xl group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm hover:border-blue-500/30">
+        <div className="w-full">
+          <Link to="/outline" className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-4 rounded-xl group relative overflow-hidden active:scale-[0.98] transition-all shadow-sm hover:border-blue-500/30 flex items-center justify-between w-full">
             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8.5 h-8.5 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-500/30 text-blue-400 rounded-lg flex items-center justify-center shrink-0">
-                  <TrendingUp size={14} />
-                </div>
-                <div>
-                  <h4 className="font-display font-black text-sm text-white drop-shadow-sm">Guide</h4>
-                  <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5">Master App</p>
-                </div>
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-500/30 text-blue-400 rounded-lg flex items-center justify-center shrink-0">
+                <TrendingUp size={18} />
               </div>
-              <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform group-hover:text-blue-400" size={14} />
+              <div>
+                <h4 className="font-display font-black text-sm text-white drop-shadow-sm">Guide</h4>
+                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest leading-none mt-1">Master Earnwise App</p>
+              </div>
             </div>
+            <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform group-hover:text-blue-400" size={18} />
           </Link>
         </div>
 

@@ -23,7 +23,7 @@ const NIGERIAN_CITIES = [
 
 const TASKS = [
   'Instagram Like', 'TikTok Follow', 'Telegram Channel Join', 'Facebook Share', 
-  'YouTube Subscribe', 'Twitter Retweet', 'Daily Check-In', 'Lucky Spin'
+  'YouTube Subscribe', 'Twitter Retweet', 'Daily Check-In'
 ];
 
 const DEPOSIT_AMOUNTS = [1000, 2000, 5000, 7000, 10000, 15000, 20000, 50000];

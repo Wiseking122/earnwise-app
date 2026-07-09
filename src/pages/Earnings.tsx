@@ -14,7 +14,6 @@ import {
   PlusCircle,
   MinusCircle,
   DollarSign,
-  Dices,
   ArrowRight,
   Wallet as WalletIcon
 } from 'lucide-react';
@@ -150,28 +149,6 @@ export default function Earnings() {
 
         {/* Admin Diagnostic & Wallet Recovery Panel Removed */}
 
-
-        {/* Lucky Spin Premium Banner */}
-        <Link 
-          to="/lucky-spin" 
-          className="block bg-slate-950 rounded-[2.5rem] p-6 text-white shadow-2xl group relative overflow-hidden active:scale-95 transition-all border border-white/5"
-        >
-           <div className="absolute inset-0 bg-linear-to-br from-blue-600/30 via-transparent to-purple-600/30 opacity-50" />
-           <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                 <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center group-hover:rotate-[15deg] group-hover:scale-110 transition-all duration-500 border border-white/10">
-                    <Dices size={28} className="text-white drop-shadow-2xl" />
-                 </div>
-                 <div>
-                    <h4 className="font-display font-black text-lg uppercase tracking-tight italic">Fortune Wheel</h4>
-                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mt-0.5">Win up to ₦50,000 Daily</p>
-                 </div>
-              </div>
-              <div className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.4)] group-hover:translate-x-1 transition-transform">
-                 <ArrowRight size={20} />
-              </div>
-           </div>
-        </Link>
 
         {/* Portfolio Summary Card */}
         <div className="grid grid-cols-2 gap-5">

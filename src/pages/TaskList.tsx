@@ -10,7 +10,6 @@ import {
   Search, 
   Filter, 
   SlidersHorizontal, 
-  Dices,
   Play,
   Video,
   Image as ImageIcon,
@@ -389,22 +388,6 @@ export default function TaskList() {
             </div>
           )}
         </div>
-
-        {/* Floating Premium Activity Button */}
-        <Link 
-          to="/lucky-spin"
-          className="fixed bottom-32 right-6 bg-slate-950 text-white w-16 h-16 rounded-3xl flex items-center justify-center shadow-2xl z-50 group hover:rotate-12 active:scale-90 transition-all border border-white/10"
-        >
-           <Dices size={28} className="group-hover:scale-110 transition-transform" />
-           <div className="absolute right-20 bg-slate-950/80 backdrop-blur-xl text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 whitespace-nowrap pointer-events-none border border-white/5 shadow-2xl">
-              Spin to Win ₦500
-           </div>
-           <motion.div 
-             animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.1, 0.3] }}
-             transition={{ repeat: Infinity, duration: 2 }}
-             className="absolute inset-0 bg-blue-500 rounded-3xl -z-10"
-           />
-        </Link>
       </div>
 
       {/* Target Modal for Zeydoo */}

@@ -18,7 +18,6 @@ import Leaderboard from './pages/Leaderboard';
 import Referral from './pages/Referral';
 import Upgrade from './pages/Upgrade';
 import Deposit from './pages/Deposit';
-import LuckySpin from './pages/LuckySpin';
 import Transactions from './pages/Transactions';
 import Vault from './pages/Vault';
 import AdvertiserPortal from './pages/AdvertiserPortal';
@@ -80,7 +79,6 @@ function AppRoutes() {
         <Route path="/referral" element={<PrivateRoute><Referral /></PrivateRoute>} />
         <Route path="/upgrade" element={<PrivateRoute bypassPlanCheck><Upgrade /></PrivateRoute>} />
         <Route path="/deposit" element={<PrivateRoute bypassPlanCheck><Deposit /></PrivateRoute>} />
-        <Route path="/lucky-spin" element={<PrivateRoute><LuckySpin /></PrivateRoute>} />
         <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
         <Route path="/vault" element={<PrivateRoute><Vault /></PrivateRoute>} />
         <Route path="/advertiser" element={<PrivateRoute><AdvertiserPortal /></PrivateRoute>} />
