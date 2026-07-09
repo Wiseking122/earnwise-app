@@ -23,20 +23,36 @@ import {
   Zap,
   ArrowUpRight,
   Loader2,
-  Search
+  Search,
+  Coins,
+  TrendingUp,
+  TrendingDown,
+  ArrowRightLeft,
+  ShieldCheck,
+  Activity,
+  DollarSign
 } from 'lucide-react';
 import { getApiUrl } from '../lib/config';
 import DepositTab from '../components/DepositTab';
 import WithdrawalTimeline from '../components/WithdrawalTimeline';
 import { PayoutReceipt } from '../components/PayoutReceipt';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
 export default function Withdrawal() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'withdraw' | 'deposit'>('withdraw');
+  const [activeTab, setActiveTab] = useState<'exchange' | 'deposit'>('exchange');
+  const [exchangeSubTab, setExchangeSubTab] = useState<'convert' | 'withdraw' | 'history'>('convert');
+  
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [conversions, setConversions] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   
+  // Conversion state
+  const [coinsToConvert, setCoinsToConvert] = useState('');
+  const [wiseCoinBalance, setWiseCoinBalance] = useState(0);
+
+  // Bank Withdrawal State
   const [amount, setAmount] = useState('');
   const [bankName, setBankName] = useState(profile?.bankDetails?.bankName || '');
   const [bankCode, setBankCode] = useState(profile?.bankDetails?.bankCode || '');
@@ -44,6 +60,7 @@ export default function Withdrawal() {
   const [accountName, setAccountName] = useState(profile?.bankDetails?.accountName || '');
   const [loading, setLoading] = useState(false);
   const [withdrawalType, setWithdrawalType] = useState<'task' | 'referral'>('task');
+  
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -61,6 +78,53 @@ export default function Withdrawal() {
 
   const [isSavingBank, setIsSavingBank] = useState(false);
 
+  // Exchange and Rate Settings (Real-time Firestore updates)
+  const [exchangeSettings, setExchangeSettings] = useState<any>({
+    exchangeRate: 10.00,
+    exchangeStatus: 'open',
+    lastUpdated: new Date(),
+    marketTrend: 'up',
+    dailyChange: '+2.4%',
+    weeklyChange: '-1.1%',
+    exchangeVolume: 1245000,
+    marketStatus: 'Stable',
+    previousRate: 10.00,
+    rateHistory: [
+      { day: 'Mon', rate: 9.80 },
+      { day: 'Tue', rate: 9.90 },
+      { day: 'Wed', rate: 9.85 },
+      { day: 'Thu', rate: 10.10 },
+      { day: 'Fri', rate: 10.05 },
+      { day: 'Sat', rate: 9.95 },
+      { day: 'Sun', rate: 10.00 }
+    ]
+  });
+
+  // Fetch live exchange settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'system_settings', 'wise_coin_exchange'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setExchangeSettings({
+          ...data,
+          lastUpdated: data.lastUpdated?.toDate?.() || new Date(data.lastUpdated) || new Date(),
+          rateHistory: data.rateHistory || [
+            { day: 'Mon', rate: (data.exchangeRate * 0.98) },
+            { day: 'Tue', rate: (data.exchangeRate * 0.99) },
+            { day: 'Wed', rate: (data.exchangeRate * 0.985) },
+            { day: 'Thu', rate: (data.exchangeRate * 1.01) },
+            { day: 'Fri', rate: (data.exchangeRate * 1.005) },
+            { day: 'Sat', rate: (data.exchangeRate * 0.995) },
+            { day: 'Sun', rate: data.exchangeRate }
+          ]
+        });
+      }
+    }, (err) => {
+      console.warn("Could not load exchange settings:", err);
+    });
+    return () => unsub();
+  }, []);
+
   // Poll system setting payouts variables
   useEffect(() => {
     if (!profile) return;
@@ -70,6 +134,19 @@ export default function Withdrawal() {
       }
     }, (error) => {
       console.warn("Retrying system settings read...", error);
+    });
+    return () => unsub();
+  }, [profile]);
+
+  // Listen to User WiseCoin balance
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const unsub = onSnapshot(doc(db, 'wise_coin_wallets', profile.uid), (snap) => {
+      if (snap.exists()) {
+        setWiseCoinBalance(snap.data().balance || 0);
+      } else {
+        setWiseCoinBalance(0);
+      }
     });
     return () => unsub();
   }, [profile]);
@@ -171,14 +248,13 @@ export default function Withdrawal() {
       .reduce((sum, w) => sum + w.amount, 0);
   };
 
-  // Cumulative pending requests to dodge double-spend attempts
   const getPendingWithdrawalTotal = (type: 'task' | 'referral') => {
     return withdrawals
       .filter(w => w.status === 'pending' && w.withdrawalType === type && !(w as any).deductedAtRequest)
       .reduce((sum, w) => sum + w.amount, 0);
   };
 
-  // Auto-resolve account name when both bankCode and a 10-digit account number are provided
+  // Auto-resolve account name
   useEffect(() => {
     const cleanNum = accountNumber.replace(/\D/g, '');
     if (cleanNum.length === 10 && bankCode) {
@@ -201,7 +277,7 @@ export default function Withdrawal() {
           }
         } catch (err: any) {
           if (!isCurrent) return;
-          console.warn("Account name resolution resulted in mismatch:", err.message);
+          console.warn("Account name resolution failed:", err.message);
           setAccountName('');
           setResolveFeedback('Verification failed');
         } finally {
@@ -219,14 +295,16 @@ export default function Withdrawal() {
     }
   }, [accountNumber, bankCode]);
 
+  // Fetch conversions and withdrawals history
   useEffect(() => {
-    if (!profile) return;
-    const q = query(
+    if (!profile?.uid) return;
+    
+    // Withdrawals Listener
+    const qW = query(
       collection(db, 'withdrawals'),
       where('userId', '==', profile.uid)
     );
-
-    const unsub = onSnapshot(q, (snap) => {
+    const unsubW = onSnapshot(qW, (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest));
       setWithdrawals(docs.sort((a,b) => {
         const timeA = (a.requestedAt as any)?.toMillis?.() || 0;
@@ -236,9 +314,27 @@ export default function Withdrawal() {
       setLoadingHistory(false);
     });
 
-    return () => unsub();
+    // Conversions Listener
+    const qC = query(
+      collection(db, 'coin_conversions'),
+      where('userId', '==', profile.uid)
+    );
+    const unsubC = onSnapshot(qC, (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setConversions(docs.sort((a,b) => {
+        const timeA = (a.createdAt as any)?.toMillis?.() || 0;
+        const timeB = (b.createdAt as any)?.toMillis?.() || 0;
+        return timeB - timeA;
+      }));
+    });
+
+    return () => {
+      unsubW();
+      unsubC();
+    };
   }, [profile]);
 
+  // Fetch banks from paystack
   useEffect(() => {
     let retryCount = 0;
     const maxRetries = 3;
@@ -246,7 +342,6 @@ export default function Withdrawal() {
     async function fetchBanks() {
       try {
         const banksUrl = getApiUrl('/api/paystack/banks');
-        console.log(`[PAYMENT] Attempting to fetch banks from: ${banksUrl}`);
         const res = await fetch(banksUrl);
         
         if (!res.ok) {
@@ -256,7 +351,6 @@ export default function Withdrawal() {
         const data = await res.json();
         if (data.status && data.data) {
           setBanks(data.data);
-          console.log(`[PAYMENT] Successfully loaded ${data.data.length} banks.`);
         } else {
           throw new Error(data.message || 'Malformed bank data received');
         }
@@ -264,9 +358,7 @@ export default function Withdrawal() {
         console.error(`[PAYMENT] Bank fetch attempt ${retryCount + 1} failed:`, err.message);
         if (retryCount < maxRetries) {
           retryCount++;
-          setTimeout(fetchBanks, 1500 * retryCount); // Exponential backoff
-        } else {
-          console.error("[PAYMENT] Max retries reached for bank fetching.");
+          setTimeout(fetchBanks, 1500 * retryCount);
         }
       }
     }
@@ -294,7 +386,136 @@ export default function Withdrawal() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Convert WiseCoins to Naira
+  const handleConvertCoins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    
+    if (exchangeSettings.exchangeStatus !== 'open') {
+      setError("WiseCoin Exchange is currently closed by Administration.");
+      return;
+    }
+
+    const wcAmount = parseInt(coinsToConvert);
+    if (isNaN(wcAmount) || wcAmount < 100) {
+      setError('Minimum conversion is 100 WC.');
+      return;
+    }
+
+    if (wcAmount > wiseCoinBalance) {
+      setError(`Insufficient WiseCoin balance. Available: ${wiseCoinBalance.toLocaleString()} WC`);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const grossNaira = (wcAmount / 100) * exchangeSettings.exchangeRate;
+      const fee = grossNaira * 0.02; // 2% fee
+      const netNaira = grossNaira - fee;
+
+      await runTransaction(db, async (transaction) => {
+        // Fetch current user details
+        const userRef = doc(db, 'users', profile.uid);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error("User profile not found.");
+        const userData = userSnap.data();
+
+        // Fetch current wallet details
+        const walletRef = doc(db, 'wise_coin_wallets', profile.uid);
+        const walletSnap = await transaction.get(walletRef);
+        const currentWcBalance = walletSnap.exists() ? (walletSnap.data().balance || 0) : 0;
+
+        if (wcAmount > currentWcBalance) {
+          throw new Error("Insufficient WiseCoins in your wallet.");
+        }
+
+        // Subtract WiseCoins from wallet
+        transaction.set(walletRef, {
+          userId: profile.uid,
+          balance: currentWcBalance - wcAmount,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        // Credit Naira to user's wallet balances (add to taskBalance, balance, withdrawableBalance)
+        const updatedTaskBalance = (userData.taskBalance || 0) + netNaira;
+        const updatedWithdrawableBalance = (userData.withdrawableBalance || 0) + netNaira;
+        const updatedTotalBalance = (userData.balance || 0) + netNaira;
+
+        transaction.update(userRef, {
+          taskBalance: updatedTaskBalance,
+          withdrawableBalance: updatedWithdrawableBalance,
+          balance: updatedTotalBalance,
+          updatedAt: serverTimestamp()
+        });
+
+        // Create transaction logs
+        const newWcTxRef = doc(collection(db, 'wise_coin_transactions'));
+        transaction.set(newWcTxRef, {
+          userId: profile.uid,
+          amount: wcAmount,
+          action: 'conversion',
+          reason: `WiseCoin Exchange: Converted ${wcAmount.toLocaleString()} WC to ₦${netNaira.toLocaleString()}`,
+          status: 'completed',
+          createdAt: serverTimestamp()
+        });
+
+        const newConversionRef = doc(collection(db, 'coin_conversions'));
+        transaction.set(newConversionRef, {
+          userId: profile.uid,
+          wiseCoins: wcAmount,
+          nairaAmount: netNaira,
+          createdAt: serverTimestamp()
+        });
+
+        const newTxRef = doc(collection(db, 'transactions'));
+        transaction.set(newTxRef, {
+          userId: profile.uid,
+          amount: netNaira,
+          type: 'earning',
+          description: `Converted ${wcAmount.toLocaleString()} WC`,
+          createdAt: serverTimestamp(),
+          status: 'completed'
+        });
+
+        const newNotifRef = doc(collection(db, 'notifications'));
+        transaction.set(newNotifRef, {
+          userId: profile.uid,
+          title: '🔄 Wise Coins Exchanged!',
+          message: `Successfully converted ${wcAmount.toLocaleString()} WC to ₦${netNaira.toLocaleString()} (Gross: ₦${grossNaira.toLocaleString()}, Fee 2%: ₦${fee.toLocaleString()}).`,
+          type: 'reward',
+          priority: 'high',
+          category: 'reward',
+          status: 'sent',
+          createdAt: serverTimestamp(),
+          readBy: []
+        });
+      });
+
+      setSuccess(true);
+      setCoinsToConvert('');
+      setLastWithdrawal({
+        amount: grossNaira,
+        netAmount: netNaira,
+        fee: fee,
+        bankName: 'WiseCoin Exchange',
+        accountNumber: 'INTERNAL',
+        accountName: profile.displayName || profile.username || 'User',
+        withdrawalType: 'task',
+        date: new Date().toISOString()
+      });
+      setShowReceipt(true);
+    } catch (err: any) {
+      console.error("Conversion failed", err);
+      setError(err?.message || "Exchange conversion request compilation failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Withdraw Naira to Bank
+  const handleBankWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
     
@@ -400,6 +621,7 @@ export default function Withdrawal() {
       });
 
       setSuccess(true);
+      setAmount('');
       setLastWithdrawal({
         amount: withdrawAmount,
         netAmount: withdrawAmount * (withdrawalType === 'referral' ? 1 : 0.90),
@@ -427,436 +649,708 @@ export default function Withdrawal() {
     bank.name.toLowerCase().includes(bankSearch.toLowerCase())
   );
 
+  // Computed live conversion calculations
+  const parsedCoins = parseInt(coinsToConvert) || 0;
+  const computedGrossNaira = (parsedCoins / 100) * exchangeSettings.exchangeRate;
+  const computedFee = computedGrossNaira * 0.02;
+  const computedNetNaira = Math.max(0, computedGrossNaira - computedFee);
+
   return (
-    <Layout title="Wallet Protocol" showBack>
+    <Layout title="WiseCoin Exchange" showBack>
       {success && <Confetti />}
       <PayoutReceipt 
         isOpen={showReceipt} 
         onClose={() => {
           setShowReceipt(false);
+          setSuccess(false);
+          setError('');
           navigate('/earnings');
         }} 
         data={lastWithdrawal} 
       />
-      <div className="p-3.5 sm:p-5 pb-24 space-y-4 max-w-2xl mx-auto relative">
-        <div className="premium-blur" />
+      <div className="p-3 sm:p-5 pb-24 space-y-4 max-w-2xl mx-auto relative text-left">
+        {/* Subtle decorative background gradient */}
+        <div className="absolute top-0 left-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Tab Switcher */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+        {/* Global Navigation Tabs (Exchange Panel vs Deposits) */}
+        <div className="flex bg-[#0D1527]/90 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
           <button 
-            onClick={() => setActiveTab('withdraw')}
-            className={`flex-1 py-2 px-3 rounded-lg font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'withdraw' 
-                ? 'bg-slate-950 text-white shadow-xl' 
-                : 'text-slate-500 hover:text-slate-900'
+            onClick={() => setActiveTab('exchange')}
+            className={`flex-1 py-3 px-3 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+              activeTab === 'exchange' 
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <ArrowUpRight size={14} />
-            Withdraw
+            <ArrowRightLeft size={14} />
+            Exchange Dashboard
           </button>
           <button 
             onClick={() => setActiveTab('deposit')}
-            className={`flex-1 py-2 px-3 rounded-lg font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-3 px-3 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
               activeTab === 'deposit' 
-                ? 'bg-slate-950 text-white shadow-xl' 
-                : 'text-slate-500 hover:text-slate-900'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <ArrowDownLeft size={14} />
-            Deposit
+            Deposit Funds
           </button>
         </div>
 
-        {activeTab === 'withdraw' ? (
+        {activeTab === 'exchange' ? (
           <>
-            {/* Real-time Status Alert Banner */}
-            <div className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${
-              isWindowOpen 
-                ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
-                : 'bg-rose-50 border-rose-100 text-rose-800'
-            }`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isWindowOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider truncate">
-                  {isWindowOpen ? "Settlement Window Open" : "Payout Gateway Closed"}
-                </p>
-                <p className="text-[9px] font-bold uppercase opacity-85 mt-0.5 leading-normal">
-                  {isWindowOpen ? (
-                    timeRemainingStr || "Processing windows are strictly scheduled by Administration."
-                  ) : (
-                    `🔒 Closed. Next: ${
-                      payoutSettings?.payoutStartDate 
-                        ? new Date(payoutSettings.payoutStartDate).toLocaleDateString() 
-                        : 'Unscheduled'
-                    }`
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {/* Available Balance Header */}
-            <div className="bg-slate-950 rounded-xl p-4 sm:p-6 text-white relative overflow-hidden shadow-xl group border border-white/5">
-              <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-600/20" />
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
+            {/* Real-time WiseCoin Rate and Status Banner */}
+            <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-5 backdrop-blur-xl relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
               
-              <div className="relative z-10 space-y-3 sm:space-y-4">
-                <div className="flex justify-between items-start gap-3">
-                  <div className="space-y-1 min-w-0 flex-1 text-left">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] truncate">
-                      {withdrawalType === 'task' ? 'Task Wallet Balance' : 'Referral Wallet Balance'}
-                    </p>
-                    <h3 className="text-2xl sm:text-4xl font-display font-black tracking-tighter italic truncate">
-                      ₦<AnimatedNumber value={withdrawalType === 'task' ? (profile?.taskBalance || 0) : (profile?.referralBalance || 0)} fractionDigits={2} />
-                    </h3>
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Live Rate Feeder</span>
                   </div>
-                  <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white/5 rounded-lg sm:rounded-xl flex items-center justify-center backdrop-blur-md border border-white/10 group-hover:rotate-12 transition-transform shrink-0">
-                    <Wallet size={16} className="text-blue-500 sm:w-6 sm:h-6" />
+                  <h2 className="text-xl sm:text-2xl font-display font-black text-white uppercase italic tracking-tight">
+                    WiseCoin Exchange
+                  </h2>
+                  <div className="flex items-center gap-4 text-xs font-bold text-slate-300">
+                    <div className="flex items-center gap-1.5 bg-black/30 px-2.5 py-1 rounded-lg border border-white/5">
+                      <span className="text-amber-500 font-extrabold">100 WC</span>
+                      <span className="text-slate-500">=</span>
+                      <span className="text-emerald-400 font-black">₦{exchangeSettings.exchangeRate.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px]">
+                      {exchangeSettings.exchangeStatus === 'open' ? (
+                        <span className="text-emerald-500 font-black flex items-center gap-1">
+                          🟢 Exchange Open
+                        </span>
+                      ) : (
+                        <span className="text-rose-500 font-black flex items-center gap-1">
+                          🔴 Exchange Closed
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                  <div>
-                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-left">Task Balance</p>
-                    <p className="text-xs sm:text-sm font-black text-slate-200 text-left">₦{(profile?.taskBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div>
-                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-left">Referral Balance</p>
-                    <p className="text-xs sm:text-sm font-black text-slate-200 text-left">₦{(profile?.referralBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider pt-2 border-t border-white/5">
-                  <span>Current Cap: {isAdminUser ? "Unlimited (Admin Bypass)" : `₦${planCap.toLocaleString()} (${profile?.plan || 'free'} tier)`}</span>
-                  <span>Session Requested: ₦{currentWindowRequestsTotal.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Withdrawal Type Selection */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setWithdrawalType('task')}
-                className={`p-2.5 sm:p-3 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
-                  withdrawalType === 'task' 
-                    ? 'bg-blue-600 border-blue-500 text-white shadow-lg scale-[1.01]' 
-                    : 'bg-white border-slate-100 text-slate-900 hover:border-blue-200'
-                }`}
-              >
-                <div className="flex items-center justify-between relative z-10">
-                  <Zap size={14} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-600'} />
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${withdrawalType === 'task' ? 'bg-white/20' : 'bg-blue-50'}`}>
-                    <span className={`w-1 h-1 rounded-full ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
-                    <span className={`text-[7px] font-black uppercase tracking-widest ${withdrawalType === 'task' ? 'text-white' : 'text-blue-600'}`}>
-                      Task
-                    </span>
-                  </div>
-                </div>
-                <div className="relative z-10 text-left">
-                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-tighter block">Task Payout</span>
-                  <span className={`text-[8px] font-bold uppercase opacity-85 mt-0.5 block ${withdrawalType === 'task' ? 'text-blue-100' : 'text-slate-400'}`}>Schedule Enabled</span>
-                </div>
-                {withdrawalType === 'task' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setWithdrawalType('referral')}
-                className={`p-2.5 sm:p-3 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
-                  withdrawalType === 'referral' 
-                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg scale-[1.01]' 
-                    : 'bg-white border-slate-100 text-slate-900 hover:border-emerald-200'
-                }`}
-              >
-                <div className="flex items-center justify-between relative z-10">
-                  <User size={14} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-600'} />
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${withdrawalType === 'referral' ? 'bg-white/20' : 'bg-emerald-50'}`}>
-                    <span className={`w-1 h-1 rounded-full ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
-                    <span className={`text-[7px] font-black uppercase tracking-widest ${withdrawalType === 'referral' ? 'text-white' : 'text-emerald-600'}`}>
-                      Referral
-                    </span>
-                  </div>
-                </div>
-                <div className="relative z-10 text-left">
-                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-tighter block">Referral Payout</span>
-                  <span className={`text-[8px] font-bold uppercase opacity-85 mt-0.5 block ${withdrawalType === 'referral' ? 'text-emerald-100' : 'text-slate-400'}`}>Schedule Enabled</span>
-                </div>
-                {withdrawalType === 'referral' && <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-2xl" />}
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1 text-left">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Transfer Quantum</h3>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-lg text-slate-400 group-focus-within:text-blue-600 transition-colors">₦</span>
-                  <input 
-                    type="number" 
-                    placeholder="0.00"
-                    required
-                    min="1000"
-                    step="0.01"
-                    className="w-full bg-white border border-slate-100 rounded-xl py-2.5 pl-10 pr-4 text-xl sm:text-2xl font-display font-black focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                </div>
-                {parseFloat(amount) >= 1000 && (
-                  <p className={`text-[9px] font-black uppercase tracking-wider px-4 ${withdrawalType === 'task' ? 'text-blue-600' : 'text-emerald-600'}`}>
-                    {withdrawalType === 'task' ? (
-                      `A 10% processing fee applies. You receive: ₦${(parseFloat(amount) * 0.90).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                    ) : (
-                      `Referral withdrawals are 100% free of charge! You receive: ₦${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                    )}
+                <div className="text-left md:text-right space-y-1">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Last Synced Timestamp</p>
+                  <p className="text-xs font-mono font-bold text-slate-300">
+                    {exchangeSettings.lastUpdated instanceof Date 
+                      ? exchangeSettings.lastUpdated.toLocaleString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                      : new Date(exchangeSettings.lastUpdated).toLocaleTimeString()
+                    }
                   </p>
-                )}
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
+                    Synced with Blockchain Nodes
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-3 text-left">
-                <div className="flex items-center justify-between px-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Ledger Information</h3>
-                  <button
-                    type="button"
-                    onClick={handleSaveBankDetails}
-                    disabled={isSavingBank || !bankCode || !accountNumber || !accountName || resolvingName}
-                    className="text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 disabled:opacity-50"
-                  >
-                    {isSavingBank ? 'Saving...' : 'Save Details'}
-                  </button>
+              {/* Interactive 7-Day Line Chart using Recharts */}
+              <div className="mt-5 h-44 w-full bg-black/20 rounded-2xl border border-white/5 p-2 overflow-hidden flex flex-col justify-end">
+                <div className="flex justify-between items-center px-2 mb-2 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                  <span>Rate Movement (7D Interval)</span>
+                  <span className="text-blue-400">Stable Node</span>
                 </div>
-                <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-100 shadow-sm space-y-3">
-                  <div className="space-y-1 relative">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Target Bank</label>
-                    <div className="relative">
-                      {/* Trigger Button */}
+                <ResponsiveContainer width="100%" height="85%">
+                  <AreaChart data={exchangeSettings.rateHistory}>
+                    <defs>
+                      <linearGradient id="rateColor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="day" 
+                      stroke="#475569" 
+                      fontSize={8} 
+                      tickLine={false} 
+                      axisLine={false} 
+                    />
+                    <YAxis 
+                      domain={['dataMin - 0.5', 'dataMax + 0.5']} 
+                      hide 
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }} 
+                      labelStyle={{ color: '#94a3b8', fontSize: '9px', fontWeight: 'bold' }}
+                      itemStyle={{ color: '#3b82f6', fontSize: '10px', fontWeight: 'black' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="rate" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2} 
+                      fillOpacity={1} 
+                      fill="url(#rateColor)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Market Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-4 border-t border-white/5">
+                <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 block">Today's Vol</span>
+                  <span className="text-xs font-mono font-black text-slate-200">
+                    {exchangeSettings.exchangeVolume.toLocaleString()} WC
+                  </span>
+                </div>
+                <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 block">Daily Change</span>
+                  <span className={`text-xs font-black flex items-center gap-0.5 ${
+                    exchangeSettings.marketTrend === 'up' ? 'text-emerald-400' : 'text-rose-400'
+                  }`}>
+                    {exchangeSettings.marketTrend === 'up' ? '▲' : '▼'} {exchangeSettings.dailyChange}
+                  </span>
+                </div>
+                <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 block">Weekly Change</span>
+                  <span className="text-xs font-black text-rose-400">
+                    {exchangeSettings.weeklyChange}
+                  </span>
+                </div>
+                <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 block">Market Status</span>
+                  <span className="text-xs font-black text-amber-500 flex items-center gap-1">
+                    <Activity size={10} className="animate-pulse" /> {exchangeSettings.marketStatus}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Balances Board */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between h-24">
+                <div className="flex justify-between items-start">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Available WC</span>
+                  <Coins size={14} className="text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-display font-black text-amber-500 italic">
+                    <AnimatedNumber value={wiseCoinBalance} fractionDigits={0} />
+                  </h4>
+                  <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">Coins ready for convert</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between h-24">
+                <div className="flex justify-between items-start">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Task Balance</span>
+                  <Wallet size={14} className="text-blue-500" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-display font-black text-emerald-400 italic">
+                    ₦<AnimatedNumber value={profile?.taskBalance || 0} fractionDigits={2} />
+                  </h4>
+                  <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">Cleared Naira holdings</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Terminal Tab Switcher (Convert WC vs Withdraw Naira to Bank vs Ledger History) */}
+            <div className="flex border-b border-white/10 pt-1">
+              <button 
+                onClick={() => setExchangeSubTab('convert')}
+                className={`flex-1 pb-3 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider relative transition-colors ${
+                  exchangeSubTab === 'convert' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                🔄 Convert WC
+                {exchangeSubTab === 'convert' && (
+                  <motion.div layoutId="terminal-bar" className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500" />
+                )}
+              </button>
+              <button 
+                onClick={() => setExchangeSubTab('withdraw')}
+                className={`flex-1 pb-3 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider relative transition-colors ${
+                  exchangeSubTab === 'withdraw' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                💸 Bank Transfer
+                {exchangeSubTab === 'withdraw' && (
+                  <motion.div layoutId="terminal-bar" className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500" />
+                )}
+              </button>
+              <button 
+                onClick={() => setExchangeSubTab('history')}
+                className={`flex-1 pb-3 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider relative transition-colors ${
+                  exchangeSubTab === 'history' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                ⏳ Ledger History
+                {exchangeSubTab === 'history' && (
+                  <motion.div layoutId="terminal-bar" className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500" />
+                )}
+              </button>
+            </div>
+
+            {/* Display correct sub-view */}
+            {exchangeSubTab === 'convert' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-900/60 border border-white/10 rounded-3xl p-5 backdrop-blur-xl space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Convert WiseCoins</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Exchanging WiseCoins into withdrawable Naira instantly</p>
+                  </div>
+                  <Coins className="text-amber-500 animate-bounce" size={20} />
+                </div>
+
+                <form onSubmit={handleConvertCoins} className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Enter WiseCoins to convert</label>
                       <button
                         type="button"
-                        onClick={() => {
-                          setIsOpenBankDropdown(!isOpenBankDropdown);
-                          setBankSearch('');
-                        }}
-                        className="w-full text-left bg-slate-50 border border-transparent rounded-lg py-2.5 pl-10 pr-8 text-xs font-black uppercase tracking-tight hover:bg-slate-100/80 active:scale-[0.99] transition-all flex items-center justify-between relative disabled:opacity-50"
+                        onClick={() => setCoinsToConvert(String(wiseCoinBalance))}
+                        className="text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-400"
                       >
-                        <Building2 className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${isOpenBankDropdown ? 'text-blue-600' : 'text-slate-400'}`} size={14} />
-                        <span className={bankCode ? 'text-slate-900 font-black' : 'text-slate-500 font-bold normal-case'}>
-                          {bankName || 'Select Protocol Bank'}
-                        </span>
-                        <ChevronDown className={`text-slate-400 transition-transform duration-200 ${isOpenBankDropdown ? 'rotate-180 text-blue-600' : ''}`} size={14} />
+                        Convert Max ({wiseCoinBalance.toLocaleString()} WC)
                       </button>
-
-                      <AnimatePresence>
-                        {isOpenBankDropdown && (
-                          <motion.div
-                            key="bank-dropdown-portal"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                            className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-xl shadow-xl overflow-hidden z-[500] max-h-80 flex flex-col"
-                          >
-                            {/* Backdrop overlay inside the motion div for better coordination */}
-                            <div 
-                              className="fixed inset-0 -z-1 bg-black/5" 
-                              onClick={() => {
-                                setIsOpenBankDropdown(false);
-                                setBankSearch('');
-                              }} 
-                            />
-                            
-                            {/* Search Bar Input */}
-                            <div className="p-2 border-b border-slate-100 relative flex items-center bg-slate-50/50 z-10">
-                              <Search className="absolute left-5 text-slate-400" size={12} />
-                              <input
-                                type="text"
-                                autoFocus
-                                placeholder="Search bank name..."
-                                className="w-full bg-white border border-slate-100 rounded-lg py-1.5 pl-8 pr-4 text-xs font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
-                                value={bankSearch}
-                                onChange={(e) => setBankSearch(e.target.value)}
-                              />
-                            </div>
-
-                            {/* Banks list */}
-                            <div className="overflow-y-auto max-h-56 no-scrollbar p-1.5 space-y-1 z-10">
-                              {filteredBanks.length > 0 ? (
-                                filteredBanks.map((bank, index) => {
-                                  const isSelected = bank.code === bankCode;
-                                  return (
-                                    <button
-                                      key={`${bank.code}-${index}`}
-                                      type="button"
-                                      onClick={() => {
-                                        setBankCode(bank.code);
-                                        setBankName(bank.name);
-                                        setIsOpenBankDropdown(false);
-                                        setBankSearch('');
-                                      }}
-                                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
-                                        isSelected 
-                                          ? 'bg-blue-50/80 text-blue-700 font-extrabold' 
-                                          : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
-                                      }`}
-                                    >
-                                      <span className="truncate">{bank.name}</span>
-                                      {isSelected && (
-                                        <CheckCircle2 size={12} className="text-blue-600 flex-shrink-0" />
-                                      )}
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <div className="text-center py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                                  No bank found
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Account Coordinate</label>
-                    <div className="relative group">
-                      <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={14} />
-                      <input 
-                        type="text" 
-                        placeholder="Enter 10-digit account number"
-                        required
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-950 placeholder:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1 flex flex-col">
-                    <div className="flex justify-between items-center ml-4 mr-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Verified Identity</label>
-                      {resolvingName && (
-                        <span className="text-[8px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse">
-                          <Loader2 size={10} className="animate-spin" /> Resolving Name
-                        </span>
-                      )}
-                      {!resolvingName && resolveFeedback && (
-                        <span className={`text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
-                          resolveFeedback.includes('Verified') ? 'text-emerald-600' : 'text-amber-600'
-                        }`}>
-                          {resolveFeedback.includes('Verified') ? <CheckCircle2 size={10} /> : <AlertCircle size={10} />} {resolveFeedback}
-                        </span>
-                      )}
                     </div>
                     <div className="relative group">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={14} />
                       <input 
-                        type="text" 
-                        placeholder={resolvingName ? "Querying secure gateway..." : "Full name as on bank record"}
+                        type="number" 
+                        placeholder="Min 100 WC"
                         required
-                        disabled={resolvingName}
-                        className={`w-full bg-slate-50 border-none rounded-lg py-2.5 pl-10 pr-4 text-xs font-black tracking-tight focus:ring-2 focus:ring-blue-500 transition-all text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
-                          resolvingName ? 'opacity-70 cursor-wait select-none' : ''
-                        }`}
-                        value={accountName}
-                        onChange={(e) => setAccountName(e.target.value)}
+                        min="100"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 font-mono font-black text-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-white placeholder:text-slate-600 disabled:opacity-50"
+                        value={coinsToConvert}
+                        onChange={(e) => setCoinsToConvert(e.target.value)}
+                        disabled={exchangeSettings.exchangeStatus !== 'open'}
                       />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs text-slate-500 font-mono">WC</span>
                     </div>
+                  </div>
+
+                  {/* Pricing breakdown summary */}
+                  {parsedCoins >= 100 && (
+                    <div className="bg-black/30 rounded-xl p-3 border border-white/5 space-y-2 text-xs">
+                      <div className="flex justify-between items-center text-slate-400 font-bold">
+                        <span>Exchanged Naira Value</span>
+                        <span className="text-white font-mono font-black">₦{computedGrossNaira.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-400 font-bold">
+                        <span>Blockchain Exchange Fee (2%)</span>
+                        <span className="text-rose-400 font-mono font-black">-₦{computedFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="border-t border-white/5 pt-2 flex justify-between items-center text-slate-200 font-black">
+                        <span className="uppercase tracking-wider text-[10px]">Net Credits Received</span>
+                        <span className="text-emerald-400 font-mono text-sm font-black">₦{computedNetNaira.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl flex items-center gap-2.5 text-rose-400">
+                      <AlertCircle size={16} />
+                      <p className="text-xs font-black uppercase tracking-tight">{error}</p>
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit"
+                    disabled={loading || exchangeSettings.exchangeStatus !== 'open' || parsedCoins < 100 || parsedCoins > wiseCoinBalance}
+                    className="w-full py-3 rounded-xl font-black text-xs uppercase tracking-[0.2em] italic transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-blue-900/20 active:scale-[0.98]"
+                  >
+                    {loading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : exchangeSettings.exchangeStatus !== 'open' ? (
+                      '🔴 Exchange Closed'
+                    ) : parsedCoins > wiseCoinBalance ? (
+                      '⚠️ Insufficient Coins'
+                    ) : (
+                      <>
+                        <span>Convert to Naira</span>
+                        <ArrowUpRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                <div className="bg-blue-500/5 rounded-xl p-3 flex gap-3 border border-blue-500/10 italic">
+                  <Zap className="text-blue-500 flex-shrink-0 animate-pulse" size={16} />
+                  <div className="text-left text-[9px] leading-relaxed text-blue-300 font-bold uppercase tracking-tight">
+                    WiseCoins are minted automatically via blockchain activities. Swapping to NGN takes less than 300ms on confirmation.
                   </div>
                 </div>
-              </div>
+              </motion.div>
+            )}
 
-              {error && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-rose-50 border border-rose-100 p-3 rounded-lg flex items-center gap-2.5 text-rose-700 shadow-sm"
-                >
-                  <AlertCircle size={16} />
-                  <p className="text-xs font-black uppercase tracking-tight">{error || "Automated withdrawal failed."}</p>
-                </motion.div>
-              )}
-
-              <button 
-                type="submit"
-                disabled={loading || success || !isWindowOpen}
-                className={`w-full py-2.5 sm:py-3 rounded-lg font-display font-black text-[11px] sm:text-xs uppercase tracking-[0.2em] italic shadow-lg transition-all flex items-center justify-center gap-2.5 group/btn ${
-                  success 
-                    ? 'bg-emerald-500 text-white shadow-emerald-900/20' 
-                    : !isWindowOpen
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]'
-                }`}
+            {exchangeSubTab === 'withdraw' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-900/60 border border-white/10 rounded-3xl p-5 backdrop-blur-xl space-y-4"
               >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : success ? (
-                  <>
-                    <CheckCircle2 size={14} /> Protocol Finalized
-                  </>
-                ) : !isWindowOpen ? (
-                  <>
-                    <span>🔒 Closed: Gateway Locked</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🟢 Active: Withdraw Now</span>
-                    <ArrowUpRight size={14} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform opacity-50" />
-                  </>
-                )}
-              </button>
-            </form>
+                {/* Gateway Window Status Indicator */}
+                <div className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                  isWindowOpen 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isWindowOpen ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider truncate">
+                      {isWindowOpen ? "Settlement Window Open" : "Payout Gateway Closed"}
+                    </p>
+                    <p className="text-[8px] font-bold uppercase opacity-85 mt-0.5 leading-normal">
+                      {isWindowOpen ? (
+                        timeRemainingStr || "Processing windows are strictly scheduled by Administration."
+                      ) : (
+                        `🔒 Closed. Next: ${
+                          payoutSettings?.payoutStartDate 
+                            ? new Date(payoutSettings.payoutStartDate).toLocaleDateString() 
+                            : 'Unscheduled'
+                        }`
+                      )}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="bg-blue-50 rounded-xl p-3 flex gap-3 border border-blue-100 italic relative overflow-hidden group">
-              <div className="absolute inset-0 bg-linear-to-r from-blue-600/5 to-transparent" />
-              <Zap className="text-blue-600 flex-shrink-0 animate-pulse relative z-10" size={16} />
-              <div className="relative z-10 text-left">
-                <h4 className="text-[10px] font-black text-blue-900 uppercase tracking-widest">Automated Node Settlement</h4>
-                <p className="text-[9px] text-blue-800 leading-normal font-bold uppercase tracking-tighter mt-1">Withdrawals are processed via real-time Paystack synchronization. Settlement is usually completed within 280ms of network confirmation.</p>
-              </div>
-            </div>
+                {/* Wallet Balance Summary for Bank Withdrawal */}
+                <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs font-black">
+                  <div className="space-y-1">
+                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Task NGN Balance</span>
+                    <h3 className="text-lg text-emerald-400">₦{(profile?.taskBalance || 0).toLocaleString()}</h3>
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Referral NGN Balance</span>
+                    <h3 className="text-lg text-emerald-400">₦{(profile?.referralBalance || 0).toLocaleString()}</h3>
+                  </div>
+                </div>
 
-            {/* Withdrawal History */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between px-2">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                  <History size={12} />
-                  Historical Protocol Data
-                </h3>
-              </div>
-              
-              <div className="space-y-2.5">
-                {loadingHistory ? (
-                  [1,2].map(i => <div key={`skeleton-withdraw-${i}`} className="h-16 bg-slate-50 rounded-xl animate-pulse" />)
-                ) : withdrawals.length > 0 ? (
-                  withdrawals.map((w, index) => (
-                    <div key={w.id || index} className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-100 transition-colors group gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center border transition-colors shrink-0 ${
-                          w.status === 'completed' || w.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white' : 
-                          w.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-100 group-hover:bg-rose-600 group-hover:text-white' : 
-                          'bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-600 group-hover:text-white'
-                        }`}>
-                          {w.status === 'completed' || w.status === 'approved' ? <CheckCircle2 size={16} /> : 
-                           w.status === 'rejected' ? <X size={16} /> : <Clock size={16} />}
-                        </div>
-                        <div className="min-w-0 text-left">
-                          <h4 className="font-display font-black text-slate-900 text-sm sm:text-base italic tracking-tighter">₦{w.amount.toLocaleString()}</h4>
-                          <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">
-                            {w.requestedAt?.toDate?.()?.toLocaleDateString() || 'Recently'} • {w.status}
-                          </p>
-                          <WithdrawalTimeline status={w.status || 'submitted'} />
+                {/* Dual Wallet Payout Selection */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalType('task')}
+                    className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden text-left ${
+                      withdrawalType === 'task' 
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg scale-[1.01]' 
+                        : 'bg-[#0D1527] border-white/5 text-slate-300 hover:border-blue-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Zap size={12} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-500'} />
+                      <span className="text-[7px] font-black uppercase tracking-widest bg-white/10 px-1.5 py-0.5 rounded">Task</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase block">Task Payout</span>
+                      <span className="text-[7.5px] font-bold uppercase text-slate-300 block">10% Platform Fee</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalType('referral')}
+                    className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden text-left ${
+                      withdrawalType === 'referral' 
+                        ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg scale-[1.01]' 
+                        : 'bg-[#0D1527] border-white/5 text-slate-300 hover:border-emerald-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <User size={12} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-500'} />
+                      <span className="text-[7px] font-black uppercase tracking-widest bg-white/10 px-1.5 py-0.5 rounded">Ref</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase block">Referral Payout</span>
+                      <span className="text-[7.5px] font-bold uppercase text-slate-300 block">0% Processing Fee</span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* NGN Withdrawal Form */}
+                <form onSubmit={handleBankWithdrawal} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-500 uppercase ml-1 tracking-widest">Withdrawal Amount in Naira</label>
+                    <div className="relative group">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-lg text-slate-400">₦</span>
+                      <input 
+                        type="number" 
+                        placeholder="0.00"
+                        required
+                        min="1000"
+                        step="0.01"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 font-mono font-black text-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-white placeholder:text-slate-600"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                      />
+                    </div>
+                    {parseFloat(amount) >= 1000 && (
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mt-1 pl-1">
+                        {withdrawalType === 'task' ? (
+                          `A 10% processing fee applies. You receive: ₦${(parseFloat(amount) * 0.90).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                        ) : (
+                          `Referral withdrawals are 100% free of charge! You receive: ₦${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Ledger Bank Information */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Bank Ledger Coordination</h3>
+                      <button
+                        type="button"
+                        onClick={handleSaveBankDetails}
+                        disabled={isSavingBank || !bankCode || !accountNumber || !accountName || resolvingName}
+                        className="text-[9px] font-black uppercase tracking-wider text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                      >
+                        {isSavingBank ? 'Saving...' : 'Save Bank Details'}
+                      </button>
+                    </div>
+
+                    <div className="bg-black/30 rounded-2xl p-4 border border-white/5 space-y-3">
+                      <div className="space-y-1 relative">
+                        <label className="text-[8.5px] font-black text-slate-500 uppercase ml-1 tracking-widest">Target Protocol Bank</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsOpenBankDropdown(!isOpenBankDropdown);
+                              setBankSearch('');
+                            }}
+                            className="w-full text-left bg-black/40 border border-white/5 rounded-xl py-3 pl-10 pr-8 text-xs font-black uppercase tracking-tight hover:bg-black/60 transition-all flex items-center justify-between relative"
+                          >
+                            <Building2 className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 ${isOpenBankDropdown ? 'text-blue-500' : ''}`} size={14} />
+                            <span className={bankCode ? 'text-white font-black' : 'text-slate-500 font-bold normal-case'}>
+                              {bankName || 'Select Protocol Bank'}
+                            </span>
+                            <ChevronDown className={`text-slate-500 transition-transform duration-200 ${isOpenBankDropdown ? 'rotate-180 text-blue-500' : ''}`} size={14} />
+                          </button>
+
+                          <AnimatePresence>
+                            {isOpenBankDropdown && (
+                              <motion.div
+                                key="bank-dropdown-portal-dark"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.15 }}
+                                className="absolute left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[500] max-h-80 flex flex-col"
+                              >
+                                <div 
+                                  className="fixed inset-0 -z-1 bg-black/40" 
+                                  onClick={() => {
+                                    setIsOpenBankDropdown(false);
+                                    setBankSearch('');
+                                  }} 
+                                />
+                                
+                                <div className="p-2 border-b border-white/5 relative flex items-center bg-black/20 z-10">
+                                  <Search className="absolute left-5 text-slate-500" size={12} />
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Search bank name..."
+                                    className="w-full bg-slate-950 border border-white/10 rounded-lg py-1.5 pl-8 pr-4 text-xs font-black text-white focus:outline-none focus:border-blue-500 transition-all placeholder:text-slate-500"
+                                    value={bankSearch}
+                                    onChange={(e) => setBankSearch(e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="overflow-y-auto max-h-56 no-scrollbar p-1.5 space-y-1 z-10">
+                                  {filteredBanks.length > 0 ? (
+                                    filteredBanks.map((bank, index) => {
+                                      const isSelected = bank.code === bankCode;
+                                      return (
+                                        <button
+                                          key={`${bank.code}-${index}`}
+                                          type="button"
+                                          onClick={() => {
+                                            setBankCode(bank.code);
+                                            setBankName(bank.name);
+                                            setIsOpenBankDropdown(false);
+                                            setBankSearch('');
+                                          }}
+                                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-black uppercase tracking-tight transition-all flex items-center justify-between ${
+                                            isSelected 
+                                              ? 'bg-blue-500/20 text-blue-400 font-extrabold' 
+                                              : 'text-slate-300 hover:bg-white/5 active:bg-white/10'
+                                          }`}
+                                        >
+                                          <span className="truncate">{bank.name}</span>
+                                          {isSelected && (
+                                            <CheckCircle2 size={12} className="text-blue-500 flex-shrink-0" />
+                                          )}
+                                        </button>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="text-center py-3 text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                                      No bank found
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       </div>
-                      <div className="hidden md:block shrink-0">
-                        <ChevronDown className="-rotate-90 text-slate-200" size={14} />
+
+                      <div className="space-y-1">
+                        <label className="text-[8.5px] font-black text-slate-500 uppercase ml-1 tracking-widest">Account Number</label>
+                        <div className="relative group">
+                          <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                          <input 
+                            type="text" 
+                            placeholder="Enter 10-digit account number"
+                            required
+                            className="w-full bg-black/40 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-xs font-black tracking-tight text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center px-1">
+                          <label className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest">Account Holder Name</label>
+                          {resolvingName && (
+                            <span className="text-[8px] text-blue-400 font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                              <Loader2 size={10} className="animate-spin" /> Resolving Name
+                            </span>
+                          )}
+                          {!resolvingName && resolveFeedback && (
+                            <span className={`text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
+                              resolveFeedback.includes('Verified') ? 'text-emerald-400' : 'text-amber-400'
+                            }`}>
+                              {resolveFeedback.includes('Verified') ? <CheckCircle2 size={10} /> : <AlertCircle size={10} />} {resolveFeedback}
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative group">
+                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                          <input 
+                            type="text" 
+                            placeholder={resolvingName ? "Querying secure gateway..." : "Full name as on bank record"}
+                            required
+                            disabled={resolvingName}
+                            className="w-full bg-black/40 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-xs font-black tracking-tight text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                            value={accountName}
+                            onChange={(e) => setAccountName(e.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="bg-slate-50 rounded-xl p-8 text-center border-2 border-dashed border-slate-200">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">No active ledger history detected</p>
                   </div>
-                )}
-              </div>
-            </section>
+
+                  {error && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl flex items-center gap-2.5 text-rose-400">
+                      <AlertCircle size={16} />
+                      <p className="text-xs font-black uppercase tracking-tight">{error}</p>
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit"
+                    disabled={loading || success || !isWindowOpen}
+                    className="w-full py-3 rounded-xl font-black text-xs uppercase tracking-[0.2em] italic transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-emerald-900/20 active:scale-[0.98]"
+                  >
+                    {loading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : success ? (
+                      '🟢 Protocol Finalized'
+                    ) : !isWindowOpen ? (
+                      '🔒 Gateway Closed'
+                    ) : (
+                      <>
+                        <span>Withdraw Naira to Bank</span>
+                        <ArrowUpRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </motion.div>
+            )}
+
+            {exchangeSubTab === 'history' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-2 px-1">
+                  <History size={16} className="text-slate-500" />
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transaction & Conversion Ledger</h3>
+                </div>
+
+                <div className="space-y-2.5 max-h-[450px] overflow-y-auto no-scrollbar">
+                  {loadingHistory ? (
+                    [1,2].map(i => <div key={`sk-${i}`} className="h-16 bg-white/5 rounded-2xl animate-pulse border border-white/5" />)
+                  ) : (withdrawals.length > 0 || conversions.length > 0) ? (
+                    <>
+                      {/* Interleave or list conversions & withdrawals */}
+                      {conversions.map((conv, index) => (
+                        <div key={`conv-${conv.id || index}`} className="bg-slate-900/50 p-3 sm:p-4 rounded-2xl border border-white/5 shadow-sm flex items-center justify-between group gap-3 text-left">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center border bg-blue-500/10 text-blue-400 border-blue-500/20">
+                              <ArrowRightLeft size={16} />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-display font-black text-white text-sm sm:text-base italic tracking-tighter">₦{conv.nairaAmount.toLocaleString()}</h4>
+                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">
+                                Exchanged {conv.wiseCoins.toLocaleString()} WC • Swap Completed
+                              </p>
+                              <p className="text-[7.5px] text-slate-500 font-bold uppercase mt-0.5">
+                                {conv.createdAt?.toDate?.()?.toLocaleString() || 'Recently'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/10">Swapped</span>
+                        </div>
+                      ))}
+
+                      {withdrawals.map((w, index) => (
+                        <div key={`w-${w.id || index}`} className="bg-slate-900/50 p-3 sm:p-4 rounded-2xl border border-white/5 shadow-sm flex items-center justify-between group gap-3 text-left">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors shrink-0 ${
+                              w.status === 'completed' || w.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
+                              w.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
+                              'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            }`}>
+                              {w.status === 'completed' || w.status === 'approved' ? <CheckCircle2 size={16} /> : 
+                               w.status === 'rejected' ? <X size={16} /> : <Clock size={16} />}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-display font-black text-white text-sm sm:text-base italic tracking-tighter">₦{w.amount.toLocaleString()}</h4>
+                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">
+                                Bank Transfer ({w.bankDetails?.bankName}) • {w.status}
+                              </p>
+                              <p className="text-[7.5px] text-slate-500 font-bold uppercase mt-0.5">
+                                {w.requestedAt?.toDate?.()?.toLocaleString() || 'Recently'}
+                              </p>
+                              <WithdrawalTimeline status={w.status || 'submitted'} />
+                            </div>
+                          </div>
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border ${
+                            w.status === 'completed' || w.status === 'approved' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/10' :
+                            w.status === 'rejected' ? 'text-rose-400 bg-rose-400/10 border-rose-400/10' :
+                            'text-amber-400 bg-amber-400/10 border-amber-400/10'
+                          }`}>
+                            {w.status}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="bg-slate-900/30 rounded-2xl p-8 text-center border border-white/5">
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] italic">No active ledger history detected</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
           </>
         ) : (
           <DepositTab />

@@ -232,12 +232,34 @@
         "maintenanceMessage": { "type": "string", "description": "Message to show when Ads Center is locked" },
         "payoutEnabled": { "type": "boolean", "description": "Global toggle for withdrawals" }
       }
+    },
+    "WiseCoinExchangeSettings": {
+      "title": "WiseCoin Exchange Settings",
+      "description": "Global WiseCoin exchange rate, status, trends, and market volume",
+      "type": "object",
+      "properties": {
+        "exchangeRate": { "type": "number", "description": "Naira payout per 100 WiseCoins" },
+        "exchangeStatus": { "type": "string", "enum": ["open", "closed"], "description": "Status of the WiseCoin Exchange" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "marketTrend": { "type": "string", "enum": ["up", "down"], "description": "Market trend direction" },
+        "dailyChange": { "type": "string", "description": "Today's percentage change string" },
+        "weeklyChange": { "type": "string", "description": "Weekly percentage change string" },
+        "exchangeVolume": { "type": "number", "description": "Total exchange volume" },
+        "marketStatus": { "type": "string", "description": "Market stability state" },
+        "previousRate": { "type": "number", "description": "Previous exchange rate for calculations" },
+        "rateHistory": { "type": "array", "description": "Historical rates list" }
+      },
+      "required": ["exchangeRate", "exchangeStatus", "lastUpdated"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/system_settings/wise_coin_exchange": {
+      "schema": "WiseCoinExchangeSettings",
+      "description": "WiseCoin Exchange configurations"
     },
     "/system_settings/{settingId}": {
       "schema": "SystemSettings",
