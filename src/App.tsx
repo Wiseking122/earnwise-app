@@ -45,6 +45,7 @@ import AdminAnnouncements from './pages/admin/Announcements';
 import InstallAppModal from './components/InstallAppModal';
 import { TelegramJoinPopup } from './components/TelegramJoinPopup';
 import WelcomePopup from './components/WelcomePopup';
+import SuspendedScreen from './components/SuspendedScreen';
 
 function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: { children: React.ReactNode, adminOnly?: boolean, bypassPlanCheck?: boolean }) {
   const { user, profile, loading } = useAuth();
@@ -52,6 +53,12 @@ function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: 
   if (loading) return <LoadingScreen />;
   
   if (!user) return <Navigate to="/welcome" />;
+  
+  // Guard for suspended users (excluding admins / wiseking)
+  if (profile?.securityMetrics?.isSuspended && profile?.role !== 'admin' && user.email !== 'wiseking7890@gmail.com') {
+    return <SuspendedScreen />;
+  }
+  
   if (adminOnly && profile?.role !== 'admin' && user.email !== 'wiseking7890@gmail.com') return <Navigate to="/" />;
   
   return <>{children}</>;

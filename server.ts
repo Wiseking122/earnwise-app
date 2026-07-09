@@ -1906,6 +1906,10 @@ async function startServer() {
       const email = userData?.email || '';
       const plan = userData?.plan || 'free';
 
+      if (userData?.securityMetrics?.isSuspended) {
+        return { allowed: false, message: "Your account is suspended." };
+      }
+
       if (role === 'admin' || email === 'wiseking7890@gmail.com') {
         return { allowed: true };
       }
@@ -2145,6 +2149,9 @@ IMPORTANT INSTRUCTIONS:
         const userDoc = await userRef.get();
         if (userDoc.exists) {
           const userData = userDoc.data()!;
+          if (userData.securityMetrics?.isSuspended && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
+            return res.status(403).json({ error: "Your account is suspended." });
+          }
           if ((!userData.plan || userData.plan === 'free') && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
             return res.status(403).json({ error: "Upgrade your plan to start earning from tasks." });
           }
@@ -4064,11 +4071,14 @@ Please verify if the submission is a plausible and honest completion of a social
       if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
       const userData = userDoc.data() || {};
       
+      const isAdmin = userData.role === 'admin' || userData.email === 'wiseking7890@gmail.com';
+      if (userData.securityMetrics?.isSuspended && !isAdmin) {
+        return res.status(403).json({ error: "Your account is suspended." });
+      }
+      
       if (userData.balance < amount) {
         return res.status(400).json({ error: "Insufficient balance" });
       }
-
-      const isAdmin = userData.role === 'admin' || userData.email === 'wiseking7890@gmail.com';
       if (!isAdmin && (!userData.plan || userData.plan === 'free')) {
         return res.status(400).json({ error: "Upgrade your plan to start withdrawing." });
       }
@@ -4401,17 +4411,23 @@ Please verify if the submission is a plausible and honest completion of a social
         try {
           // Check if the user is an admin (Admins automatically bypass purchase checks)
           const userDoc = await dbAdmin.collection('users').doc(userId).get();
-          if (userDoc.exists && userDoc.data()?.role === 'admin') {
-            hasAccess = true;
-          } else {
-            const purchaseCheck = await dbAdmin.collection('coursePurchases')
-              .where('userId', '==', userId)
-              .where('courseId', '==', courseId)
-              .limit(1)
-              .get();
-
-            if (!purchaseCheck.empty) {
+          if (userDoc.exists) {
+            const userData = userDoc.data() || {};
+            if (userData.securityMetrics?.isSuspended && userData.role !== 'admin' && userData.email !== 'wiseking7890@gmail.com') {
+              return res.status(403).json({ error: "Your account is suspended." });
+            }
+            if (userData.role === 'admin') {
               hasAccess = true;
+            } else {
+              const purchaseCheck = await dbAdmin.collection('coursePurchases')
+                .where('userId', '==', userId)
+                .where('courseId', '==', courseId)
+                .limit(1)
+                .get();
+
+              if (!purchaseCheck.empty) {
+                hasAccess = true;
+              }
             }
           }
         } catch (dbErr: any) {
