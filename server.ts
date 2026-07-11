@@ -894,7 +894,11 @@ async function startServer() {
     try {
       const apiKey = process.env.OGADS_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ success: false, error: "OGADS_API_KEY is not defined in server environment variables." });
+        return res.status(200).json({ 
+          success: false, 
+          error: "Premium Offerwall is currently being configured. Please add the OGADS_API_KEY to your environment variables to enable these tasks.",
+          isMissingConfig: true
+        });
       }
 
       const xForwardedFor = req.headers['x-forwarded-for'];

@@ -44,7 +44,7 @@ export interface NormalizedOffer {
 export async function fetchOGAdsOffers(params: FetchOffersParams): Promise<NormalizedOffer[]> {
   const apiKey = process.env.OGADS_API_KEY;
   if (!apiKey) {
-    throw new Error('OGADS_API_KEY is not defined in server environment variables.');
+    throw new Error('Premium Offerwall is currently being configured. Please add the OGADS_API_KEY to your environment variables to enable these tasks.');
   }
 
   // The official OGAds Offer API Endpoint
@@ -108,8 +108,30 @@ export async function fetchOGAdsOffers(params: FetchOffersParams): Promise<Norma
       devices = ['All Devices'];
     }
 
+    // Generate stable and deterministic ID if no native ID exists to prevent random generation on reload
+    let stableId = String(offer.ad_id || offer.offer_id || offer.id || offer.campaign_id || '').trim();
+    
+    if (!stableId || stableId === 'undefined' || stableId === 'null') {
+      const title = (offer.name || offer.title || 'Premium Earnwise Campaign').trim();
+      // Strip query parameters from link for hashing to ensure stability if tracking IDs change
+      const rawLink = String(offer.link || '').trim();
+      const stableLink = rawLink.split('?')[0];
+      
+      let hash = 0;
+      const str = `${title}-${stableLink}`.toLowerCase();
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash = hash & hash;
+      }
+      stableId = `h-${Math.abs(hash)}`;
+    } else {
+      // Normalize existing ID
+      stableId = stableId.toLowerCase();
+    }
+
     return {
-      id: String(offer.ad_id || offer.id || Math.random()),
+      id: stableId,
       title: offer.name || offer.title || 'Premium Earnwise Campaign',
       description: offer.description || 'Complete the campaign instructions fully to receive your Naira wallet reward.',
       payout: payoutNum,
