@@ -224,7 +224,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
     { path: '/', label: 'Home', icon: Home, locked: isFree },
     { path: '/tasks', label: 'Tasks', icon: List, locked: isFree },
     { path: '/academy', label: 'Academy', icon: BookOpen, locked: isFree },
-    { path: '/advertiser', label: 'Post Ads', icon: Megaphone, locked: false },
+    { path: '/advertiser', label: 'Ads', icon: Megaphone, locked: false },
     { path: '/upgrade', label: 'Upgrade', icon: Crown, locked: false },
     { path: '/earnings', label: 'Wallet', icon: Wallet, locked: isFree },
     { path: '/profile', label: 'Profile', icon: UserIcon, locked: false },
@@ -303,9 +303,9 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       </main>
 
       {/* Premium Floating Navigation */}
-      <div className="fixed bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 w-[98%] max-w-sm sm:max-w-lg z-[1000] px-1 shadow-[0_10px_30px_-5px_rgba(37,99,235,0.15)] rounded-full">
-        <nav className="bg-[#050B1A]/90 backdrop-blur-3xl border border-blue-500/15 shadow-2xl rounded-full h-11 sm:h-14 flex items-center justify-around px-0.5 relative overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
+      <div className="fixed bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 w-[98%] max-w-sm sm:max-w-lg z-[1000] px-1 shadow-[0_10px_40px_-5px_rgba(0,0,0,0.5)] rounded-2xl">
+        <nav className="bg-[#0A1128]/95 backdrop-blur-2xl border border-white/5 shadow-2xl rounded-2xl h-14 sm:h-16 flex items-center justify-around px-1 relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
             
             {navItems.map((item) => {
             const Icon = item.icon;
@@ -314,27 +314,37 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
                 <Link 
                 key={item.path}
                 to={item.path}
-                className={`group relative flex flex-col items-center justify-center w-full h-full transition-all duration-300 rounded-full ${
-                    isActive ? 'text-blue-400' : (item.locked ? 'text-slate-600' : 'text-slate-400 hover:text-slate-200')
+                className={`group relative flex flex-col items-center justify-center flex-1 h-full transition-all duration-300 ${
+                    isActive ? 'text-blue-400' : (item.locked ? 'text-slate-600' : 'text-slate-400')
                 }`}
                 >
                   <motion.div 
                     whileTap={{ scale: 0.85 }}
-                    className={`p-0.5 sm:p-1 rounded-full transition-all duration-300 relative flex flex-col items-center justify-center ${isActive ? '' : (item.locked ? 'opacity-40' : '')}`}
+                    className={`flex flex-col items-center justify-center gap-1 transition-all duration-300 ${isActive ? '' : (item.locked ? 'opacity-40' : '')}`}
                   >
-                      {isActive && (
-                        <motion.div layoutId="nav-pill" className="absolute inset-0 bg-blue-500/10 rounded-full -z-10 shadow-[0_0_12px_rgba(59,130,246,0.3)]" />
-                      )}
-                      <Icon size={13} strokeWidth={isActive ? 2.5 : 2} className={`sm:w-[18px] sm:h-[18px] transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
-                      {item.locked && (
-                        <div className="absolute -top-0.5 -right-0.5 bg-slate-900 border border-slate-700 text-slate-400 rounded-full p-[0.5px] shadow-sm">
-                           <Lock size={5} />
-                        </div>
-                      )}
+                      <div className="relative">
+                        <Icon 
+                          size={isActive ? 18 : 17} 
+                          strokeWidth={isActive ? 2.5 : 2} 
+                          className={`transition-all duration-300 ${isActive ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : ''}`} 
+                        />
+                        {item.locked && (
+                          <div className="absolute -top-1 -right-1 bg-slate-900 border border-slate-700 text-slate-400 rounded-full p-[1px] shadow-sm">
+                             <Lock size={6} />
+                          </div>
+                        )}
+                      </div>
+                      <span className={`text-[9px] sm:text-[10px] leading-tight tracking-tight transition-all duration-300 ${isActive ? 'font-black' : 'font-medium opacity-70'}`}>
+                        {item.label}
+                      </span>
                   </motion.div>
-                  <span className={`text-[6.5px] sm:text-[9px] font-black mt-0.5 tracking-wider transition-all duration-300 ${isActive ? 'opacity-100 block' : 'hidden sm:block sm:opacity-0 sm:h-0 sm:mt-0 sm:overflow-hidden group-hover:sm:opacity-100 group-hover:sm:h-auto group-hover:sm:mt-1'}`}>
-                      {item.label}
-                  </span>
+                  
+                  {isActive && (
+                    <motion.div 
+                      layoutId="nav-glow"
+                      className="absolute -bottom-1 w-8 h-1 bg-blue-500 rounded-full blur-[4px] opacity-60" 
+                    />
+                  )}
                 </Link>
             );
             })}

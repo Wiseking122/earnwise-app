@@ -3,10 +3,13 @@ import { getApiUrl, WS_BASE_URL } from '../lib/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export default function FloatingAIAssistant() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<any>(null);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', content: string, image?: string}[]>([
     { role: 'ai', content: "Welcome to EarnWise! I am Wise AI, your mentor proudly owned by EarnWise and sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. I'm here to help you maximize your earnings on Nigeria's largest digital task network.\n\nTo activate your account and start earning, simply fund your wallet via Paystack on the Upgrade page and select your preferred tier!" }
   ]);
@@ -99,8 +102,17 @@ export default function FloatingAIAssistant() {
   useEffect(() => {
     isActiveRef.current = true;
     connect();
+
+    // Listen to live platform settings for AI awareness
+    const unsub = onSnapshot(doc(db, 'system_settings', 'platform'), (snap) => {
+      if (snap.exists()) {
+        setPlatformSettings(snap.data());
+      }
+    });
+
     return () => {
       isActiveRef.current = false;
+      unsub();
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -127,6 +139,7 @@ export default function FloatingAIAssistant() {
       wsRef.current.send(JSON.stringify({
         message: p,
         userId: user?.uid,
+        platformSettings: platformSettings, // Pass live settings to AI
         history: messages.map(m => ({ 
           role: m.role === 'user' ? 'user' : 'model', 
           parts: [{ text: m.content }] 

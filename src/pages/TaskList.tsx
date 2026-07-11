@@ -36,6 +36,15 @@ const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: strin
   { id: 'referral', label: 'Banner Ads', icon: ShieldCheck, color: 'bg-purple-500' },
 ];
 
+const taskTypeColors: Record<string, string> = {
+  survey: 'border-orange-200 bg-orange-50/50 hover:bg-orange-100/80',
+  ad: 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/80',
+  video: 'border-blue-200 bg-blue-50/50 hover:bg-blue-100/80',
+  referral: 'border-purple-200 bg-purple-50/50 hover:bg-purple-100/80',
+  content_creation: 'border-pink-200 bg-pink-50/50 hover:bg-pink-100/80',
+  app_download: 'border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/80'
+};
+
 export default function TaskList() {
   const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
@@ -353,24 +362,49 @@ export default function TaskList() {
               className="space-y-3.5"
             >
               {filteredTasks.map((task, index) => {
+                const isInternal = task.advertiserId === 'internal_platform' || !task.advertiserId;
                 const isFree = isUserFree;
+                const typeStyle = isInternal 
+                  ? "bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 border-blue-400/30 shadow-[0_10px_25px_rgba(37,99,235,0.25)] hover:shadow-[0_15px_35px_rgba(37,99,235,0.35)] hover:scale-[1.01]"
+                  : (taskTypeColors[task.type] || 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/80');
+                
                 const cardContent = (
                   <div className="flex justify-between items-center relative z-10">
                     <div className="flex gap-3 items-center min-w-0 flex-1 mr-2">
-                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-900 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shrink-0">
-                        {isFree ? <Lock size={18} className="text-amber-500" /> : <Zap size={18} className="group-hover:fill-white" />}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 shrink-0 ${
+                        isInternal 
+                          ? 'bg-white/20 text-white backdrop-blur-md border border-white/20 shadow-inner'
+                          : (isFree ? 'bg-slate-50 text-slate-400' : 'bg-white shadow-sm text-slate-900 group-hover:scale-110')
+                      }`}>
+                        {isFree ? <Lock size={18} className={isInternal ? "text-amber-300" : "text-amber-500"} /> : <Zap size={18} className={isInternal ? "fill-white" : "group-hover:fill-blue-500 transition-colors"} />}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{task.type.replace('_', ' ')} Network</span>
-                          {task.isRepeatable && (
-                            <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full border border-amber-100 shrink-0">
-                              <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
-                              <span className="text-[7.5px] font-black uppercase tracking-tighter">Unlimited</span>
-                            </div>
-                          )}
+                          <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate ${
+                            isInternal ? 'text-blue-100' : (
+                              task.type === 'survey' ? 'text-orange-600' :
+                              task.type === 'ad' ? 'text-emerald-600' :
+                              task.type === 'video' ? 'text-blue-600' :
+                              task.type === 'referral' ? 'text-purple-600' :
+                              'text-slate-400'
+                            )
+                          }`}>
+                            {isInternal ? '🛡️ Earnwise Verified' : `${task.type.replace('_', ' ')} Network`}
+                          </span>
+                          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border shrink-0 ${
+                            isInternal 
+                              ? 'bg-white/10 border-white/20' 
+                              : 'bg-white/60 backdrop-blur-sm border-current/10'
+                          }`}>
+                            <div className={`w-1 h-1 rounded-full animate-pulse ${isInternal ? 'bg-white' : 'bg-green-500'}`} />
+                            <span className={`text-[7.5px] font-black uppercase tracking-tighter ${isInternal ? 'text-white' : 'text-slate-600'}`}>
+                              {isInternal ? 'Premium' : 'Admin Verified'}
+                            </span>
+                          </div>
                         </div>
-                        <h4 className="font-display font-black text-slate-900 text-sm sm:text-base leading-tight uppercase italic group-hover:text-blue-600 transition-colors truncate text-left">
+                        <h4 className={`font-display font-black text-sm sm:text-base leading-tight uppercase italic transition-colors truncate text-left ${
+                          isInternal ? 'text-white drop-shadow-sm' : 'text-slate-900 group-hover:text-blue-600'
+                        }`}>
                           {task.title}
                         </h4>
                       </div>
@@ -379,22 +413,34 @@ export default function TaskList() {
                     <div className="text-right shrink-0">
                       <div className="flex flex-col items-end">
                         {isFree ? (
-                          <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-2 py-1 rounded-xl border border-amber-100">
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-xl border ${
+                            isInternal 
+                              ? 'bg-white/10 text-white border-white/20' 
+                              : 'bg-amber-50 text-amber-600 border-amber-100'
+                          }`}>
                             <Lock size={10} className="stroke-[3px]" />
                             <span className="text-[9px] font-black uppercase tracking-tight">LOCKED</span>
                           </div>
                         ) : (
                           <>
-                            <p className="text-base sm:text-2xl font-display font-black text-slate-900 tracking-tighter text-right">
+                            <p className={`text-base sm:text-2xl font-display font-black tracking-tighter text-right ${
+                              isInternal ? 'text-white' : 'text-slate-900'
+                            }`}>
                               {((task.userPayout || 0) * multiplier).toFixed(0)} Wisecoin
                             </p>
                             {multiplier > 1 ? (
-                              <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md border border-blue-100 mt-0.5">
+                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border mt-0.5 ${
+                                isInternal 
+                                  ? 'bg-white/10 text-white border-white/20' 
+                                  : 'bg-blue-50 text-blue-600 border-blue-100'
+                              }`}>
                                  <TrendingUp size={8} />
                                  <span className="text-[7.5px] font-black uppercase tracking-tighter">+{((multiplier - 1) * 100).toFixed(0)}% Boost</span>
                               </div>
                             ) : (
-                              <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 italic">Verified Rate</span>
+                              <span className={`text-[7.5px] font-bold uppercase tracking-widest mt-0.5 italic ${
+                                isInternal ? 'text-blue-100/70' : 'text-slate-400'
+                              }`}>Verified Rate</span>
                             )}
                           </>
                         )}
@@ -403,22 +449,37 @@ export default function TaskList() {
                   </div>
                 );
 
+                const cardClasses = `w-full text-left block group border p-4 rounded-2xl shadow-sm hover:shadow-lg transition-all active:scale-[0.98] relative overflow-hidden cursor-pointer ${typeStyle}`;
+                const glowColor = isInternal ? 'rgba(255, 255, 255, 0.15)' : (
+                  task.type === 'survey' ? 'rgba(249, 115, 22, 0.1)' :
+                  task.type === 'ad' ? 'rgba(16, 185, 129, 0.1)' :
+                  task.type === 'video' ? 'rgba(59, 130, 246, 0.1)' :
+                  task.type === 'referral' ? 'rgba(168, 85, 247, 0.1)' :
+                  'rgba(59, 130, 246, 0.1)'
+                );
+
                 return (
                   <motion.div key={task.id || index} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
                     {isFree ? (
                       <button 
                         onClick={() => setShowRestriction(true)}
-                        className="w-full text-left block group bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-amber-200 transition-all active:scale-[0.98] relative overflow-hidden cursor-pointer"
+                        className={cardClasses}
                       >
-                        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)' }} />
+                        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)` }} />
+                        {isInternal && (
+                          <div className="absolute -top-1 -left-1 w-16 h-16 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                        )}
                         {cardContent}
                       </button>
                     ) : (
                       <Link 
                         to={`/tasks/${task.id}`}
-                        className="block group bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-200 transition-all active:scale-[0.98] relative overflow-hidden"
+                        className={cardClasses}
                       >
-                        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' }} />
+                        <div className="absolute top-0 right-0 w-48 h-48 rounded-full opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none" style={{ background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)` }} />
+                        {isInternal && (
+                          <div className="absolute -top-1 -left-1 w-16 h-16 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                        )}
                         {cardContent}
                       </Link>
                     )}

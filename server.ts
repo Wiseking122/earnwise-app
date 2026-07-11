@@ -2257,36 +2257,49 @@ async function startServer() {
     try {
       if (action === 'generate-text') {
         const history = payload?.history || [];
+        
         // Fetch dynamic platform settings for AI context
-        let dynamicContext = "";
+        let systemSettings: any = null;
         try {
           const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
           if (settingsSnap.exists) {
-            const data = settingsSnap.data();
-            dynamicContext = `\n\nDYNAMIC PLATFORM RULES & KNOWLEDGE:\n${data?.aiKnowledge || ""}`;
+            systemSettings = settingsSnap.data();
           }
         } catch (e) {
           console.error("AI context fetch error:", e);
         }
 
-        const systemInstruction = `You are an expert marketing and earning assistant for EarnWise, a leading task-based earning and advertising platform in Nigeria.
-Your goal is to help users succeed on EarnWise. Answer all their questions about EarnWise features including:
-- Task List & Detail: How to perform social tasks (follow, like, comment) and submit proof for automated verification.
-- Earnings & Withdrawals: How to track revenue, the 7-day escrow period for funds, and automated withdrawals via Paystack.
-- Membership Tiers (Free, Elite, Starter, Pro, Bronze, Diamond, Silver, Platinum, Golden): Explain the cost and the EARNING MULTIPLIERS for each.
-- Advertiser Portal: How businesses can launch targetted campaigns and social follow tasks.
-- Academy: Access to high-income skill courses and blueprints.
-- Referrals & Team Building: The 10% lifetime referral bonus structure.
-- Vault: Staking funds for fixed-term growth bonuses.
-- Support: How to reach out for assistance.
-${dynamicContext}
+        const exchangeRate = systemSettings?.exchangeRate ?? 1;
+        const wiseCoinName = systemSettings?.wiseCoinName || 'WiseCoin';
+        const wiseCoinSymbol = systemSettings?.wiseCoinSymbol || 'WC';
+        const aiKnowledge = systemSettings?.aiKnowledge || '';
+        const websiteName = systemSettings?.websiteName || 'EarnWise';
+        const supportEmail = systemSettings?.supportEmail || 'support@earnwise.com';
 
-IMPORTANT INSTRUCTIONS:
-- ONLY explain what the user asks about. Do NOT volunteer facts about the owner, CEO, or sponsors unless the user explicitly asks for them.
-- If explicitly asked about the owner, CEO, or founder of EarnWise, state clearly that the owner, founder, and CEO is Johnathan Sterling. Maintain total anonymity for any other identities.
-- If asked how to earn, accurately explain earning through tasks, ads, courses, upgrades, buying plans, referral, and lucky spin. Do NOT mention the owner in a general guide.
-- If asked about Wise AI, state that Wise AI is proudly owned by EarnWise.
-- Be highly professional, encouraging, and informative. Keep responses natural and conversational.`;
+        console.log(`[AI-HTTP] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Live DB Fetch)`);
+
+        const systemInstruction = `
+You are 'Wise AI', the ultimate financial coach for members of ${websiteName}. 
+
+CRITICAL PLATFORM DATA (LIVE):
+- PLATFORM NAME: ${websiteName}
+- OFFICIAL CURRENCY: ${wiseCoinName} (${wiseCoinSymbol})
+- EXCHANGE RATE (STRICT): 1 ${wiseCoinSymbol} = ₦${exchangeRate}
+- CONVERSION RULE: 100 ${wiseCoinSymbol} is exactly ₦${(exchangeRate * 100).toFixed(2)}. This is the only correct math.
+- CONVERSION RULE 2: 1000 ${wiseCoinSymbol} is exactly ₦${(exchangeRate * 1000).toFixed(2)}.
+- SUPPORT CONTACT: ${supportEmail}
+- ADMIN KNOWLEDGE BASE: ${aiKnowledge}
+- CURRENT WITHDRAWAL MINIMUM: ₦${systemSettings?.withdrawalSettings?.minWithdrawal || 1000}
+- WITHDRAWAL WINDOWS: Saturdays for Referrals, Monthly 30th for Tasks.
+
+GENERAL RULES:
+- ONLY answer what the user is explicitly asking about. Keep it conversational, helpful, and natural.
+- OWNER & CEO: ONLY if explicitly asked 'who is the owner/CEO', say it is Johnathan Sterling.
+- UPGRADING & PLANS: To upgrade/buy plans, users MUST go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.
+- REWARDS & EARNINGS: Users earn by interacting with sponsored ads, social media, taking courses, and referrals.
+- TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).
+- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak.
+`.trim();
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
@@ -4901,9 +4914,21 @@ CRITICAL PROTOCOLS:
     ws.on('message', async (data) => {
       try {
         const payload = JSON.parse(data.toString());
-        const { message, userId, history = [] } = payload;
+        const { message, userId, history = [], platformSettings: clientSettings } = payload;
         
         if (!message) return;
+
+        // Fetch live platform settings to keep AI up to date
+        let systemSettings: any = null;
+        try {
+          const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
+          if (settingsSnap.exists) {
+            systemSettings = settingsSnap.data();
+          }
+        } catch (err) {
+          console.warn("[WS] Failed to fetch live system settings from DB:", err);
+          systemSettings = clientSettings; // Fallback to client data if DB fails
+        }
 
         if (userId) {
           const limitCheck = await checkAndIncrementAiLimit(userId);
@@ -4921,6 +4946,38 @@ CRITICAL PROTOCOLS:
           return;
         }
 
+        const exchangeRate = systemSettings?.exchangeRate ?? 1;
+        const wiseCoinName = systemSettings?.wiseCoinName || 'WiseCoin';
+        const wiseCoinSymbol = systemSettings?.wiseCoinSymbol || 'WC';
+        const aiKnowledge = systemSettings?.aiKnowledge || '';
+        const websiteName = systemSettings?.websiteName || 'EarnWise';
+        const supportEmail = systemSettings?.supportEmail || 'support@earnwise.com';
+
+        console.log(`[AI-WS] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Live DB Fetch)`);
+        
+        const dynamicInstruction = `
+You are 'Wise AI', the ultimate financial coach for members of ${websiteName}. 
+
+CRITICAL PLATFORM DATA (LIVE):
+- PLATFORM NAME: ${websiteName}
+- OFFICIAL CURRENCY: ${wiseCoinName} (${wiseCoinSymbol})
+- EXCHANGE RATE (STRICT): 1 ${wiseCoinSymbol} = ₦${exchangeRate}
+- CONVERSION RULE: 100 ${wiseCoinSymbol} is exactly ₦${(exchangeRate * 100).toFixed(2)}. This is the only correct math.
+- CONVERSION RULE 2: 1000 ${wiseCoinSymbol} is exactly ₦${(exchangeRate * 1000).toFixed(2)}.
+- SUPPORT CONTACT: ${supportEmail}
+- ADMIN KNOWLEDGE BASE: ${aiKnowledge}
+- CURRENT WITHDRAWAL MINIMUM: ₦${systemSettings?.withdrawalSettings?.minWithdrawal || 1000}
+- WITHDRAWAL WINDOWS: Saturdays for Referrals, Monthly 30th for Tasks.
+
+GENERAL RULES:
+- ONLY answer what the user is explicitly asking about. Keep it conversational, helpful, and natural.
+- OWNER & CEO: ONLY if explicitly asked 'who is the owner/CEO', say it is Johnathan Sterling. NEVER spit these facts out randomly.
+- UPGRADING & PLANS: To upgrade/buy plans, users MUST go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.
+- REWARDS & EARNINGS: Users earn by interacting with sponsored ads, social media, taking courses, and referrals.
+- TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).
+- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak.
+`.trim();
+
         try {
           const responseStream = await withRetry((modelName) => ai.models.generateContentStream({
             model: modelName,
@@ -4932,7 +4989,7 @@ CRITICAL PROTOCOLS:
                 { role: 'user', parts: [{ text: message }] }
             ],
             config: {
-              systemInstruction: "You are 'Wise AI', the ultimate financial coach for Earnwise members. \n\nCRITICAL INSTRUCTIONS:\n- ONLY answer what the user is explicitly asking about. Keep it conversational, helpful, and natural.\n- OWNER & CEO: ONLY if explicitly asked 'who is the owner/CEO', say it is Johnathan Sterling. NEVER spit these facts out randomly in a general guide.\n- UPGRADING & PLANS: Users MUST NOT contact vendors or use activation codes. To upgrade/buy plans, go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.\n- REWARDS & EARNINGS: Give accurate answers. Users earn ₦ by interacting with sponsored ads, social media, uploading screenshots, taking courses, lucky spin, and referrals.\n- TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).\n- WITHDRAWAL: Minimum ₦1,000 to any Nigerian bank.\n- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. Do NOT volunteer this by default.",
+              systemInstruction: dynamicInstruction,
               temperature: 0.5,
               topP: 0.8,
               maxOutputTokens: 800,

@@ -22,6 +22,15 @@ import {
 import { playRewardSound } from './sounds';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
+const taskTypeGradients: Record<string, string> = {
+  survey: 'bg-gradient-to-b from-orange-50 to-white border-orange-100',
+  ad: 'bg-gradient-to-b from-emerald-50 to-white border-emerald-100',
+  video: 'bg-gradient-to-b from-blue-50 to-white border-blue-100',
+  referral: 'bg-gradient-to-b from-purple-50 to-white border-purple-100',
+  app_download: 'bg-gradient-to-b from-indigo-50 to-white border-indigo-100',
+  content_creation: 'bg-gradient-to-b from-pink-50 to-white border-pink-100',
+};
+
 export default function TaskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -559,28 +568,45 @@ export default function TaskDetail() {
     <Layout title="Task Details" showBack>
       <div className="p-4 space-y-6">
         {/* Header Section */}
-        <section className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm text-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-            task.type === 'survey' ? 'bg-orange-100 text-orange-600' :
-            task.type === 'ad' ? 'bg-green-100 text-green-600' :
-            task.type === 'app_download' ? 'bg-blue-100 text-blue-600' :
-            'bg-purple-100 text-purple-600'
+        <section className={`rounded-3xl p-6 border shadow-sm text-center relative overflow-hidden ${
+          taskTypeGradients[task.type] || 'bg-white border-gray-100'
+        }`}>
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, currentColor 0%, transparent 70%)' }} />
+          
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg transform rotate-3 ${
+            task.type === 'survey' ? 'bg-orange-500 text-white' :
+            task.type === 'ad' ? 'bg-emerald-500 text-white' :
+            task.type === 'video' ? 'bg-blue-500 text-white' :
+            task.type === 'referral' ? 'bg-purple-500 text-white' :
+            'bg-indigo-500 text-white'
           }`}>
-            <DollarSign size={32} />
+            <DollarSign size={32} strokeWidth={3} />
           </div>
-          <h2 className="text-2xl font-black mb-2">{task.title}</h2>
+          
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            <span className="bg-white/60 backdrop-blur-sm px-2 py-0.5 rounded-full border border-current/10 text-[8px] font-black uppercase tracking-widest text-slate-500">
+               Premium Task
+            </span>
+            <div className="flex items-center gap-1 bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100">
+              <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-[8px] font-black uppercase tracking-widest">Verified</span>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-black mb-2 text-slate-900 uppercase italic tracking-tight">{task.title}</h2>
+          
           <div className="flex items-center justify-center gap-4 text-sm font-bold">
             <div className="flex flex-col items-center">
-              <span className="flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full">
+              <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
                 ₦{calculatedReward.toFixed(2)} Reward
               </span>
               {multiplier > 1 && (
-                <span className="text-[9px] text-blue-600 font-black uppercase mt-1">
-                  Includes {multiplier}x {profile?.plan} Bonus
+                <span className="text-[9px] text-blue-600 font-black uppercase mt-1 tracking-widest">
+                  {multiplier}x {profile?.plan} Bonus Active
                 </span>
               )}
             </div>
-            <span className="flex items-center gap-1 text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+            <span className="flex items-center gap-1 text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
               <Clock size={14} /> 5-10 min
             </span>
           </div>

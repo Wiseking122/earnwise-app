@@ -702,8 +702,8 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
               return (
                 <div 
                   key={task.id}
-                  className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all flex flex-col relative group ${
-                    completedToday ? 'opacity-60 grayscale' : ''
+                  className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all flex flex-col relative group ${
+                    completedToday ? 'opacity-60 grayscale border-slate-100' : 'border-indigo-100'
                   }`}
                 >
                   {task.mediaUrl && (
@@ -714,26 +714,33 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
                       />
-                      <div className="absolute top-3 right-3 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2 py-1 rounded-lg text-emerald-400 font-mono text-[9px] font-black">
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent" />
+                      <div className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-white font-display font-black text-[10px] shadow-lg">
                         ₦{task.reward.toFixed(2)}
+                      </div>
+                      <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                        <span className="text-white font-black text-[8px] uppercase tracking-widest drop-shadow-md">Premium Sponsor</span>
                       </div>
                     </div>
                   )}
-                  <div className="p-4 flex flex-col justify-between flex-1">
-                    <div>
-                      <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest">{task.provider}</span>
-                      <h5 className="font-display font-black text-slate-900 text-sm uppercase italic leading-tight mt-1">{task.name}</h5>
+                  <div className="p-5 flex flex-col justify-between flex-1 relative">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl -mr-8 -mt-8" />
+                    <div className="relative z-10">
+                      <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">{task.provider}</span>
+                      <h5 className="font-display font-black text-slate-900 text-base uppercase italic leading-tight mt-2 group-hover:text-blue-600 transition-colors">{task.name}</h5>
                     </div>
                     <button
                       onClick={() => handleTaskClick(task)}
                       disabled={loading || completedToday}
-                      className={`mt-3 w-full py-2.5 rounded-xl font-display font-black text-[10px] uppercase tracking-wider transition-all text-center ${
+                      className={`mt-4 w-full py-3.5 rounded-2xl font-display font-black text-xs uppercase tracking-widest transition-all text-center relative overflow-hidden group/btn ${
                         completedToday 
-                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                          : 'bg-slate-950 text-white hover:bg-blue-600'
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                          : 'bg-slate-950 text-white shadow-lg shadow-slate-900/20 active:scale-95'
                       }`}
                     >
-                      {completedToday ? 'Completed Today' : 'Click & Earn'}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
+                      {completedToday ? 'Completed Today' : 'Visit & Unlock Reward'}
                     </button>
                   </div>
                 </div>
@@ -751,6 +758,8 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       <div className="grid gap-4">
         {adTasks.map((task, index) => {
           const completedToday = isAdCompletedToday(task.id);
+          const isInternal = task.isCustom;
+
           return (
             <motion.button
               key={task.id}
@@ -762,34 +771,44 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
               className={`group w-full border p-5 rounded-[2rem] flex items-center justify-between transition-all active:scale-[0.98] relative overflow-hidden ${
                 completedToday 
                   ? 'bg-slate-50 border-slate-200 opacity-60 grayscale cursor-not-allowed' 
-                  : 'bg-white border-slate-100 hover:shadow-2xl hover:border-blue-200'
+                  : isInternal 
+                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-800 border-blue-400/30 shadow-[0_10px_25px_rgba(37,99,235,0.25)] text-white'
+                    : 'bg-white border-slate-100 hover:shadow-2xl hover:border-blue-200'
               }`}
             >
               <div className="flex items-center gap-4 relative z-10">
-                <div className={`w-14 h-14 ${task.color} rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:rotate-12`}>
-                  <task.icon size={26} />
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:rotate-12 ${
+                  isInternal ? 'bg-white/20 backdrop-blur-md border border-white/20' : task.color + ' text-white'
+                }`}>
+                  <task.icon size={26} className={isInternal ? 'text-white' : ''} />
                 </div>
                 <div className="text-left">
                   <div className="flex items-center gap-2 mb-1">
-                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{task.provider}</span>
-                     <div className="w-1 h-1 bg-slate-300 rounded-full" />
-                     <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{task.type}</span>
+                     <span className={`text-[9px] font-black uppercase tracking-widest ${isInternal ? 'text-blue-100' : 'text-slate-400'}`}>
+                       {isInternal ? '🛡️ EARNWISE SPONSOR' : task.provider}
+                     </span>
+                     <div className={`w-1 h-1 rounded-full ${isInternal ? 'bg-white/40' : 'bg-slate-300'}`} />
+                     <span className={`text-[9px] font-black uppercase tracking-widest ${isInternal ? 'text-blue-200' : 'text-blue-600'}`}>{task.type}</span>
                   </div>
-                  <h4 className="font-display font-black text-slate-900 text-lg uppercase italic leading-none">{task.name}</h4>
+                  <h4 className={`font-display font-black text-lg uppercase italic leading-none ${isInternal ? 'text-white drop-shadow-sm' : 'text-slate-900'}`}>{task.name}</h4>
                 </div>
               </div>
               
               <div className="text-right relative z-10">
-                <p className="text-xl font-display font-black text-slate-900 tracking-tighter">
+                <p className={`text-xl font-display font-black tracking-tighter ${isInternal ? 'text-white' : 'text-slate-900'}`}>
                   {completedToday ? 'DONE' : `₦${task.reward.toFixed(2)}`}
                 </p>
                 <div className="flex items-center gap-1 justify-end mt-1">
-                   <Timer size={10} className="text-slate-400" />
-                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter italic">
+                   <Timer size={10} className={isInternal ? 'text-blue-100' : 'text-slate-400'} />
+                   <span className={`text-[8px] font-black uppercase tracking-tighter italic ${isInternal ? 'text-blue-100/70' : 'text-slate-400'}`}>
                      {completedToday ? 'Come back tomorrow' : '30s Ad Visit'}
                    </span>
                 </div>
               </div>
+
+              {isInternal && !completedToday && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+              )}
             </motion.button>
           );
         })}
