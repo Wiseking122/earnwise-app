@@ -2259,14 +2259,16 @@ async function startServer() {
         const history = payload?.history || [];
         
         // Fetch dynamic platform settings for AI context
-        let systemSettings: any = null;
+        let systemSettings: any = payload?.platformSettings || null;
         try {
-          const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
-          if (settingsSnap.exists) {
-            systemSettings = settingsSnap.data();
+          if (isDbAdminCapable) {
+            const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
+            if (settingsSnap.exists) {
+              systemSettings = settingsSnap.data();
+            }
           }
         } catch (e) {
-          console.error("AI context fetch error:", e);
+          console.error("AI context fetch error (HTTP):", e);
         }
 
         const exchangeRate = systemSettings?.exchangeRate ?? 1;
@@ -2276,7 +2278,7 @@ async function startServer() {
         const websiteName = systemSettings?.websiteName || 'EarnWise';
         const supportEmail = systemSettings?.supportEmail || 'support@earnwise.com';
 
-        console.log(`[AI-HTTP] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Live DB Fetch)`);
+        console.log(`[AI-HTTP] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Source: ${isDbAdminCapable ? 'DB/Client' : 'Client Only'})`);
 
         const systemInstruction = `
 You are 'Wise AI', the ultimate financial coach for members of ${websiteName}. 
@@ -4919,15 +4921,16 @@ CRITICAL PROTOCOLS:
         if (!message) return;
 
         // Fetch live platform settings to keep AI up to date
-        let systemSettings: any = null;
+        let systemSettings: any = clientSettings || null;
         try {
-          const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
-          if (settingsSnap.exists) {
-            systemSettings = settingsSnap.data();
+          if (isDbAdminCapable) {
+            const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
+            if (settingsSnap.exists) {
+              systemSettings = settingsSnap.data();
+            }
           }
         } catch (err) {
           console.warn("[WS] Failed to fetch live system settings from DB:", err);
-          systemSettings = clientSettings; // Fallback to client data if DB fails
         }
 
         if (userId) {
@@ -4953,7 +4956,7 @@ CRITICAL PROTOCOLS:
         const websiteName = systemSettings?.websiteName || 'EarnWise';
         const supportEmail = systemSettings?.supportEmail || 'support@earnwise.com';
 
-        console.log(`[AI-WS] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Live DB Fetch)`);
+        console.log(`[AI-WS] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Source: ${isDbAdminCapable ? 'DB/Client' : 'Client Only'})`);
         
         const dynamicInstruction = `
 You are 'Wise AI', the ultimate financial coach for members of ${websiteName}. 

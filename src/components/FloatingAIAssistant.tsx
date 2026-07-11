@@ -156,6 +156,7 @@ export default function FloatingAIAssistant() {
             userId: user?.uid,
             payload: { 
               prompt: p,
+              platformSettings: platformSettings,
               history: messages.map(m => ({
                 role: m.role === 'user' ? 'user' : 'model',
                 content: m.content
