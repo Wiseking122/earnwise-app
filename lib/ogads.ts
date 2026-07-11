@@ -42,9 +42,9 @@ export interface NormalizedOffer {
  * Passes client IP, User-Agent, and Country for precision geo-targeting.
  */
 export async function fetchOGAdsOffers(params: FetchOffersParams): Promise<NormalizedOffer[]> {
-  const apiKey = process.env.OGADS_API_KEY;
+  const apiKey = process.env.OGADS_API_KEY || '';
   if (!apiKey) {
-    throw new Error('Premium Offerwall is currently being configured. Please add the OGADS_API_KEY to your environment variables to enable these tasks.');
+    console.warn('[OGADS] Warning: OGADS_API_KEY is missing in environment variables.');
   }
 
   // The official OGAds Offer API Endpoint
