@@ -377,14 +377,16 @@ export default function TaskDetail() {
         });
 
         await updateDoc(userDocRef, {
-          balance: increment(payoutAmount),
-          withdrawableBalance: increment(payoutAmount),
-          taskBalance: increment(payoutAmount),
-          taskEarnings: increment(payoutAmount),
-          totalEarnings: increment(payoutAmount),
+          wiseCoins: increment(payoutAmount),
           tasksCompleted: increment(1),
           updatedAt: serverTimestamp()
         });
+
+        await setDoc(doc(db, 'wise_coin_wallets', user.uid), {
+          userId: user.uid,
+          balance: increment(payoutAmount),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
 
         await setDoc(transactionRef, {
           userId: user.uid,

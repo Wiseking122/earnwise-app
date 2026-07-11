@@ -66,8 +66,8 @@ export default function Transactions() {
             <div className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none -mr-16 -mt-16" style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)' }} />
             <div className="relative z-10 flex items-center justify-between">
                 <div>
-                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Total Wallet</p>
-                   <h3 className="text-3xl font-black tracking-tight">₦<AnimatedNumber value={profile?.balance || 0} /></h3>
+                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Total Wisecoin Wallet</p>
+                   <h3 className="text-3xl font-black tracking-tight"><AnimatedNumber value={profile?.balance || 0} /> WC</h3>
                 </div>
                 <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
                     <Wallet size={24} className="text-white" />
@@ -78,16 +78,16 @@ export default function Transactions() {
                 <div className="flex-1 bg-white/5 p-4 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingUp size={14} className="text-emerald-400" />
-                        <span className="text-[9px] font-black uppercase text-slate-400">Income</span>
+                        <span className="text-[9px] font-black uppercase text-slate-400">Wisecoin Income</span>
                     </div>
-                    <p className="font-black text-sm text-emerald-400">₦<AnimatedNumber value={profile?.taskEarnings || 0} /></p>
+                    <p className="font-black text-sm text-emerald-400"><AnimatedNumber value={profile?.taskEarnings || 0} /> WC</p>
                 </div>
                 <div className="flex-1 bg-white/5 p-4 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingDown size={14} className="text-orange-400" />
                         <span className="text-[9px] font-black uppercase text-slate-400">Withdrawals</span>
                     </div>
-                    <p className="font-black text-sm text-orange-400">₦{(profile?.withdrawableBalance === 0 ? 0 : 0 /* Placeholder for actual withdrawn total if we tracked it */).toLocaleString()}</p>
+                    <p className="font-black text-sm text-orange-400">{(profile?.withdrawableBalance === 0 ? 0 : 0).toLocaleString()} WC</p>
                 </div>
             </div>
         </div>
@@ -143,7 +143,7 @@ export default function Transactions() {
                   <p className={`font-black text-lg tracking-tighter ${
                     t.type === 'withdrawal' || t.type === 'staking' ? "text-slate-900" : "text-emerald-600"
                   }`}>
-                    {t.type === 'withdrawal' || t.type === 'staking' ? '-' : '+'}₦{t.amount.toLocaleString()}
+                    {t.type === 'withdrawal' || t.type === 'staking' ? '-' : '+'}{t.amount.toLocaleString()} WC
                   </p>
                   <div className="flex items-center gap-1 justify-end">
                      <div className={`w-1 h-1 rounded-full ${t.type === 'withdrawal' ? 'bg-orange-400' : 'bg-emerald-400'}`} />

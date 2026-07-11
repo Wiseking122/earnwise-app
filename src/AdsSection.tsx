@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
-import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot, setDoc } from 'firebase/firestore';
 import { useAuth } from './context/AuthContext';
 import { playRewardSound } from './pages/sounds';
 import VideoAd from './components/VideoAd';
@@ -364,20 +364,22 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     try {
        const userRef = doc(db, 'users', user.uid);
        await updateDoc(userRef, {
-         balance: increment(amount),
-         withdrawableBalance: increment(amount),
-         taskBalance: increment(amount),
-         taskEarnings: increment(amount),
-         totalEarnings: increment(amount),
+         wiseCoins: increment(amount),
          completedAds: arrayUnion({
            id: adId,
            timestamp: new Date().toISOString(),
            reward: amount
          })
        });
+
+       await setDoc(doc(db, 'wise_coin_wallets', user.uid), {
+         userId: user.uid,
+         balance: increment(amount),
+         updatedAt: new Date().toISOString()
+       }, { merge: true });
        
        playRewardSound();
-       setRewardMsg(`Success! +₦${amount.toFixed(2)} added to your wallet.`);
+       setRewardMsg(`Success! +${amount.toFixed(2)} WC added to your wallet.`);
        setTimeout(() => setRewardMsg(null), 3500);
     } catch (error) {
        console.error('Reward error:', error);

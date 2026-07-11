@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { getApiUrl } from '../lib/config';
 
 interface CpxOfferwallProps {
   userId: string;
@@ -25,7 +26,7 @@ export const CpxOfferwall: React.FC<CpxOfferwallProps> = ({ userId, userName, us
           email: userEmail || '',
         });
 
-        const res = await fetch(`/api/cpx/signed-url?${queryParams.toString()}`);
+        const res = await fetch(getApiUrl(`/api/cpx/signed-url?${queryParams.toString()}`));
         if (!res.ok) {
           throw new Error('Failed to generate secure survey path.');
         }

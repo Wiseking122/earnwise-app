@@ -38,7 +38,8 @@ import {
   Video,
   Copy,
   CheckCircle2,
-  Share2
+  Share2,
+  Coins
 } from 'lucide-react';
 
 import { DailyCheckIn } from '../components/DailyCheckIn';
@@ -292,11 +293,11 @@ export default function Home() {
       // Fallback local AI engine ensures Wise AI always works
       const estimatedEarning = Number(profile?.balance || 0) + (profile?.plan === 'golden' ? 15000 : profile?.plan === 'platinum' ? 7500 : 2500);
       setAiInsights({
-        prediction: `₦${estimatedEarning.toLocaleString()} daily earning potential based on your ${profile?.plan || 'free'} tier`,
+        prediction: `${estimatedEarning.toLocaleString()} Wisecoin daily earning potential based on your ${profile?.plan || 'free'} tier`,
         insights: [
           { title: "🔥 Wise AI Direct Strategy", description: "Regular ad tasks are temporarily unavailable for upgrade. Complete high-yield surveys in the Survey section to maintain your daily earning momentum.", type: "quick_win" },
           { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete at least one survey daily to maintain your 1.5x earnings multiplier!`, type: "strategy" },
-          { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant ₦2,500 bonus per verified invite.", type: "upgrade" }
+          { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant 2,500 Wisecoin bonus per verified invite.", type: "upgrade" }
         ]
       });
     } finally {
@@ -398,9 +399,9 @@ export default function Home() {
                       <div className="w-1 h-1 bg-emerald-400 opacity-80 rounded-full animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                     </div>
                     <h2 className="text-xl sm:text-2xl md:text-3xl font-display font-black tracking-tight text-white mb-0.5 break-all select-all drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-                      ₦<AnimatedNumber value={profile?.balance || 0} fractionDigits={2} />
+                      ₦<AnimatedNumber value={profile?.balance || 0} fractionDigits={0} />
                     </h2>
-                    <p className="text-blue-400/80 text-[7.5px] sm:text-[9px] font-bold uppercase tracking-widest truncate">Digital Earning Assets Secured</p>
+                    <p className="text-blue-400/80 text-[7.5px] sm:text-[9px] font-bold uppercase tracking-widest truncate">Available Naira Funds Secure</p>
                   </div>
                   <div className="flex gap-1.5 sm:gap-2 shrink-0">
                     <Link to="/deposit" className="w-8 h-8 sm:w-10 sm:h-10 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 rounded-lg flex items-center justify-center transition-all active:scale-95 group/icon relative overflow-hidden">
@@ -412,7 +413,7 @@ export default function Home() {
                     </Link>
                   </div>
                 </div>
- 
+
                 <div className="grid grid-cols-2 gap-2 mt-0.5 mb-0.5">
                   <div className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 rounded-lg sm:rounded-xl p-2 sm:p-3 shadow-inner relative overflow-hidden group/card shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
                     <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover/card:translate-x-[100%] transition-transform duration-1000" />
@@ -437,7 +438,7 @@ export default function Home() {
                         </div>
                         <div>
                           <p className="text-amber-500/80 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest leading-none mb-0.5">Wise Coin (WC)</p>
-                          <p className="text-[6.5px] text-amber-500/60 font-bold uppercase tracking-widest leading-none">Survey Rewards</p>
+                          <p className="text-[6.5px] text-amber-500/60 font-bold uppercase tracking-widest leading-none">Task & Survey Rewards</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -557,14 +558,14 @@ export default function Home() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <h4 className="font-display font-black text-sm leading-tight uppercase italic text-white group-hover:text-yellow-200 transition-colors">
-                    Weekly Cash Prizes
+                    Weekly Wisecoin Prizes
                   </h4>
                   <div className="bg-yellow-500/20 px-1.5 py-0.5 rounded-full border border-yellow-500/30">
-                    <span className="text-[6.5px] font-black text-yellow-300 uppercase tracking-widest">₦15,000 Max</span>
+                    <span className="text-[6.5px] font-black text-yellow-300 uppercase tracking-widest">15,000 WC Max</span>
                   </div>
                 </div>
                 <p className="text-slate-400 text-[9.5px] sm:text-[10.5px] font-medium leading-tight max-w-sm sm:max-w-md">
-                  Complete tasks, invite active members and earn XP. Top 10 earners get cash bonuses every Sunday at 11:59 PM!
+                  Complete tasks, invite active members and earn XP. Top 10 earners get Wisecoin bonuses every Sunday at 11:59 PM!
                 </p>
               </div>
               <div className="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-yellow-500 transition-colors shrink-0">
@@ -652,7 +653,7 @@ export default function Home() {
                   </div>
                   <div className="bg-white/5 border border-white/5 rounded-lg px-2 py-0.5 text-center min-w-[4.5rem] flex-1 sm:flex-initial">
                     <p className="text-[7.5px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-0.5">Total Earnings</p>
-                    <p className="text-xs font-black text-amber-400">₦{(profile?.referralEarnings || 0).toLocaleString()}</p>
+                    <p className="text-xs font-black text-amber-400">{(profile?.referralEarnings || 0).toLocaleString()} WC</p>
                   </div>
                 </div>
               </div>
@@ -802,7 +803,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-amber-400 font-display font-black text-sm sm:text-base tracking-tighter">₦{((task.reward ?? task.userPayout ?? 0) * multiplier).toFixed(0)}</p>
+                      <p className="text-amber-400 font-display font-black text-sm sm:text-base tracking-tighter">{((task.reward ?? task.userPayout ?? 0) * multiplier).toFixed(0)} WC</p>
                       <div className="flex items-center justify-end gap-0.5">
                         <Zap size={8} className="text-blue-600 fill-blue-600" />
                         <span className="text-[8px] text-blue-600 font-black uppercase tracking-tighter">Boosted</span>

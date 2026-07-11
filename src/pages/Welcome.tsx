@@ -86,7 +86,7 @@ export default function Welcome() {
     try {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
-        const isTargetAdmin = user.email === 'wiseking7890@gmail.com';
+        const isTargetAdmin = user.email?.toLowerCase() === 'wiseking7890@gmail.com';
         const existingData = userDoc.exists() ? userDoc.data() : null;
         
         const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;

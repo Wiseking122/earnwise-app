@@ -839,14 +839,14 @@ export default function Withdrawal() {
 
               <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between h-24">
                 <div className="flex justify-between items-start">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Task Balance</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Task Wisecoin Balance</span>
                   <Wallet size={14} className="text-blue-500" />
                 </div>
                 <div>
                   <h4 className="text-xl font-display font-black text-emerald-400 italic">
-                    ₦<AnimatedNumber value={profile?.taskBalance || 0} fractionDigits={2} />
+                    <AnimatedNumber value={profile?.taskBalance || 0} fractionDigits={0} /> <span className="text-xs">WC</span>
                   </h4>
-                  <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">Cleared Naira holdings</p>
+                  <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">Cleared Wisecoin holdings</p>
                 </div>
               </div>
             </div>
@@ -1018,12 +1018,12 @@ export default function Withdrawal() {
                 {/* Wallet Balance Summary for Bank Withdrawal */}
                 <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs font-black">
                   <div className="space-y-1">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Task NGN Balance</span>
-                    <h3 className="text-lg text-emerald-400">₦{(profile?.taskBalance || 0).toLocaleString()}</h3>
+                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Task Wisecoin Balance</span>
+                    <h3 className="text-lg text-emerald-400">{(profile?.taskBalance || 0).toLocaleString()} WC</h3>
                   </div>
                   <div className="space-y-1 text-right">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Referral NGN Balance</span>
-                    <h3 className="text-lg text-emerald-400">₦{(profile?.referralBalance || 0).toLocaleString()}</h3>
+                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Referral Wisecoin Balance</span>
+                    <h3 className="text-lg text-emerald-400">{(profile?.referralBalance || 0).toLocaleString()} WC</h3>
                   </div>
                 </div>
 
@@ -1071,9 +1071,9 @@ export default function Withdrawal() {
                 {/* NGN Withdrawal Form */}
                 <form onSubmit={handleBankWithdrawal} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-500 uppercase ml-1 tracking-widest">Withdrawal Amount in Naira</label>
+                    <label className="text-[9px] font-black text-slate-500 uppercase ml-1 tracking-widest">Withdrawal Amount in Wisecoin</label>
                     <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-lg text-slate-400">₦</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-[10px] text-slate-400">WC</span>
                       <input 
                         type="number" 
                         placeholder="0.00"
@@ -1088,9 +1088,9 @@ export default function Withdrawal() {
                     {parseFloat(amount) >= 1000 && (
                       <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mt-1 pl-1">
                         {withdrawalType === 'task' ? (
-                          `A 10% processing fee applies. You receive: ₦${(parseFloat(amount) * 0.90).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                          `A 10% processing fee applies. You receive: ${(parseFloat(amount) * 0.90).toLocaleString(undefined, { minimumFractionDigits: 0 })} WC`
                         ) : (
-                          `Referral withdrawals are 100% free of charge! You receive: ₦${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                          `Referral withdrawals are 100% free of charge! You receive: ${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 0 })} WC`
                         )}
                       </p>
                     )}

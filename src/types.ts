@@ -41,12 +41,12 @@ export interface UserProfile {
   referralEarnings?: number;
   bonusEarnings?: number;
   totalEarnings?: number;
-  balance: number;
   taskBalance: number;
   referralBalance: number;
   telegramId?: string | null;
   deviceFingerprint?: string | null;
-  wiseCoins: number;
+  wiseCoins: number; // Task wallet
+  balance: number; // Naira/Available balance
   rank: RankType;
   vaultBalance?: number;
   tasksCompleted?: number;
@@ -96,6 +96,26 @@ export interface UserProfile {
     reward: number;
   }[];
   createdAt: any;
+}
+
+export interface PlatformSettings {
+  wiseCoinName: string;
+  wiseCoinSymbol: string;
+  exchangeRate: number; // 1 WiseCoin = X Naira
+  minConversion: number;
+  maxConversion: number;
+  exchangeEnabled: boolean;
+  websiteName: string;
+  supportEmail: string;
+  telegramLink: string;
+  aiKnowledge: string;
+  faqs: { question: string; answer: string }[];
+  withdrawalSettings: {
+    minWithdrawal: number;
+    maxWithdrawal: number;
+    feePercentage: number;
+  };
+  ogadsConversionRate?: number;
 }
 
 export interface Task {
@@ -186,4 +206,21 @@ export interface CoursePurchase {
   userId: string;
   courseId: string;
   purchasedAt: any;
+}
+
+export interface OfferSubmission {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  offerId: string;
+  offerTitle: string;
+  payout: number;
+  screenshotUrl: string;
+  note?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: any;
+  reviewedAt?: any;
+  rejectionReason?: string;
+  adminNotes?: string;
 }

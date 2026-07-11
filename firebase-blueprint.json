@@ -223,6 +223,25 @@
       },
       "required": ["userId", "amount", "bonus", "payoutAmount", "status", "lockedAt", "unlocksAt"]
     },
+    "Appeal": {
+      "title": "Appeal",
+      "description": "User appeal against account suspension",
+      "type": "object",
+      "properties": {
+        "appealId": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "message": { "type": "string" },
+        "screenshot": { "type": "string", "description": "Base64 image string of optional proof screenshot" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "suspensionReason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "fullName", "username", "email", "message", "status", "createdAt"]
+    },
     "SystemSettings": {
       "title": "System Settings",
       "description": "Global application configuration and toggles",
@@ -304,6 +323,10 @@
     "/vault_entries/{vaultEntryId}": {
       "schema": "VaultEntry",
       "description": "Vault staking entries"
+    },
+    "/appeals/{appealId}": {
+      "schema": "Appeal",
+      "description": "User account suspension appeals"
     },
     "/wise_coin_wallets/{userId}": {
       "schema": "WiseCoinWallet",

@@ -890,6 +890,226 @@ async function startServer() {
     res.json({ status: "ok", botActive: !!bot });
   });
 
+  app.get("/api/offers", async (req, res) => {
+    try {
+      const apiKey = process.env.OGADS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ success: false, error: "OGADS_API_KEY is not defined in server environment variables." });
+      }
+
+      const xForwardedFor = req.headers['x-forwarded-for'];
+      const ip = typeof xForwardedFor === 'string'
+        ? xForwardedFor.split(',')[0].trim()
+        : (req.socket.remoteAddress || '');
+
+      const userAgent = req.headers['user-agent'] || '';
+      
+      const queryCountry = req.query.country || undefined;
+      const queryDevice = req.query.device || undefined;
+      const queryType = req.query.type || undefined;
+      const queryMax = req.query.max || undefined;
+      const queryMin = req.query.min || undefined;
+      
+      const vercelCountry = req.headers['x-vercel-ip-country'] || undefined;
+      const country = queryCountry || vercelCountry;
+
+      const url = 'https://appsave.online/api/v2';
+      const queryParams: Record<string, string> = {};
+      if (ip) queryParams.ip = ip;
+      if (userAgent) queryParams.user_agent = userAgent;
+      if (country) queryParams.country = String(country);
+      if (queryDevice) queryParams.device = String(queryDevice);
+      if (queryType) queryParams.type = String(queryType);
+      if (queryMax) queryParams.max = String(queryMax);
+      if (queryMin) queryParams.min = String(queryMin);
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const requestUrl = queryString ? `${url}?${queryString}` : url;
+
+      const apiResponse = await fetch(requestUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        return res.status(500).json({ success: false, error: `OGAds API HTTP Error ${apiResponse.status}: ${errorText}` });
+      }
+
+      const data = await apiResponse.json();
+      
+      // Support if "data" itself is an array, or has "offers" or "data" fields
+      const rawOffers = Array.isArray(data) ? data : (data.offers || data.data || []);
+      const offers = Array.isArray(rawOffers) ? rawOffers.map((offer: any) => {
+        let payoutNum = parseFloat(offer.payout) || 0;
+        const defaultImage = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';
+        const imageUrl = offer.picture || offer.icon_url || offer.image || defaultImage;
+
+        let devices: string[] = [];
+        if (offer.platforms && Array.isArray(offer.platforms)) {
+          devices = offer.platforms;
+        } else if (offer.platform) {
+          devices = [offer.platform];
+        } else if (offer.device) {
+          devices = [offer.device];
+        } else {
+          devices = ['All Devices'];
+        }
+
+        // Generate stable and deterministic ID if no native ID exists to prevent random generation on reload
+        let stableId = String(offer.ad_id || offer.offer_id || offer.id || offer.campaign_id || '').trim();
+        
+        if (!stableId || stableId === 'undefined' || stableId === 'null') {
+          const title = (offer.name || offer.title || 'Premium Earnwise Campaign').trim();
+          // Strip query parameters from link for hashing to ensure stability if tracking IDs change
+          const rawLink = String(offer.link || '').trim();
+          const stableLink = rawLink.split('?')[0];
+          
+          let hash = 0;
+          const str = `${title}-${stableLink}`.toLowerCase();
+          for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash = hash & hash;
+          }
+          stableId = `h-${Math.abs(hash)}`;
+        } else {
+          // Normalize existing ID
+          stableId = stableId.toLowerCase();
+        }
+
+        return {
+          id: stableId,
+          title: offer.name || offer.title || 'Premium Earnwise Campaign',
+          description: offer.description || 'Complete the campaign instructions fully to receive your WiseCoin reward.',
+          adcopy: offer.adcopy || offer.instructions || '',
+          payout: payoutNum,
+          imageUrl,
+          link: offer.link || '#',
+          countries: offer.countries || (offer.country ? [offer.country] : ['Global']),
+          devices: devices.map((d: string) => d.toLowerCase()),
+          category: offer.category || 'Incentive Task',
+        };
+      }) : [];
+
+      return res.json({
+        success: true,
+        count: offers.length,
+        offers,
+        meta: {
+          detectedIp: ip || 'unknown',
+          detectedCountry: country || 'unknown',
+          deviceRequested: queryDevice || 'all',
+        }
+      });
+    } catch (error: any) {
+      console.error('[OGADS SERVER API ERROR]:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/v1/offers/submit-proof", async (req, res) => {
+    const { userId, userName, userEmail, screenshotUrl, note } = req.body;
+    const offerId = String(req.body.offerId || '').trim().toLowerCase();
+    const offerTitle = req.body.offerTitle || 'Premium Offer';
+    const payout = req.body.payout || 0;
+
+    try {
+      const now = new Date();
+      const unlockAtDate = new Date(now);
+      unlockAtDate.setHours(24, 0, 0, 0); // Sets to next midnight in server's local time
+
+      // Calculate completed_date in WAT timezone (UTC+1)
+      const watMs = now.getTime() + (1 * 60 * 60 * 1000);
+      const watDate = new Date(watMs);
+      const watYear = watDate.getUTCFullYear();
+      const watMonth = String(watDate.getUTCMonth() + 1).padStart(2, '0');
+      const watDay = String(watDate.getUTCDate()).padStart(2, '0');
+      const completedDateStr = `${watYear}-${watMonth}-${watDay}`;
+
+      if (!isDbAdminCapable) {
+        console.warn("[FIREBASE] Server Admin SDK is not ready. Returning client-side fallback mode.");
+        return res.json({ 
+          success: true, 
+          fallback: true, 
+          message: "Server is in fallback/restricted mode.",
+          unlockAt: unlockAtDate.toISOString()
+        });
+      }
+
+      if (!userId || !offerId || offerId === '' || offerId === 'unknown') {
+        return res.status(400).json({ error: "Missing required fields: userId or valid offerId." });
+      }
+
+      // Check if there is already a submission for this user, offer, that has not unlocked yet
+      const existingSubSnap = await dbAdmin.collection('offer_submissions')
+        .where('userId', '==', userId)
+        .where('offerId', '==', offerId)
+        .get();
+
+      let alreadyLocked = false;
+      const nowTime = now.getTime();
+      existingSubSnap.forEach(doc => {
+        const data = doc.data();
+        const unlockField = data.unlockAt || data.unlock_at;
+        if (unlockField) {
+          const unlockTime = unlockField.toDate ? unlockField.toDate().getTime() : new Date(unlockField).getTime();
+          if (nowTime < unlockTime) {
+            alreadyLocked = true;
+          }
+        } else if (data.completed_date && data.completed_date === completedDateStr) {
+          alreadyLocked = true;
+        }
+      });
+
+      if (alreadyLocked) {
+        return res.status(400).json({ 
+          error: "You have already completed this offer today. Please come back tomorrow." 
+        });
+      }
+
+      // Save the submission
+      const submissionRef = dbAdmin.collection('offer_submissions').doc();
+      const submissionData = {
+        userId: userId,
+        userName: userName || 'User',
+        userEmail: userEmail || '',
+        offerId: offerId,
+        offerTitle: offerTitle || 'Untitled Offer',
+        payout: Number(payout) || 0,
+        screenshotUrl: screenshotUrl || '',
+        note: note || '',
+        status: 'pending', // For admin panel compatibility
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        unlockAt: admin.firestore.Timestamp.fromDate(unlockAtDate),
+        
+        // Snake case requested by user
+        user_id: userId,
+        offer_id: offerId,
+        proof: screenshotUrl || '',
+        submitted_at: admin.firestore.FieldValue.serverTimestamp(),
+        completed_date: completedDateStr,
+        unlock_at: admin.firestore.Timestamp.fromDate(unlockAtDate),
+      };
+
+      await submissionRef.set(submissionData);
+
+      res.json({ 
+        success: true, 
+        message: "Offer submission saved successfully.",
+        id: submissionRef.id,
+        unlockAt: unlockAtDate.toISOString()
+      });
+
+    } catch (err: any) {
+      console.error("[OFFER_SUBMISSION_API] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to submit offer proof." });
+    }
+  });
+
   app.get("/api/debug-user", async (req, res) => {
     try {
       const email = "wiseking7890@gmail.com";
@@ -1091,11 +1311,15 @@ async function startServer() {
               });
             }
 
+            const walletRef = dbAdmin.collection('wise_coin_wallets').doc(userId.toString());
+            transaction.set(walletRef, {
+              userId: userId.toString(),
+              balance: admin.firestore.FieldValue.increment(finalReward),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
             transaction.update(userRef, {
-               balance: admin.firestore.FieldValue.increment(finalReward),
-               withdrawableBalance: admin.firestore.FieldValue.increment(finalReward),
-               taskBalance: admin.firestore.FieldValue.increment(finalReward),
-               taskEarnings: admin.firestore.FieldValue.increment(finalReward),
+               wiseCoins: admin.firestore.FieldValue.increment(finalReward),
                totalEarnings: admin.firestore.FieldValue.increment(finalReward),
                updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
@@ -1168,14 +1392,19 @@ async function startServer() {
         if (isDbAdminCapable) {
           const userRef = dbAdmin.collection('users').doc(user_id as string);
           await userRef.update({
-            balance: admin.firestore.FieldValue.increment(Number(amount_local)),
-            withdrawableBalance: admin.firestore.FieldValue.increment(Number(amount_local)),
-            taskBalance: admin.firestore.FieldValue.increment(Number(amount_local)),
+            wiseCoins: admin.firestore.FieldValue.increment(Number(amount_local)),
             totalSurveyEarnings: admin.firestore.FieldValue.increment(Number(amount_local)),
             taskEarnings: admin.firestore.FieldValue.increment(Number(amount_local)),
             totalEarnings: admin.firestore.FieldValue.increment(Number(amount_local)),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           });
+
+          const walletRef = dbAdmin.collection('wise_coin_wallets').doc(user_id as string);
+          await walletRef.set({
+            userId: user_id,
+            balance: admin.firestore.FieldValue.increment(Number(amount_local)),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
 
           // Record Transaction
           await dbAdmin.collection('transactions').add({
@@ -1190,7 +1419,7 @@ async function startServer() {
           await dbAdmin.collection('notifications').add({
             userId: user_id,
             title: "💰 Survey Reward Credited!",
-            message: `You earned ₦${amount_local} from a CPX Research survey completion.`,
+            message: `You earned ${amount_local} WC from a CPX Research survey completion.`,
             type: 'reward',
             read: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1203,10 +1432,16 @@ async function startServer() {
         if (isDbAdminCapable) {
           const userRef = dbAdmin.collection('users').doc(user_id as string);
           await userRef.update({
-            balance: admin.firestore.FieldValue.increment(-Number(amount_local)),
-            withdrawableBalance: admin.firestore.FieldValue.increment(-Number(amount_local)),
+            wiseCoins: admin.firestore.FieldValue.increment(-Number(amount_local)),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           });
+
+          const walletRef = dbAdmin.collection('wise_coin_wallets').doc(user_id as string);
+          await walletRef.set({
+            userId: user_id,
+            balance: admin.firestore.FieldValue.increment(-Number(amount_local)),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
 
           // Record Chargeback Transaction
           await dbAdmin.collection('transactions').add({
@@ -1357,17 +1592,23 @@ async function startServer() {
         }
 
         await dbAdmin.runTransaction(async (transaction) => {
-          // Increment the user's balances
+          // Increment the user's wiseCoins balance
           transaction.update(userRef, {
-            balance: admin.firestore.FieldValue.increment(rewardNum),
-            withdrawableBalance: admin.firestore.FieldValue.increment(rewardNum),
-            taskBalance: admin.firestore.FieldValue.increment(rewardNum),
+            wiseCoins: admin.firestore.FieldValue.increment(rewardNum),
             totalSurveyEarnings: admin.firestore.FieldValue.increment(rewardNum),
             totalOfferwallEarnings: admin.firestore.FieldValue.increment(rewardNum),
             taskEarnings: admin.firestore.FieldValue.increment(rewardNum),
             totalEarnings: admin.firestore.FieldValue.increment(rewardNum),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           });
+
+          // Increment wise_coin_wallets
+          const walletRef = dbAdmin.collection('wise_coin_wallets').doc(String(subId));
+          transaction.set(walletRef, {
+            userId: String(subId),
+            balance: admin.firestore.FieldValue.increment(rewardNum),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
 
           // Set the transaction id block
           transaction.set(completionRef, {
@@ -1393,7 +1634,7 @@ async function startServer() {
           transaction.set(notifRef, {
             userId: subId,
             title: "🔥 BitcoTasks Reward Credited!",
-            message: `You earned ₦${rewardNum} from completing a BitcoTasks task.`,
+            message: `You earned ${rewardNum} WC from completing a BitcoTasks task.`,
             type: 'reward',
             read: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1401,7 +1642,7 @@ async function startServer() {
           });
         });
 
-        console.log(`[WEBHOOK-BITCOTASKS] SUCCESSFULLY credited User ${subId} with ₦${rewardNum}`);
+        console.log(`[WEBHOOK-BITCOTASKS] SUCCESSFULLY credited User ${subId} with ${rewardNum} WC`);
         return res.status(200).send("ok");
       }
       
@@ -1431,10 +1672,16 @@ async function startServer() {
 
         await dbAdmin.runTransaction(async (transaction) => {
           transaction.update(userRef, {
-            balance: admin.firestore.FieldValue.increment(-rewardNum),
-            withdrawableBalance: admin.firestore.FieldValue.increment(-rewardNum),
+            wiseCoins: admin.firestore.FieldValue.increment(-rewardNum),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           });
+
+          const walletRef = dbAdmin.collection('wise_coin_wallets').doc(String(subId));
+          transaction.set(walletRef, {
+            userId: String(subId),
+            balance: admin.firestore.FieldValue.increment(-rewardNum),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
 
           transaction.set(completionRef, {
             subId,
@@ -2010,6 +2257,18 @@ async function startServer() {
     try {
       if (action === 'generate-text') {
         const history = payload?.history || [];
+        // Fetch dynamic platform settings for AI context
+        let dynamicContext = "";
+        try {
+          const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
+          if (settingsSnap.exists) {
+            const data = settingsSnap.data();
+            dynamicContext = `\n\nDYNAMIC PLATFORM RULES & KNOWLEDGE:\n${data?.aiKnowledge || ""}`;
+          }
+        } catch (e) {
+          console.error("AI context fetch error:", e);
+        }
+
         const systemInstruction = `You are an expert marketing and earning assistant for EarnWise, a leading task-based earning and advertising platform in Nigeria.
 Your goal is to help users succeed on EarnWise. Answer all their questions about EarnWise features including:
 - Task List & Detail: How to perform social tasks (follow, like, comment) and submit proof for automated verification.
@@ -2020,6 +2279,7 @@ Your goal is to help users succeed on EarnWise. Answer all their questions about
 - Referrals & Team Building: The 10% lifetime referral bonus structure.
 - Vault: Staking funds for fixed-term growth bonuses.
 - Support: How to reach out for assistance.
+${dynamicContext}
 
 IMPORTANT INSTRUCTIONS:
 - ONLY explain what the user asks about. Do NOT volunteer facts about the owner, CEO, or sponsors unless the user explicitly asks for them.
@@ -2290,10 +2550,15 @@ Please verify if the submission is a plausible and honest completion of a social
           }
 
           transaction.update(userRef, {
-            balance: admin.firestore.FieldValue.increment(numericReward),
-            taskBalance: admin.firestore.FieldValue.increment(numericReward),
-            taskEarnings: admin.firestore.FieldValue.increment(numericReward)
+            wiseCoins: admin.firestore.FieldValue.increment(numericReward)
           });
+
+          const walletRef = dbAdmin.collection('wise_coin_wallets').doc(userId);
+          transaction.set(walletRef, {
+            userId,
+            balance: admin.firestore.FieldValue.increment(numericReward),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
 
           // 3. Log transaction
           const txRef = dbAdmin.collection('transactions').doc();
@@ -2727,13 +2992,16 @@ Please verify if the submission is a plausible and honest completion of a social
           });
         }
 
-        // Atomic multi-variable update - Immediate Payout (Restored to yesterday's behavior)
-        transaction.update(userRef, {
+        // Atomic multi-variable update - WiseCoin Payout
+        const walletRef = dbAdmin.collection('wise_coin_wallets').doc(userId);
+        transaction.set(walletRef, {
+          userId,
           balance: admin.firestore.FieldValue.increment(finalPayout),
-          withdrawableBalance: admin.firestore.FieldValue.increment(finalPayout),
-          taskBalance: admin.firestore.FieldValue.increment(finalPayout),
-          taskEarnings: admin.firestore.FieldValue.increment(finalPayout),
-          totalEarnings: admin.firestore.FieldValue.increment(finalPayout),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        transaction.update(userRef, {
+          wiseCoins: admin.firestore.FieldValue.increment(finalPayout),
           tasksCompleted: admin.firestore.FieldValue.increment(1),
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -2787,7 +3055,7 @@ Please verify if the submission is a plausible and honest completion of a social
 
     try {
       const adminDoc = await dbAdmin.collection('users').doc(adminId as string).get();
-      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email !== 'wiseking7890@gmail.com')) {
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email?.toLowerCase() !== 'wiseking7890@gmail.com')) {
         return res.status(403).json({ error: "Unauthorized" });
       }
 
@@ -2822,7 +3090,7 @@ Please verify if the submission is a plausible and honest completion of a social
 
     try {
       const adminDoc = await dbAdmin.collection('users').doc(adminId).get();
-      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email !== 'wiseking7890@gmail.com')) {
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email?.toLowerCase() !== 'wiseking7890@gmail.com')) {
         return res.status(403).json({ error: "Unauthorized" });
       }
 
@@ -2845,7 +3113,7 @@ Please verify if the submission is a plausible and honest completion of a social
           message,
           userId,
           type: 'direct',
-          read: false,
+          isRead: false,
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 

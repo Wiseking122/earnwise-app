@@ -29,6 +29,9 @@ import Support from './pages/Support';
 import Academy from './pages/Academy';
 import SurveySubmission from './pages/SurveySubmission';
 import SurveyHistory from './pages/SurveyHistory';
+import Offers from './pages/Offers';
+import SubmitProof from './pages/SubmitProof';
+import PlatformSettings from './pages/admin/PlatformSettings';
 
 import CoursePlayer from './pages/CoursePlayer';
 import VideoPlayer from './pages/VideoPlayer';
@@ -38,6 +41,7 @@ import AdminPayments from './pages/admin/Payments';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
 import SurveyVerification from './pages/admin/SurveyVerification';
+import OfferVerification from './pages/admin/OfferVerification';
 import WiseCoinManager from './pages/admin/WiseCoinManager';
 import AdminAds from './pages/admin/Ads';
 import AdminNotifications from './pages/admin/Notifications';
@@ -46,6 +50,7 @@ import InstallAppModal from './components/InstallAppModal';
 import { TelegramJoinPopup } from './components/TelegramJoinPopup';
 import WelcomePopup from './components/WelcomePopup';
 import SuspendedScreen from './components/SuspendedScreen';
+import AdminAppeals from './pages/admin/AppealsManager';
 
 function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: { children: React.ReactNode, adminOnly?: boolean, bypassPlanCheck?: boolean }) {
   const { user, profile, loading } = useAuth();
@@ -55,11 +60,11 @@ function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: 
   if (!user) return <Navigate to="/welcome" />;
   
   // Guard for suspended users (excluding admins / wiseking)
-  if (profile?.securityMetrics?.isSuspended && profile?.role !== 'admin' && user.email !== 'wiseking7890@gmail.com') {
+  if (profile?.securityMetrics?.isSuspended && profile?.role !== 'admin' && user.email?.toLowerCase() !== 'wiseking7890@gmail.com') {
     return <SuspendedScreen />;
   }
   
-  if (adminOnly && profile?.role !== 'admin' && user.email !== 'wiseking7890@gmail.com') return <Navigate to="/" />;
+  if (adminOnly && profile?.role !== 'admin' && user.email?.toLowerCase() !== 'wiseking7890@gmail.com') return <Navigate to="/" />;
   
   return <>{children}</>;
 }
@@ -93,6 +98,8 @@ function AppRoutes() {
         <Route path="/academy" element={<PrivateRoute><Academy /></PrivateRoute>} />
         <Route path="/submit-survey" element={<PrivateRoute><SurveySubmission /></PrivateRoute>} />
         <Route path="/survey-history" element={<PrivateRoute><SurveyHistory /></PrivateRoute>} />
+        <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
+        <Route path="/submit-proof" element={<PrivateRoute><SubmitProof /></PrivateRoute>} />
 
         <Route path="/academy/course/:id" element={<PrivateRoute><CoursePlayer /></PrivateRoute>} />
         <Route path="/player" element={<PrivateRoute><VideoPlayer /></PrivateRoute>} />
@@ -106,12 +113,15 @@ function AppRoutes() {
         <Route path="/admin/tasks" element={<PrivateRoute adminOnly bypassPlanCheck><AdminTasks /></PrivateRoute>} />
         <Route path="/admin/payments" element={<PrivateRoute adminOnly bypassPlanCheck><AdminPayments /></PrivateRoute>} />
         <Route path="/admin/survey-verification" element={<PrivateRoute adminOnly bypassPlanCheck><SurveyVerification /></PrivateRoute>} />
+        <Route path="/admin/proof-review" element={<PrivateRoute adminOnly bypassPlanCheck><OfferVerification /></PrivateRoute>} />
         <Route path="/admin/wise-coin" element={<PrivateRoute adminOnly bypassPlanCheck><WiseCoinManager /></PrivateRoute>} />
+        <Route path="/admin/platform-settings" element={<PrivateRoute adminOnly bypassPlanCheck><PlatformSettings /></PrivateRoute>} />
         <Route path="/admin/users" element={<PrivateRoute adminOnly bypassPlanCheck><AdminUsers /></PrivateRoute>} />
         <Route path="/admin/courses" element={<PrivateRoute adminOnly bypassPlanCheck><AdminCourses /></PrivateRoute>} />
         <Route path="/admin/ads" element={<PrivateRoute adminOnly bypassPlanCheck><AdminAds /></PrivateRoute>} />
         <Route path="/admin/notifications" element={<PrivateRoute adminOnly bypassPlanCheck><AdminNotifications /></PrivateRoute>} />
         <Route path="/admin/announcements" element={<PrivateRoute adminOnly bypassPlanCheck><AdminAnnouncements /></PrivateRoute>} />
+        <Route path="/admin/appeals" element={<PrivateRoute adminOnly bypassPlanCheck><AdminAppeals /></PrivateRoute>} />
         
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

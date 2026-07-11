@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, increment, arrayUnion, setDoc } from 'firebase/firestore';
 import { playRewardSound } from './sounds';
 import VastVideoPlayer from '../components/VastVideoPlayer';
 
@@ -97,20 +97,22 @@ export default function VideoPlayer() {
     try {
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        balance: increment(rewardVal),
-        withdrawableBalance: increment(rewardVal),
-        taskBalance: increment(rewardVal),
-        taskEarnings: increment(rewardVal),
-        totalEarnings: increment(rewardVal),
+        wiseCoins: increment(rewardVal),
         completedAds: arrayUnion({
           id: adId,
           timestamp: new Date().toISOString(),
           reward: rewardVal
         })
       });
+
+      await setDoc(doc(db, 'wise_coin_wallets', user.uid), {
+        userId: user.uid,
+        balance: increment(rewardVal),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
       
       playRewardSound();
-      setStatusMsg(`Success! +₦${rewardVal.toFixed(2)} added to your wallet.`);
+      setStatusMsg(`Success! +${rewardVal.toFixed(2)} WC added to your wallet.`);
     } catch (err) {
       console.error('Error crediting reward on video end:', err);
       setStatusMsg("Failed to credit reward. Please try again.");

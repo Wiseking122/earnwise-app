@@ -31,7 +31,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.uid == 'Ik1Ngp1oC9hYXZt9lQEPIeOiCGA3') ||
-        (request.auth.token.email == 'wiseking7890@gmail.com') ||
+        ('email' in request.auth.token && (request.auth.token.email == 'wiseking7890@gmail.com' || request.auth.token.email == 'Wiseking7890@gmail.com' || request.auth.token.email.matches('(?i)^wiseking7890@gmail\\.com$'))) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
@@ -121,6 +121,16 @@ service cloud.firestore {
              (data.unlocksAt is timestamp || data.unlocksAt is string);
     }
 
+    function isValidAppeal(data) {
+      return data.userId == request.auth.uid &&
+             data.fullName is string && data.fullName.size() <= 100 &&
+             data.username is string && data.username.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.message is string && data.message.size() <= 3000 &&
+             data.status in ['Pending', 'Approved', 'Rejected'] &&
+             (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+
     match /test/connection {
       allow read: if true;
     }
@@ -154,6 +164,13 @@ service cloud.firestore {
     }
 
     match /survey_submissions/{submissionId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn(); 
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /offer_submissions/{submissionId} {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn(); 
       allow create: if isSignedIn() && incoming().userId == request.auth.uid;
@@ -257,6 +274,13 @@ service cloud.firestore {
     match /ads/{adId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /appeals/{appealId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidAppeal(incoming()) && isValidId(appealId);
+      allow update, delete: if isAdmin();
     }
 
     // Default Deny at the bottom

@@ -25,7 +25,8 @@ import {
   X,
   BookOpen,
   ShieldCheck,
-  Coins
+  Coins,
+  ShieldAlert
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { sendNotification, NotificationType } from '../../lib/notifications';
@@ -38,6 +39,8 @@ export default function AdminDashboard() {
     pendingWithdrawals: 0,
     pendingEscrow: 0, 
     pendingSurveys: 0,
+    pendingOffers: 0,
+    pendingAppeals: 0,
     totalPending: 0,
     totalWithdrawable: 0
   });
@@ -102,6 +105,14 @@ export default function AdminDashboard() {
       setStats(prev => ({ ...prev, pendingSurveys: snap.size }));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'survey_submissions'));
 
+    const unsubOffers = onSnapshot(query(collection(db, 'offer_submissions'), where('status', '==', 'pending')), (snap) => {
+      setStats(prev => ({ ...prev, pendingOffers: snap.size }));
+    }, (error) => console.error(error));
+
+    const unsubAppeals = onSnapshot(query(collection(db, 'appeals'), where('status', '==', 'Pending')), (snap) => {
+      setStats(prev => ({ ...prev, pendingAppeals: snap.size }));
+    }, (error) => console.error(error));
+
     return () => {
       unsubUsers();
       unsubTasks();
@@ -109,6 +120,8 @@ export default function AdminDashboard() {
       unsubWiths();
       unsubEscrow();
       unsubSurveys();
+      unsubOffers();
+      unsubAppeals();
     };
   }, []);
 
@@ -133,9 +146,11 @@ export default function AdminDashboard() {
     { label: 'Verify Tasks', icon: CheckCircle, path: '/admin/tasks', count: stats.pendingCompletions, color: 'orange' },
     { label: 'User Directory', icon: Users, path: '/admin/users', count: stats.users, color: 'purple' },
     { label: 'Survey Verification', icon: ShieldCheck, path: '/admin/survey-verification', count: stats.pendingSurveys, color: 'orange' },
+    { label: 'Offer Proof Review', icon: ShieldCheck, path: '/admin/proof-review', count: stats.pendingOffers, color: 'blue' },
     { label: 'Wise Coin Manager', icon: Coins, path: '/admin/wise-coin', count: 0, color: 'blue' },
     { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },
     { label: 'Ad Management', icon: Megaphone, path: '/admin/ads', count: 0, color: 'indigo' },
+    { label: 'Appeals Manager', icon: ShieldAlert, path: '/admin/appeals', count: stats.pendingAppeals, color: 'purple' },
   ];
 
   return (

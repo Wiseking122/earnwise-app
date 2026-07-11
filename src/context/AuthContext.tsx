@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const updates: any = {};
         let needsUpdate = false;
 
-        if (user.email === 'wiseking7890@gmail.com' && userData.role !== 'admin') {
+        if (user.email?.toLowerCase() === 'wiseking7890@gmail.com' && userData.role !== 'admin') {
           updates.role = 'admin';
           needsUpdate = true;
         }
@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName: user.displayName?.split(' ')[0] || '',
           lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
           phoneNumber: user.phoneNumber || '',
-          role: user.email === 'wiseking7890@gmail.com' ? 'admin' : 'user',
+          role: user.email?.toLowerCase() === 'wiseking7890@gmail.com' ? 'admin' : 'user',
           balance: 0,
           taskBalance: 0,
           referralBalance: 0,

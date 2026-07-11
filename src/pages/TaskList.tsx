@@ -247,6 +247,56 @@ export default function TaskList() {
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
           {activeCategory === 'survey' && user && (
             <div className="space-y-6">
+               {isUserFree ? (
+                 <button 
+                   onClick={() => setShowRestriction(true)}
+                   className="block w-full p-6 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-[2.5rem] text-center shadow-[0_15px_35px_rgba(37,99,235,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden border border-blue-500/35 relative"
+                 >
+                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                   <div className="absolute top-4 right-4 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1">
+                      <Lock size={8} /> LOCKED
+                   </div>
+                   <div className="relative z-10 flex flex-col items-center gap-2">
+                     <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-1 border border-white/10 shadow-inner">
+                       <Lock size={24} className="group-hover:scale-110 transition-all duration-500 text-amber-400" />
+                     </div>
+                     <h3 className="text-xl sm:text-2xl font-display font-black text-white uppercase italic tracking-tight flex items-center gap-2">
+                       OGAds Premium Offers
+                     </h3>
+                     <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest leading-none text-center">
+                       Earn High Payouts on Direct App Installs & Action Campaigns
+                     </p>
+                     <div className="mt-3 inline-flex items-center gap-1 bg-white/15 text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-white/10 backdrop-blur-md">
+                       Unlock Offer Wall <ChevronRight size={10} className="stroke-[3px]" />
+                     </div>
+                   </div>
+                 </button>
+               ) : (
+                 <Link 
+                   to="/offers"
+                   className="block w-full p-6 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-[2.5rem] text-center shadow-[0_15px_35px_rgba(37,99,235,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden border border-blue-500/35"
+                 >
+                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                   <div className="absolute top-4 right-4 bg-red-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-bounce">
+                      🔥 HOT
+                   </div>
+                   <div className="relative z-10 flex flex-col items-center gap-2">
+                     <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-1 border border-white/10 shadow-inner">
+                       <Zap size={24} className="group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 fill-white" />
+                     </div>
+                     <h3 className="text-xl sm:text-2xl font-display font-black text-white uppercase italic tracking-tight flex items-center gap-2">
+                       OGAds Premium Offers
+                     </h3>
+                     <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest leading-none">
+                       Earn High Payouts on Direct App Installs & Action Campaigns
+                     </p>
+                     <div className="mt-3 inline-flex items-center gap-1 bg-white/15 text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-white/10 backdrop-blur-md">
+                       Go to Offer Wall <ChevronRight size={10} className="stroke-[3px]" />
+                     </div>
+                   </div>
+                 </Link>
+               )}
+
                <AoycoOfferwall userId={user.uid} />
                
                <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
@@ -335,8 +385,8 @@ export default function TaskList() {
                           </div>
                         ) : (
                           <>
-                            <p className="text-base sm:text-2xl font-display font-black text-slate-900 tracking-tighter">
-                              ₦{((task.userPayout || 0) * multiplier).toFixed(0)}
+                            <p className="text-base sm:text-2xl font-display font-black text-slate-900 tracking-tighter text-right">
+                              {((task.userPayout || 0) * multiplier).toFixed(0)} Wisecoin
                             </p>
                             {multiplier > 1 ? (
                               <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md border border-blue-100 mt-0.5">
