@@ -27,7 +27,6 @@ import { NotificationCenter } from './NotificationCenter';
 import { AnnouncementEngine } from './AnnouncementEngine';
 import { playNotificationSound } from '../pages/sounds';
 import TransactionReceipt from './TransactionReceipt';
-import CpxNotification from './CpxNotification';
 import CpxTopBanner from './CpxTopBanner';
 
 interface LayoutProps {
@@ -290,7 +289,6 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
         )}
       </header>
       <AnnouncementEngine placement="sticky_banner" />
-      <CpxNotification />
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
       <InstallModal />
       
