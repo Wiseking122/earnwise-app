@@ -118,21 +118,39 @@ export default function AdminPayments() {
     }
   }, [searchParams]);
 
+  // Fetch user profiles for involved users only
   useEffect(() => {
-    // Users profile mapping listener
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const uMap: Record<string, any> = {};
-      snap.docs.forEach(doc => {
-        uMap[doc.id] = { uid: doc.id, ...doc.data() };
-      });
-      setUserMap(uMap);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'users');
-    });
+    const fetchNeededUsers = async () => {
+      const userIds = new Set<string>();
+      withdrawals.forEach(w => userIds.add(w.userId));
+      pendingTransactions.forEach(t => userIds.add(t.userId));
+      topUsers.forEach(u => userIds.add(u.uid));
 
-    // Withdrawals Listener
-    const qW = query(collection(db, 'withdrawals'), where('status', '==', 'pending'));
-    const unsubW = onSnapshot(qW, (snap) => {
+      const newIds = Array.from(userIds).filter(id => !userMap[id]);
+      if (newIds.length === 0) return;
+
+      console.log(`[PERF] Fetching ${newIds.length} missing user profiles for Payments view`);
+      
+      // Firestore 'in' query limit is 30, so we batch
+      for (let i = 0; i < newIds.length; i += 30) {
+        const batch = newIds.slice(i, i + 30);
+        const q = query(collection(db, 'users'), where('__name__', 'in', batch));
+        const snap = await getDocs(q);
+        const updates: Record<string, any> = {};
+        snap.docs.forEach(d => {
+          updates[d.id] = { uid: d.id, ...d.data() };
+        });
+        setUserMap(prev => ({ ...prev, ...updates }));
+      }
+    };
+
+    if (withdrawals.length > 0 || pendingTransactions.length > 0 || topUsers.length > 0) {
+      fetchNeededUsers();
+    }
+  }, [withdrawals, pendingTransactions, topUsers, userMap]);
+
+  useEffect(() => {
+    const unsubW = onSnapshot(query(collection(db, 'withdrawals'), where('status', '==', 'pending')), (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest));
       docs.sort((a, b) => {
         const timeA = (a.requestedAt as any)?.toMillis?.() || 0;
@@ -141,13 +159,9 @@ export default function AdminPayments() {
       });
       setWithdrawals(docs);
       if (activeTab === 'withdrawals') setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'withdrawals');
     });
 
-    // Escrow Transitions Listener
-    const qE = query(collection(db, 'transactions'), where('status', '==', 'pending'));
-    const unsubE = onSnapshot(qE, (snap) => {
+    const unsubE = onSnapshot(query(collection(db, 'transactions'), where('status', '==', 'pending')), (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       docs.sort((a, b) => {
         const timeA = (a.createdAt as any)?.toMillis?.() || 0;
@@ -156,12 +170,9 @@ export default function AdminPayments() {
       });
       setPendingTransactions(docs);
       if (activeTab === 'escrow') setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'pending_transactions');
     });
 
     return () => {
-      unsubUsers();
       unsubW();
       unsubE();
     };

@@ -61,7 +61,8 @@ export default function AdminTasks() {
   const [adDurations, setAdDurations] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snap) => {
+    const qTasks = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200));
+    const unsubTasks = onSnapshot(qTasks, (snap) => {
       setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'tasks'));
 
@@ -209,7 +210,7 @@ export default function AdminTasks() {
     }
   };
 
-  const handleVerifyCompletion = async (completion: TaskCompletion, status: 'approved' | 'rejected') => {
+  const handleVerifyCompletion = async (completion: TaskCompletion, status: 'approved' | 'rejected', reason?: string) => {
     try {
       await runTransaction(db, async (transaction) => {
         const compRef = doc(db, 'completions', completion.id);
@@ -243,14 +244,15 @@ export default function AdminTasks() {
         // ---- ALL WRITES AFTER ----
         transaction.update(compRef, { 
           status, 
-          verifiedAt: serverTimestamp() 
+          verifiedAt: serverTimestamp(),
+          rejectionReason: reason || null
         });
 
         const notifTitle = status === 'approved' ? '✅ Submission Approved!' : '❌ Submission Rejected';
         const taskIdent = completion.taskId ? completion.taskId.slice(0, 5) : 'Task';
         const notifMsg = status === 'approved' 
           ? `Your submission for task ${taskIdent}... was approved. ₦${completion.rewardEarned} added to your balance.`
-          : 'Your submission was rejected. Please ensure you followed all instructions and provided clear proof.';
+          : `Your submission was rejected. ${reason ? `Reason: ${reason}. ` : ''}Please ensure you followed all instructions and provided clear proof.`;
         
         const notifRef = doc(collection(db, 'notifications'));
         transaction.set(notifRef, {
@@ -657,19 +659,37 @@ export default function AdminTasks() {
                       </div>
                     )}
 
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={() => handleVerifyCompletion(comp, 'approved')}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-green-100"
-                      >
-                        <Check size={18} /> Approve & Reward
-                      </button>
-                      <button 
-                        onClick={() => handleVerifyCompletion(comp, 'rejected')}
-                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-                      >
-                        <X size={18} /> Reject Submission
-                      </button>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex gap-3">
+                        <button 
+                          onClick={() => handleVerifyCompletion(comp, 'approved')}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-green-100"
+                        >
+                          <Check size={18} /> Approve & Reward
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const reason = prompt("Enter rejection reason:");
+                            if (reason) handleVerifyCompletion(comp, 'rejected', reason);
+                          }}
+                          className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                        >
+                          <X size={18} /> Reject
+                        </button>
+                      </div>
+
+                      {/* Quick Rejection Presets */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {['Invalid Proof', 'Already Used', 'Blurred Image', 'Incomplete'].map(reason => (
+                          <button
+                            key={reason}
+                            onClick={() => handleVerifyCompletion(comp, 'rejected', reason)}
+                            className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-2 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
+                          >
+                            {reason}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 );

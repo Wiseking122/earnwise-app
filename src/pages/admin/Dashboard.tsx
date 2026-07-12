@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/Layout';
-import { collection, query, getDocs, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, where, onSnapshot, addDoc, serverTimestamp, getCountFromServer } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { getApiUrl } from '../../lib/config';
 import { Link } from 'react-router-dom';
@@ -75,58 +75,98 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchStatsClientFallback = async () => {
+    console.log("[PERF] Falling back to client-side getCountFromServer for admin stats");
+    try {
+      const [
+        usersCount,
+        tasksCount,
+        withdrawalsCount,
+        completionsCount,
+        surveysCount,
+        offersCount,
+        appealsCount
+      ] = await Promise.all([
+        getCountFromServer(collection(db, 'users')),
+        getCountFromServer(query(collection(db, 'tasks'), where('status', '==', 'active'))),
+        getCountFromServer(query(collection(db, 'withdrawals'), where('status', '==', 'pending'))),
+        getCountFromServer(query(collection(db, 'completions'), where('status', '==', 'pending'))),
+        getCountFromServer(query(collection(db, 'survey_submissions'), where('status', '==', 'pending'))),
+        getCountFromServer(query(collection(db, 'offer_submissions'), where('status', '==', 'pending'))),
+        getCountFromServer(query(collection(db, 'appeals'), where('status', '==', 'Pending')))
+      ]);
+
+      setStats(prev => ({
+        ...prev,
+        users: usersCount.data().count,
+        activeTasks: tasksCount.data().count,
+        pendingWithdrawals: withdrawalsCount.data().count,
+        pendingCompletions: completionsCount.data().count,
+        pendingSurveys: surveysCount.data().count,
+        pendingOffers: offersCount.data().count,
+        pendingAppeals: appealsCount.data().count
+      }));
+    } catch (err) {
+      console.error("Failed to fetch admin stats via client fallback:", err);
+    }
+  };
+
+  const fetchStats = async () => {
+    if (!user) return;
+    console.time('AdminDashboard_API_Fetch');
+    try {
+      const resp = await fetch(getApiUrl(`/api/admin/system-stats?adminId=${user.uid}`));
+      if (!resp.ok) {
+        throw new Error(`API responded with status ${resp.status}`);
+      }
+      const contentType = resp.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`API responded with non-JSON content-type: ${contentType}`);
+      }
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      
+      setStats(prev => ({
+        ...prev,
+        users: data.totalUsers,
+        activeTasks: data.activeTasks,
+        pendingWithdrawals: data.pendingWithdrawals,
+        pendingCompletions: data.pendingCompletions,
+        pendingSurveys: data.pendingSurveys,
+        pendingOffers: data.pendingOffers,
+        pendingAppeals: data.pendingAppeals,
+        totalPaidOut: data.totalPaidOut,
+        // Fallback for fields not yet in API
+        totalPending: data.totalPending || prev.totalPending,
+        totalWithdrawable: data.totalWithdrawable || prev.totalWithdrawable
+      }));
+    } catch (err: any) {
+      console.log("[INFO] Admin stats API not available, running client-side fallback:", err?.message || err);
+      await fetchStatsClientFallback();
+    } finally {
+      console.timeEnd('AdminDashboard_API_Fetch');
+    }
+  };
+
   useEffect(() => {
-    // This is a simplified fetch for a dash, in real apps we'd use better indexing or counters
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      let pending = 0;
-      let withdrawable = 0;
-      snap.docs.forEach(doc => {
-        const d = doc.data();
-        pending += (d.pendingBalance || 0);
-        withdrawable += (d.withdrawableBalance || 0);
-      });
-      setStats(prev => ({ ...prev, users: snap.size, totalPending: pending, totalWithdrawable: withdrawable }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
-
-    const unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('status', '==', 'active')), (snap) => {
-      setStats(prev => ({ ...prev, activeTasks: snap.size }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'tasks'));
-
+    fetchStats();
+    // Keep a few key listeners for real-time feel, but use getCountFromServer for the rest if possible
+    // For now, we'll keep them as onSnapshot but they are much lighter now since we don't scan docs
+    
+    // Real-time counts are fine as long as we don't iterate docs
     const unsubComps = onSnapshot(query(collection(db, 'completions'), where('status', '==', 'pending')), (snap) => {
       setStats(prev => ({ ...prev, pendingCompletions: snap.size }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'completions'));
+    });
 
     const unsubWiths = onSnapshot(query(collection(db, 'withdrawals'), where('status', '==', 'pending')), (snap) => {
       setStats(prev => ({ ...prev, pendingWithdrawals: snap.size }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'withdrawals'));
-
-    const unsubEscrow = onSnapshot(query(collection(db, 'transactions'), where('status', '==', 'pending')), (snap) => {
-      setStats(prev => ({ ...prev, pendingEscrow: snap.size }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'pending_escrow'));
-
-    const unsubSurveys = onSnapshot(query(collection(db, 'survey_submissions'), where('status', '==', 'pending')), (snap) => {
-      setStats(prev => ({ ...prev, pendingSurveys: snap.size }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'survey_submissions'));
-
-    const unsubOffers = onSnapshot(query(collection(db, 'offer_submissions'), where('status', '==', 'pending')), (snap) => {
-      setStats(prev => ({ ...prev, pendingOffers: snap.size }));
-    }, (error) => console.error(error));
-
-    const unsubAppeals = onSnapshot(query(collection(db, 'appeals'), where('status', '==', 'Pending')), (snap) => {
-      setStats(prev => ({ ...prev, pendingAppeals: snap.size }));
-    }, (error) => console.error(error));
+    });
 
     return () => {
-      unsubUsers();
-      unsubTasks();
       unsubComps();
       unsubWiths();
-      unsubEscrow();
-      unsubSurveys();
-      unsubOffers();
-      unsubAppeals();
     };
-  }, []);
+  }, [user?.uid]);
 
   const handleClearEscrow = async () => {
     if (!window.confirm("Move all eligible pending funds (7+ days old) to withdrawable balances?")) return;
@@ -143,7 +183,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const adminMenu = [
+  const adminMenu = useMemo(() => [
     { label: 'Task Management', icon: Layers, path: '/admin/tasks', count: stats.activeTasks, color: 'blue' },
     { label: 'Payment Requests', icon: CreditCard, path: '/admin/payments', count: stats.pendingWithdrawals + stats.pendingEscrow, color: 'green' },
     { label: 'Verify Tasks', icon: CheckCircle, path: '/admin/tasks', count: stats.pendingCompletions, color: 'orange' },
@@ -154,7 +194,7 @@ export default function AdminDashboard() {
     { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },
     { label: 'Ad Management', icon: Megaphone, path: '/admin/ads', count: 0, color: 'indigo' },
     { label: 'Appeals Manager', icon: ShieldAlert, path: '/admin/appeals', count: stats.pendingAppeals, color: 'purple' },
-  ];
+  ], [stats]);
 
   return (
     <Layout title="Admin Panel">

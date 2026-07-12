@@ -3173,6 +3173,7 @@ Please verify if the submission is a plausible and honest completion of a social
 
   app.get("/api/admin/system-stats", async (req, res) => {
     const { adminId } = req.query;
+    console.time(`StatsFetch_${adminId}`);
     if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
 
     try {
@@ -3181,24 +3182,56 @@ Please verify if the submission is a plausible and honest completion of a social
         return res.status(403).json({ error: "Unauthorized" });
       }
 
-      // Fetch parallel stats
-      const [usersSnap, tasksSnap, transSnap, payoutSnap] = await Promise.all([
+      // Fetch parallel stats using aggregation
+      const [
+        usersSnap, 
+        tasksSnap, 
+        transSnap, 
+        completionsSnap, 
+        surveysSnap, 
+        offersSnap, 
+        appealsSnap,
+        paidOutAgg,
+        withdrawableAgg,
+        pendingAgg
+      ] = await Promise.all([
         dbAdmin.collection('users').count().get(),
         dbAdmin.collection('tasks').where('status', '==', 'active').count().get(),
         dbAdmin.collection('transactions').where('type', '==', 'withdrawal').where('status', '==', 'pending').count().get(),
-        dbAdmin.collection('transactions').where('type', '==', 'withdrawal').where('status', '==', 'completed').get()
+        dbAdmin.collection('completions').where('status', '==', 'pending').count().get(),
+        dbAdmin.collection('survey_submissions').where('status', '==', 'pending').count().get(),
+        dbAdmin.collection('offer_submissions').where('status', '==', 'pending').count().get(),
+        dbAdmin.collection('appeals').where('status', '==', 'Pending').count().get(),
+        // Aggregations
+        dbAdmin.collection('transactions')
+          .where('type', '==', 'withdrawal')
+          .where('status', '==', 'completed')
+          .aggregate({ total: admin.firestore.AggregateField.sum('amount') })
+          .get(),
+        dbAdmin.collection('users')
+          .aggregate({ total: admin.firestore.AggregateField.sum('withdrawableBalance') })
+          .get(),
+        dbAdmin.collection('users')
+          .aggregate({ total: admin.firestore.AggregateField.sum('pendingBalance') })
+          .get()
       ]);
 
-      let totalPaidOut = 0;
-      payoutSnap.docs.forEach(doc => {
-        totalPaidOut += Math.abs(doc.data().amount || 0);
-      });
+      const totalPaidOut = Math.abs(paidOutAgg.data().total || 0);
+      const totalWithdrawable = withdrawableAgg.data().total || 0;
+      const totalPending = pendingAgg.data().total || 0;
 
+      console.timeEnd(`StatsFetch_${adminId}`);
       res.json({
         totalUsers: usersSnap.data().count,
         activeTasks: tasksSnap.data().count,
         pendingWithdrawals: transSnap.data().count,
-        totalPaidOut
+        pendingCompletions: completionsSnap.data().count,
+        pendingSurveys: surveysSnap.data().count,
+        pendingOffers: offersSnap.data().count,
+        pendingAppeals: appealsSnap.data().count,
+        totalPaidOut,
+        totalWithdrawable,
+        totalPending
       });
     } catch (err) {
       console.error("Stats error:", err);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, doc, updateDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc, onSnapshot, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { sendNotification } from '../../lib/notifications';
 import { 
   ShieldAlert, 
@@ -60,20 +60,18 @@ export default function AppealsManager() {
 
   // Fetch appeals from Firestore
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'appeals'), (snapshot) => {
+    const q = query(
+      collection(db, 'appeals'),
+      orderBy('createdAt', 'desc'),
+      limit(200)
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
       try {
         const list: Appeal[] = snapshot.docs.map(d => ({
           id: d.id,
           ...d.data()
         })) as Appeal[];
         
-        // Sort by createdAt descending
-        list.sort((a, b) => {
-          const tA = a.createdAt?.seconds || 0;
-          const tB = b.createdAt?.seconds || 0;
-          return tB - tA;
-        });
-
         setAppeals(list);
         setError(null);
       } catch (err: any) {

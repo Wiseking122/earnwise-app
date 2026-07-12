@@ -31,6 +31,101 @@ const SurveyVerification = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
+  const parseExpectedPayout = (note?: string) => {
+    if (!note) return 0;
+    const match = note.match(/Expected payout: (\d+) WiseCoins/);
+    return match ? parseInt(match[1]) : 0;
+  };
+
+  const handleQuickApprove = async (sub: SurveySubmission, amountOverride?: number) => {
+    const amount = amountOverride || parseExpectedPayout(sub.note) || 50;
+    
+    setProcessingId(sub.id);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const walletRef = doc(db, 'wise_coin_wallets', sub.userId);
+        const walletSnap = await transaction.get(walletRef);
+        const subRef = doc(db, 'survey_submissions', sub.id);
+        
+        transaction.update(subRef, {
+          status: 'approved',
+          rewardAmount: amount,
+          reviewedAt: serverTimestamp(),
+        });
+
+        if (walletSnap.exists()) {
+          transaction.update(walletRef, {
+            balance: increment(amount),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          transaction.set(walletRef, {
+            userId: sub.userId,
+            balance: amount,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        const transRef = doc(collection(db, 'wise_coin_transactions'));
+        transaction.set(transRef, {
+          userId: sub.userId,
+          amount: amount,
+          action: 'credit',
+          reason: `Survey Approved: ${sub.surveyTitle || 'Untitled Survey'}`,
+          status: 'completed',
+          createdAt: serverTimestamp(),
+        });
+      });
+
+      try {
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: auth.currentUser?.uid,
+            title: '🪙 Wise Coins Awarded!',
+            message: `Your survey proof for "${sub.surveyTitle || 'Untitled'}" was approved! You earned ${amount} WC.`,
+            targeting: 'specific',
+            userId: sub.userId
+          })
+        });
+      } catch (e) {}
+    } catch (err: any) {
+      alert('Failed to approve: ' + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleQuickReject = async (sub: SurveySubmission, reason: string) => {
+    setProcessingId(sub.id);
+    try {
+      await updateDoc(doc(db, 'survey_submissions', sub.id), {
+        status: 'rejected',
+        rejectionReason: reason,
+        reviewedAt: serverTimestamp(),
+      });
+
+      try {
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: auth.currentUser?.uid,
+            title: '❌ Survey Proof Rejected',
+            message: `Your survey proof for "${sub.surveyTitle || 'Untitled'}" was rejected. Reason: ${reason}`,
+            targeting: 'specific',
+            userId: sub.userId
+          })
+        });
+      } catch (e) {}
+    } catch (err: any) {
+      alert('Failed to reject: ' + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   useEffect(() => {
     const q = query(
       collection(db, 'survey_submissions'),
@@ -267,25 +362,65 @@ const SurveyVerification = () => {
                   </div>
                 )}
 
-                <div className="mt-auto flex gap-2">
+                <div className="mt-auto space-y-2">
                   {sub.status === 'pending' && (
                     <>
-                      <button
-                        onClick={() => setShowRewardModal(sub)}
-                        disabled={processingId === sub.id}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest"
-                      >
-                        {processingId === sub.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => setShowRejectionModal(sub)}
-                        disabled={processingId === sub.id}
-                        className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest"
-                      >
-                        <X size={14} />
-                        Reject
-                      </button>
+                      {/* Expected Payout Action */}
+                      {parseExpectedPayout(sub.note) > 0 && (
+                        <button
+                          onClick={() => handleQuickApprove(sub)}
+                          disabled={processingId === sub.id}
+                          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-900/20"
+                        >
+                          {processingId === sub.id ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                          Approve Expected ({parseExpectedPayout(sub.note)} WC)
+                        </button>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowRewardModal(sub)}
+                          disabled={processingId === sub.id}
+                          className="flex-1 bg-white/10 hover:bg-white/20 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest border border-white/5"
+                        >
+                          Custom
+                        </button>
+                        <button
+                          onClick={() => setShowRejectionModal(sub)}
+                          disabled={processingId === sub.id}
+                          className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest"
+                        >
+                          Reject
+                        </button>
+                      </div>
+
+                      {/* Quick Presets */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {[50, 100, 250, 500].map(amt => (
+                          <button
+                            key={amt}
+                            onClick={() => handleQuickApprove(sub, amt)}
+                            disabled={processingId === sub.id}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-[9px] font-black border border-white/5 transition-all"
+                          >
+                            +{amt}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Quick Reject Presets */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Invalid Proof', 'Already Used'].map(reason => (
+                          <button
+                            key={reason}
+                            onClick={() => handleQuickReject(sub, reason)}
+                            disabled={processingId === sub.id}
+                            className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-2 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
+                          >
+                            Reject: {reason}
+                          </button>
+                        ))}
+                      </div>
                     </>
                   )}
                   {sub.status === 'approved' && (

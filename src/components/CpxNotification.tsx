@@ -61,8 +61,8 @@ const CpxNotification: React.FC = () => {
       const script4 = {
         div_id: "notification",
         theme_style: 4,
-        position: 5,
-        text: "",
+        position: 4, // Position 4 (Top Right) to prevent overlap with bottom navigation footer
+        text: "Earn 300 WC per survey!",
         link: linkUrl,
         newtab: true
       };
@@ -117,19 +117,26 @@ const CpxNotification: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div 
-      id="notification" 
-      style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        zIndex: 99999,
-        pointerEvents: 'none' // Ensures clicks pass through to UI unless notification is active
-      }}
-    >
-      {/* The CPX script will inject content into this container */}
-    </div>
+    <>
+      <style>{`
+        #notification * {
+          pointer-events: auto !important;
+        }
+      `}</style>
+      <div 
+        id="notification" 
+        style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          zIndex: 99999,
+          pointerEvents: 'none' // Ensures clicks pass through empty spaces of this container
+        }}
+      >
+        {/* The CPX script will inject content into this container */}
+      </div>
+    </>
   );
 };
 

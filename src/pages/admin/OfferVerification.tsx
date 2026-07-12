@@ -55,6 +55,122 @@ export default function OfferVerification() {
     return () => unsub();
   }, [filter]);
 
+  const handleQuickApprove = async (sub: OfferSubmission) => {
+    setProcessingId(sub.id);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const walletRef = doc(db, 'wise_coin_wallets', sub.userId);
+        const walletSnap = await transaction.get(walletRef);
+        const subRef = doc(db, 'offer_submissions', sub.id);
+        const userRef = doc(db, 'users', sub.userId);
+        const amount = Number(sub.payout) || 0;
+
+        transaction.update(subRef, {
+          status: 'approved',
+          reviewedAt: serverTimestamp(),
+        });
+
+        transaction.update(userRef, {
+          wiseCoins: increment(amount),
+          tasksCompleted: increment(1)
+        });
+
+        if (walletSnap.exists()) {
+          transaction.update(walletRef, {
+            balance: increment(amount),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          transaction.set(walletRef, {
+            userId: sub.userId,
+            balance: amount,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        const transRef = doc(collection(db, 'wise_coin_transactions'));
+        transaction.set(transRef, {
+          userId: sub.userId,
+          amount: amount,
+          action: 'credit',
+          reason: `Offer Approved: ${sub.offerTitle || 'Untitled Offer'}`,
+          status: 'completed',
+          createdAt: serverTimestamp(),
+        });
+
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          userId: sub.userId,
+          title: '🪙 Wisecoins Awarded!',
+          message: `Your proof for offer "${sub.offerTitle || 'Untitled'}" was approved! You earned ${sub.payout} Wisecoin.`,
+          isRead: false,
+          createdAt: serverTimestamp(),
+          category: 'reward',
+          priority: 'normal',
+          status: 'sent'
+        });
+      });
+
+      try {
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: auth.currentUser?.uid,
+            title: '🪙 Wisecoins Awarded!',
+            message: `Your proof for offer "${sub.offerTitle || 'Untitled'}" was approved! You earned ${sub.payout} Wisecoin.`,
+            targeting: 'specific',
+            userId: sub.userId
+          })
+        });
+      } catch (e) {}
+    } catch (err: any) {
+      alert('Failed to approve: ' + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleQuickReject = async (sub: OfferSubmission, reason: string) => {
+    setProcessingId(sub.id);
+    try {
+      await updateDoc(doc(db, 'offer_submissions', sub.id), {
+        status: 'rejected',
+        rejectionReason: reason,
+        reviewedAt: serverTimestamp(),
+      });
+
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          userId: sub.userId,
+          title: '❌ Offer Proof Rejected',
+          message: `Your proof for offer "${sub.offerTitle || 'Untitled'}" was rejected. Reason: ${reason}`,
+          isRead: false,
+          createdAt: serverTimestamp(),
+          category: 'task',
+          priority: 'normal',
+          status: 'sent'
+        });
+        
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: auth.currentUser?.uid,
+            title: '❌ Offer Proof Rejected',
+            message: `Your proof for offer "${sub.offerTitle || 'Untitled'}" was rejected. Reason: ${reason}`,
+            targeting: 'specific',
+            userId: sub.userId
+          })
+        });
+      } catch (e) {}
+    } catch (err: any) {
+      alert('Failed to reject: ' + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleApprove = async () => {
     if (!showApprovalModal) return;
     const sub = showApprovalModal;
@@ -389,28 +505,52 @@ export default function OfferVerification() {
                     </div>
 
                     {sub.status === 'pending' && (
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2">
                         <button
-                          onClick={() => {
-                            setAdminNotes('');
-                            setShowApprovalModal(sub);
-                          }}
+                          onClick={() => handleQuickApprove(sub)}
                           disabled={processingId !== null}
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-lg shadow-emerald-600/10 disabled:opacity-50 transition-all"
+                          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 disabled:opacity-50 transition-all"
                         >
-                          <Check size={14} /> Approve
+                          <Check size={14} /> Quick Approve ({sub.payout} WC)
                         </button>
-                        <button
-                          onClick={() => {
-                            setAdminNotes('');
-                            setRejectionReason('');
-                            setShowRejectionModal(sub);
-                          }}
-                          disabled={processingId !== null}
-                          className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-lg shadow-red-600/10 disabled:opacity-50 transition-all"
-                        >
-                          <X size={14} /> Reject
-                        </button>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setAdminNotes('');
+                              setShowApprovalModal(sub);
+                            }}
+                            disabled={processingId !== null}
+                            className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 border border-white/5 disabled:opacity-50 transition-all"
+                          >
+                            Custom
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAdminNotes('');
+                              setRejectionReason('');
+                              setShowRejectionModal(sub);
+                            }}
+                            disabled={processingId !== null}
+                            className="flex-1 bg-red-600/10 border border-red-600/20 text-red-500 hover:bg-red-600/20 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 disabled:opacity-50 transition-all"
+                          >
+                            <X size={14} /> Reject
+                          </button>
+                        </div>
+
+                        {/* Quick Rejection Presets */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {['Invalid Proof', 'Already Used', 'Incomplete', 'Wrong Offer'].map(reason => (
+                            <button
+                              key={reason}
+                              onClick={() => handleQuickReject(sub, reason)}
+                              disabled={processingId !== null}
+                              className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-1.5 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
+                            >
+                              {reason}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 

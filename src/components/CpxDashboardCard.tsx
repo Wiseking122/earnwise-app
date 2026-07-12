@@ -61,7 +61,7 @@ const CpxDashboardCard: React.FC = () => {
                 <TrendingUp size={12} />
                 <span className="text-[8px] font-bold uppercase tracking-widest">Earn up to</span>
               </div>
-              <p className="text-lg font-display font-black text-emerald-400 italic">₦{(stats.max_payout * multiplier).toLocaleString()}</p>
+              <p className="text-lg font-display font-black text-emerald-400 italic">{(stats.max_payout * multiplier).toLocaleString()} WC</p>
             </div>
           </div>
 

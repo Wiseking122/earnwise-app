@@ -7,9 +7,7 @@ const isRenderUrl = (url: string) => url.includes('onrender.com') || url.include
 // Since we are running in a full-stack container on Cloud Run/Custom Domains, 
 // the API and WebSockets are hosted on the exact same domain.
 // We default to relative paths/local origin so everything works automatically out-of-the-box.
-export const API_BASE_URL = (rawApiUrl && !isRenderUrl(rawApiUrl)) 
-  ? rawApiUrl 
-  : '';
+export const API_BASE_URL = '';
 
 export const WS_BASE_URL = (rawWsUrl && !isRenderUrl(rawWsUrl))
   ? rawWsUrl

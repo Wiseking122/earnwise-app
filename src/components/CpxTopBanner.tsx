@@ -88,7 +88,7 @@ const CpxTopBanner: React.FC = () => {
                     New High-Paying Surveys!
                   </p>
                   <p className="text-[9px] sm:text-[10px] font-bold text-blue-100 uppercase tracking-widest truncate">
-                    Earn up to ₦{(stats.max_payout * multiplier).toLocaleString()} today
+                    Earn up to {(stats.max_payout * multiplier).toLocaleString()} WC today
                   </p>
                 </div>
               </div>
