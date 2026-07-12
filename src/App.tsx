@@ -30,6 +30,7 @@ import Academy from './pages/Academy';
 import SurveySubmission from './pages/SurveySubmission';
 import SurveyHistory from './pages/SurveyHistory';
 import Offers from './pages/Offers';
+import Surveys from './pages/Surveys';
 import SubmitProof from './pages/SubmitProof';
 import PlatformSettings from './pages/admin/PlatformSettings';
 
@@ -99,6 +100,7 @@ function AppRoutes() {
         <Route path="/submit-survey" element={<PrivateRoute><SurveySubmission /></PrivateRoute>} />
         <Route path="/survey-history" element={<PrivateRoute><SurveyHistory /></PrivateRoute>} />
         <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
+        <Route path="/surveys" element={<PrivateRoute><Surveys /></PrivateRoute>} />
         <Route path="/submit-proof" element={<PrivateRoute><SubmitProof /></PrivateRoute>} />
 
         <Route path="/academy/course/:id" element={<PrivateRoute><CoursePlayer /></PrivateRoute>} />

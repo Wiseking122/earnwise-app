@@ -11,7 +11,7 @@ export default function FloatingAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [platformSettings, setPlatformSettings] = useState<any>(null);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', content: string, image?: string}[]>([
-    { role: 'ai', content: "Welcome to EarnWise! I am Wise AI, your mentor proudly owned by EarnWise and sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak. I'm here to help you maximize your earnings on Nigeria's largest digital task network.\n\nTo activate your account and start earning, simply fund your wallet via Paystack on the Upgrade page and select your preferred tier!" }
+    { role: 'ai', content: "Welcome to EarnWise! I am Wise AI, your mentor proudly owned by EarnWise and sponsored by Google, Giminai, Adsense, Dune & Oak. I'm here to help you maximize your earnings on Nigeria's largest digital task network.\n\nTo activate your account and start earning, simply fund your wallet via Paystack on the Upgrade page and select your preferred tier!" }
   ]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);

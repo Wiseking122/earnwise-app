@@ -31,7 +31,10 @@ import {
 import { motion } from 'motion/react';
 import { sendNotification, NotificationType } from '../../lib/notifications';
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     users: 0,
     activeTasks: 0,
@@ -167,15 +170,27 @@ export default function AdminDashboard() {
                   <span className="text-xs font-bold text-slate-400">Withdrawable</span>
                 </div>
               </div>
-              <button 
-                onClick={handleClearEscrow}
-                disabled={clearing}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
-              >
-                {clearing ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={12} />}
-                Clear Escrow
-              </button>
-            </div>
+                <button 
+                  onClick={() => {
+                    if (user) {
+                      localStorage.removeItem(`hasSeenTelegramPopup_${user.uid}`);
+                      window.dispatchEvent(new CustomEvent('earnwise_show_telegram_popup'));
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20"
+                >
+                  <Send size={12} />
+                  Preview TG Popup
+                </button>
+                <button 
+                  onClick={handleClearEscrow}
+                  disabled={clearing}
+                  className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
+                >
+                  {clearing ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={12} />}
+                  Clear Escrow
+                </button>
+              </div>
             
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
               <Link to="/admin/payments?tab=escrow" className="hover:bg-white/5 p-2 rounded-xl transition-colors">

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Camera, Image as ImageIcon, Send, ArrowLeft, Loader2, Info, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
@@ -115,6 +115,7 @@ const compressAndGetBase64 = (file: File): Promise<string> => {
 const SurveySubmission = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [success, setSuccess] = useState(false);
@@ -124,6 +125,17 @@ const SurveySubmission = () => {
   const [note, setNote] = useState('');
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+
+  useEffect(() => {
+    const title = searchParams.get('title');
+    if (title) {
+      setSurveyTitle(decodeURIComponent(title));
+    }
+    const payout = searchParams.get('payout');
+    if (payout) {
+      setNote(prev => prev || `Expected payout: ${payout} WiseCoins`);
+    }
+  }, [searchParams]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -279,7 +291,7 @@ const SurveySubmission = () => {
               type="text"
               value={surveyTitle}
               onChange={(e) => setSurveyTitle(e.target.value)}
-              placeholder="e.g. CPX Shopping Habits Survey"
+              placeholder="e.g. Shopping Habits Survey"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
             />
           </div>

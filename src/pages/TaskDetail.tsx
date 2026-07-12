@@ -196,7 +196,7 @@ export default function TaskDetail() {
       } else if (data.status === 'pending') {
         setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       } else if (data.approved) {
-        setWiseAiMessage(`Wise AI: ${data.message} Reward of ₦${calculatedReward.toFixed(2)} added to your task wallet.`);
+        setWiseAiMessage(`Wise AI: ${data.message} Reward of ${calculatedReward.toFixed(2)} WiseCoins added to your task wallet.`);
       } else {
         setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       }
@@ -531,7 +531,7 @@ export default function TaskDetail() {
       } else if (data.status === 'pending') {
         setWiseAiMessage(`Proof submitted successfully! Awaiting admin manual review.`);
       } else if (data.approved) {
-        setWiseAiMessage(`Wise AI: ${data.message} Reward of ₦${calculatedReward.toFixed(2)} added to your task wallet.`);
+        setWiseAiMessage(`Wise AI: ${data.message} Reward of ${calculatedReward.toFixed(2)} WiseCoins added to your task wallet.`);
       } else {
         setError(`Wise AI Rejected: ${data.message}`);
         setSubmitting(false);
@@ -598,7 +598,7 @@ export default function TaskDetail() {
           <div className="flex items-center justify-center gap-4 text-sm font-bold">
             <div className="flex flex-col items-center">
               <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                ₦{calculatedReward.toFixed(2)} Reward
+                {calculatedReward.toFixed(2)} WiseCoins
               </span>
               {multiplier > 1 && (
                 <span className="text-[9px] text-blue-600 font-black uppercase mt-1 tracking-widest">

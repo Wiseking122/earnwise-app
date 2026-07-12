@@ -95,9 +95,28 @@ async function checkDbAdminCapability() {
 }
 checkDbAdminCapability();
 
+// --- PLATFORM SETTINGS CACHE (QUOTA OPTIMIZATION) ---
+let cachedSystemSettings: any = null;
+function startSystemSettingsSync() {
+  if (!isDbAdminCapable) return;
+  try {
+    dbAdmin.collection('system_settings').doc('platform').onSnapshot(snap => {
+      if (snap.exists) {
+        cachedSystemSettings = snap.data();
+        console.log("[FIREBASE] System settings synced to server cache.");
+      }
+    }, err => {
+      console.warn("[FIREBASE] System settings sync error (likely permissions or quota):", err.message);
+    });
+  } catch (e) {
+    console.error("[FIREBASE] Failed to setup system settings sync:", e);
+  }
+}
+
 // --- STARTUP SCRIPT: Ensure Admin Status for Owner ---
 async function ensureOwnerAdminStatus() {
   if (!isDbAdminCapable) return;
+  startSystemSettingsSync(); // Start sync once capable
   try {
     const ownerEmail = 'wiseking7890@gmail.com';
     const usersSnap = await dbAdmin.collection('users').where('email', '==', ownerEmail).get();
@@ -748,12 +767,15 @@ async function startServer() {
 
     console.log(`[COACHING-AUTO] Starting coaching cycle at ${new Date().toISOString()}. Force: ${force}`);
     try {
-      // Get a batch of users to process. We'll filter for enabled coaching in memory 
-      // because Firestore != query doesn't include documents where the field is missing.
-      const usersSnap = await dbAdmin.collection('users').get();
+      // Quota Optimization: Get a small batch of users who haven't been coached in a while
+      // We order by lastCoachingAt (ascending) to get those who are most "due".
+      const usersSnap = await dbAdmin.collection('users')
+        .orderBy('lastCoachingAt', 'asc')
+        .limit(25)
+        .get();
 
       if (usersSnap.empty) {
-        console.log("[COACHING-AUTO] No users found in database.");
+        console.log("[COACHING-AUTO] No users found in database slice.");
         return;
       }
 
@@ -1717,26 +1739,121 @@ async function startServer() {
   });
 
   /**
+   * GET /api/cpx/surveys
+   * Proxy for CPX Research Survey List API to handle CORS and Secure Hash.
+   */
+  app.get("/api/cpx/surveys", async (req, res) => {
+    try {
+      const { user_id } = req.query;
+      if (!user_id) return res.status(400).json({ error: "User ID is required" });
+
+      const appId = process.env.CPX_APP_ID || '33341';
+      const secureHash = process.env.CPX_SECURE_HASH;
+      
+      // Try multiple potential endpoints if the first one fails
+      // Note: get-surveys.php is a reliable fallback that often returns HTML cards if JSON is not enabled
+      const endpoints = [
+        `https://live-api.cpx-research.com/api/get-surveys.php?app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
+        `https://live-api.cpx-research.com/api/v1/surveys?app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
+        `https://www.cpx-research.com/api/v1/surveys?app_id=${appId}&ext_user_id=${user_id}&output_format=json`
+      ];
+
+      let lastError = null;
+      for (const baseUrl of endpoints) {
+        try {
+          let url = baseUrl;
+          if (secureHash) {
+            // CPX documentation typically uses md5(user_id + "-" + secure_hash)
+            const hash = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
+            url += `&hash=${hash}`;
+          }
+
+          const response = await axios.get(url, { 
+            timeout: 6000,
+            headers: {
+              'User-Agent': 'EarnWise-Platform/1.0',
+              'Accept': 'application/json, text/html'
+            }
+          });
+          
+          // Case 1: Standard JSON response
+          if (response.data && typeof response.data === 'object' && (response.data.surveys || response.data.status === 'success')) {
+            const surveys = Array.isArray(response.data.surveys) ? response.data.surveys : [];
+            return res.json({
+              status: 'success',
+              available_surveys: surveys.length,
+              surveys: surveys.slice(0, 5), // Keep a few for stats but UI won't show them all
+              max_payout: surveys.length > 0 ? Math.max(...surveys.map((s: any) => s.payout_local || 0)) : 0,
+              avg_loi: surveys.length > 0 ? Math.round(surveys.reduce((acc: number, s: any) => acc + (s.loi || 0), 0) / surveys.length) : 0
+            });
+          }
+
+          // Case 2: HTML response from get-surveys.php
+          if (typeof response.data === 'string' && response.data.includes('id="survey-')) {
+            const surveyIds = response.data.match(/id="survey-(\d+)"/g) || [];
+            const count = surveyIds.length;
+            
+            // Extract max payout and avg loi from HTML if possible
+            const payoutMatches = response.data.match(/<h5>(\d+)\s+<span>/g) || [];
+            const payouts = payoutMatches.map(m => parseInt(m.match(/\d+/)![0]));
+            
+            const loiMatches = response.data.match(/~ (\d+)\s+minutes/g) || [];
+            const lois = loiMatches.map(m => parseInt(m.match(/\d+/)![0]));
+
+            return res.json({ 
+              status: 'success', 
+              available_surveys: count,
+              surveys: [], // UI won't use individual cards
+              max_payout: payouts.length > 0 ? Math.max(...payouts) : 0,
+              avg_loi: lois.length > 0 ? Math.round(lois.reduce((a, b) => a + b, 0) / lois.length) : 0
+            });
+          }
+        } catch (err: any) {
+          lastError = err;
+        }
+      }
+      
+      // If we reached here, all endpoints failed or returned no surveys
+      console.error("[CPX-PROXY] All endpoints failed. Last error:", lastError?.message);
+      
+      res.json({ 
+        status: 'success', // We return success with 0 surveys instead of error to keep UI clean
+        available_surveys: 0,
+        surveys: [], 
+        max_payout: 0,
+        avg_loi: 0
+      });
+    } catch (err: any) {
+      console.error("[CPX-PROXY] Fatal Error:", err.message);
+      res.json({ surveys: [], status: 'error', message: "Connecting to survey network..." });
+    }
+  });
+
+  /**
    * GET /api/cpx/signed-url
    * Generates a signed survey URL to keep the secret hash hidden from the client.
    */
   app.get("/api/cpx/signed-url", async (req, res) => {
-    const { user_id, username, email } = req.query;
-    const appId = process.env.CPX_APP_ID || '33341';
-    const secureHash = process.env.CPX_SECURE_HASH;
+    try {
+      const { user_id, username, email } = req.query;
+      if (!user_id) return res.status(400).json({ error: "User ID is required" });
 
-    if (!user_id) {
-      return res.status(400).json({ error: "User ID is required" });
+      const appId = process.env.CPX_APP_ID || '33341';
+      const secureHash = process.env.CPX_SECURE_HASH;
+      
+      let signedUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user_id}&username=${encodeURIComponent(String(username || ''))}&email=${encodeURIComponent(String(email || ''))}&subid_1=&subid_2=`;
+
+      if (secureHash) {
+        // CPX documentation typically uses md5(user_id + "-" + secure_hash)
+        const hash = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
+        signedUrl += `&secure_hash=${hash}`;
+      }
+
+      res.json({ url: signedUrl });
+    } catch (err: any) {
+      console.error("[CPX-SIGNED-URL] Error:", err.message);
+      res.status(500).json({ error: "Failed to generate signed URL" });
     }
-
-    let signedUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user_id}&username=${encodeURIComponent(String(username || ''))}&email=${encodeURIComponent(String(email || ''))}&subid_1=&subid_2=`;
-
-    if (secureHash) {
-      const hash = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
-      signedUrl += `&secure_hash=${hash}`;
-    }
-
-    res.json({ url: signedUrl });
   });
 
   /**
@@ -2258,18 +2375,8 @@ async function startServer() {
       if (action === 'generate-text') {
         const history = payload?.history || [];
         
-        // Fetch dynamic platform settings for AI context
-        let systemSettings: any = payload?.platformSettings || null;
-        try {
-          if (isDbAdminCapable) {
-            const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
-            if (settingsSnap.exists) {
-              systemSettings = settingsSnap.data();
-            }
-          }
-        } catch (e) {
-          console.error("AI context fetch error (HTTP):", e);
-        }
+        // Fetch dynamic platform settings for AI context (Use cache or client data)
+        const systemSettings: any = cachedSystemSettings || payload?.platformSettings || null;
 
         const exchangeRate = systemSettings?.exchangeRate ?? 1;
         const wiseCoinName = systemSettings?.wiseCoinName || 'WiseCoin';
@@ -2278,7 +2385,7 @@ async function startServer() {
         const websiteName = systemSettings?.websiteName || 'EarnWise';
         const supportEmail = systemSettings?.supportEmail || 'support@earnwise.com';
 
-        console.log(`[AI-HTTP] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Source: ${isDbAdminCapable ? 'DB/Client' : 'Client Only'})`);
+        console.log(`[AI-HTTP] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Source: ${cachedSystemSettings ? 'Server Cache' : 'Client Data'})`);
 
         const systemInstruction = `
 You are 'Wise AI', the ultimate financial coach for members of ${websiteName}. 
@@ -2300,7 +2407,7 @@ GENERAL RULES:
 - UPGRADING & PLANS: To upgrade/buy plans, users MUST go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.
 - REWARDS & EARNINGS: Users earn by interacting with sponsored ads, social media, taking courses, and referrals.
 - TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).
-- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak.
+- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, Giminai, Adsense, Dune & Oak.
 `.trim();
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -2976,7 +3083,7 @@ Please verify if the submission is a plausible and honest completion of a social
           // 1. Total Task Cap Check
           const activePlanTaskEarnings = userData.activePlanTaskEarnings || 0;
           if (activePlanTaskEarnings + finalPayout > planLimit.cap) {
-            throw new Error(`Total plan task earning cap reached (₦${planLimit.cap.toLocaleString()}). Upgrade your plan to continue earning.`);
+            throw new Error(`Total plan task earning cap reached (${planLimit.cap.toLocaleString()} WC). Upgrade your plan to continue earning.`);
           }
 
           // 2. Daily Earning Limit Check
@@ -4033,55 +4140,89 @@ Please verify if the submission is a plausible and honest completion of a social
 
     try {
       console.log(`[AUTH] Processing welcome sequence for ${email}...`);
+      
+      // Fetch dynamic system settings
+      let websiteName = 'Earnwise';
+      let supportEmail = 'support@earnwise.com';
+      
+      if (isDbAdminCapable) {
+        try {
+          const settingsSnap = await dbAdmin.collection('settings').doc('system').get();
+          if (settingsSnap.exists) {
+            const data = settingsSnap.data();
+            websiteName = data?.websiteName || websiteName;
+            supportEmail = data?.supportEmail || supportEmail;
+          }
+        } catch (e) {
+          console.warn("[AUTH] Failed to fetch settings for email, using defaults.");
+        }
+      }
+
       let emailSent = false;
       
       if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
         try {
           await transporter.sendMail({
-            from: `"Wise AI Support" <${process.env.EMAIL_USER}>`,
+            from: `"${websiteName} Support" <${process.env.EMAIL_USER}>`,
             to: email,
-            replyTo: 'earnwise29@gmail.com',
-            subject: `Welcome to Earnwise, ${name || ''}!`,
-            text: `Welcome to Earnwise! You're now part of Nigeria's #1 digital wealth platform, powered by Wise AI. Complete high-paying tasks, withdraw real cash, and earn referral commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}`,
+            replyTo: supportEmail,
+            subject: `Welcome to ${websiteName}, ${name || ''}!`,
+            text: `Welcome to ${websiteName}! You're now part of Nigeria's #1 digital wealth platform. Complete high-paying tasks, withdraw real cash, and earn referral commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://earnwise1.vercel.app'}`,
             html: `
-              <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                  <img src="cid:earnwise_logo" alt="Earnwise Logo" style="max-width: 150px; margin-bottom: 15px;" />
-                  <h1 style="color: #2563eb; font-size: 28px; font-weight: 800; margin: 0; padding: 10px;">Earnwise</h1>
-                  <p style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Powered by Wise AI</p>
+              <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
+                <div style="background-color: #2563eb; padding: 40px 20px; text-align: center;">
+                  <img src="cid:earnwise_logo" alt="${websiteName} Logo" style="max-width: 80px; margin-bottom: 20px; filter: brightness(0) invert(1);" />
+                  <h1 style="color: #ffffff; font-size: 28px; font-weight: 900; margin: 0; letter-spacing: -0.02em;">Welcome to ${websiteName}</h1>
+                  <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 8px; font-weight: 600; text-transform: uppercase; tracking-widest;">Your Gateway to Digital Wealth</p>
                 </div>
-                <h2 style="color: #1e293b; text-align: center; font-size: 22px;">Welcome aboard, ${name || 'Earners'}!</h2>
-                <p style="font-size: 16px; color: #475569; line-height: 1.6;">We're thrilled to have you! You've officially joined Nigeria's premier platform for earning money online. Our community is growing fast, and we're excited to see you start earning.</p>
-                <div style="background-color: #f8fafc; padding: 25px; border-radius: 12px; margin: 25px 0; border: 1px solid #e2e8f0;">
-                  <h3 style="margin-top: 0; color: #1e293b; font-size: 18px;">Three Steps to Your First Payout:</h3>
-                  <ul style="color: #475569; font-size: 15px; line-height: 1.8; padding-left: 20px;">
-                    <li><strong>Browse:</strong> Check out the latest high-paying tasks on your dashboard.</li>
-                    <li><strong>Complete:</strong> Easily finish tasks and earn daily in Naira.</li>
-                    <li><strong>Withdraw:</strong> Request instant bank payouts via Paystack directly to your account.</li>
-                  </ul>
+                
+                <div style="padding: 40px 30px;">
+                  <h2 style="color: #0f172a; font-size: 22px; font-weight: 800; margin-bottom: 16px;">Hello ${name || 'Earner'},</h2>
+                  <p style="font-size: 16px; color: #475569; line-height: 1.7; margin-bottom: 24px;">
+                    We're thrilled to have you! You've officially joined Nigeria's premier community for digital earners. 
+                    With <strong>${websiteName}</strong>, you can turn your daily screen time into real, withdrawable cash.
+                  </p>
+                  
+                  <div style="background-color: #f8fafc; padding: 30px; border-radius: 20px; margin: 32px 0; border: 1px solid #e2e8f0;">
+                    <h3 style="margin-top: 0; color: #0f172a; font-size: 18px; font-weight: 800; margin-bottom: 16px;">How to start earning:</h3>
+                    <div style="margin-bottom: 20px;">
+                      <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">1. Complete Tasks</p>
+                      <p style="margin: 0; color: #64748b; font-size: 15px;">Like, follow, and share to earn WiseCoins instantly.</p>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                      <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">2. Grow Your Team</p>
+                      <p style="margin: 0; color: #64748b; font-size: 15px;">Invite friends and earn 30% commission on their upgrades.</p>
+                    </div>
+                    <div style="margin: 0;">
+                      <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">3. Withdraw Cash</p>
+                      <p style="margin: 0; color: #64748b; font-size: 15px;">Cash out your earnings directly to your bank account via Paystack.</p>
+                    </div>
+                  </div>
+                  
+                  <div style="text-align: center; margin: 40px 0;">
+                    <a href="${currentAppUrl || 'https://earnwise1.vercel.app'}" style="background-color: #2563eb; color: #ffffff; padding: 18px 40px; text-decoration: none; border-radius: 16px; font-weight: 800; font-size: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);">Launch Your Dashboard</a>
+                  </div>
+                  
+                  <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #f1f5f9;">
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Join our community</p>
+                    <a href="https://t.me/Earnwise01" style="margin: 0 8px; color: #2563eb; text-decoration: none; font-weight: 700; background: #eff6ff; padding: 10px 16px; border-radius: 10px; display: inline-block;">Telegram Group</a>
+                    <a href="https://t.me/EarnwiseElite" style="margin: 0 8px; color: #2563eb; text-decoration: none; font-weight: 700; background: #eff6ff; padding: 10px 16px; border-radius: 10px; display: inline-block;">Official Channel</a>
+                  </div>
+                  
+                  <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-top: 40px; line-height: 1.6;">
+                    Need assistance? Reply to this email or contact us at <strong>${supportEmail}</strong>.<br>
+                    &copy; ${new Date().getFullYear()} ${websiteName} Team. All rights reserved.
+                  </p>
                 </div>
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">Go to Your Dashboard</a>
-                </div>
-                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-                  <p style="color: #64748b; font-size: 14px; margin-bottom: 10px;">Connect with us:</p>
-                  <a href="[LINK_TO_WHATSAPP]" style="margin: 0 10px; color: #2563eb; text-decoration: none;">WhatsApp</a>
-                  <span style="color: #cbd5e1;">|</span>
-                  <a href="[LINK_TO_TELEGRAM_CHANNEL]" style="margin: 0 10px; color: #2563eb; text-decoration: none;">Telegram Channel</a>
-                </div>
-                <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 20px;">Need a hand? Simply reply to this email, and our support team will be ready to help.</p>
               </div>
             `,
             attachments: (() => {
               const logoPath = path.join(process.cwd(), 'public/logo.png');
               const iconPath = path.join(process.cwd(), 'public/icon.png');
-              const icon512Path = path.join(process.cwd(), 'public/icon-512.png');
               if (fs.existsSync(logoPath)) {
                 return [{ filename: 'logo.png', path: logoPath, cid: 'earnwise_logo' }];
               } else if (fs.existsSync(iconPath)) {
                 return [{ filename: 'logo.png', path: iconPath, cid: 'earnwise_logo' }];
-              } else if (fs.existsSync(icon512Path)) {
-                return [{ filename: 'logo.png', path: icon512Path, cid: 'earnwise_logo' }];
               }
               return [];
             })()
@@ -4891,10 +5032,10 @@ CRITICAL PROTOCOLS:
     runAutomatedCoachingCycle().catch(e => console.error("Initial coaching cycle error:", e));
   }, 8000);
 
-  // Scan every 3 minutes to keep the pipeline highly active and ready to process due dispatches
+  // Scan every 20 minutes to keep the pipeline active without exhausting quota
   setInterval(() => {
     runAutomatedCoachingCycle().catch(e => console.error("Interval coaching cycle error:", e));
-  }, 3 * 60 * 1000);
+  }, 20 * 60 * 1000);
 
   const server = http.createServer(app);
 
@@ -4920,18 +5061,8 @@ CRITICAL PROTOCOLS:
         
         if (!message) return;
 
-        // Fetch live platform settings to keep AI up to date
-        let systemSettings: any = clientSettings || null;
-        try {
-          if (isDbAdminCapable) {
-            const settingsSnap = await dbAdmin.collection('system_settings').doc('platform').get();
-            if (settingsSnap.exists) {
-              systemSettings = settingsSnap.data();
-            }
-          }
-        } catch (err) {
-          console.warn("[WS] Failed to fetch live system settings from DB:", err);
-        }
+        // Fetch live platform settings (Use cache or client data)
+        const systemSettings: any = cachedSystemSettings || clientSettings || null;
 
         if (userId) {
           const limitCheck = await checkAndIncrementAiLimit(userId);
@@ -4956,7 +5087,7 @@ CRITICAL PROTOCOLS:
         const websiteName = systemSettings?.websiteName || 'EarnWise';
         const supportEmail = systemSettings?.supportEmail || 'support@earnwise.com';
 
-        console.log(`[AI-WS] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Source: ${isDbAdminCapable ? 'DB/Client' : 'Client Only'})`);
+        console.log(`[AI-WS] Using Rate: 1 ${wiseCoinSymbol} = ₦${exchangeRate} (Source: ${cachedSystemSettings ? 'Server Cache' : 'Client Data'})`);
         
         const dynamicInstruction = `
 You are 'Wise AI', the ultimate financial coach for members of ${websiteName}. 
@@ -4978,7 +5109,7 @@ GENERAL RULES:
 - UPGRADING & PLANS: To upgrade/buy plans, users MUST go to 'Deposit', fund via Paystack, then go to 'Plans' and click 'Activate Now'.
 - REWARDS & EARNINGS: Users earn by interacting with sponsored ads, social media, taking courses, and referrals.
 - TIERS: Elite (1.25x), Lite (1.5x), Bronze (2.0x), Silver (3.0x), Golden (5.0x).
-- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, CPX Limited, Giminai, Adsense, Dune & Oak.
+- SPONSORS: ONLY if asked, EarnWise is sponsored by Google, Giminai, Adsense, Dune & Oak.
 `.trim();
 
         try {

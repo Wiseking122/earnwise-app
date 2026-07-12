@@ -51,6 +51,7 @@ import { AnnouncementEngine, ScrollingBanner } from '../components/AnnouncementE
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
 import PayoutTicker from '../components/PayoutTicker';
+import CpxDashboardCard from '../components/CpxDashboardCard';
 
 export default function Home() {
   const { user, profile } = useAuth();
@@ -293,11 +294,11 @@ export default function Home() {
       // Fallback local AI engine ensures Wise AI always works
       const estimatedEarning = Number(profile?.balance || 0) + (profile?.plan === 'golden' ? 15000 : profile?.plan === 'platinum' ? 7500 : 2500);
       setAiInsights({
-        prediction: `${estimatedEarning.toLocaleString()} Wisecoin daily earning potential based on your ${profile?.plan || 'free'} tier`,
+        prediction: `${estimatedEarning.toLocaleString()} WiseCoins daily earning potential based on your ${profile?.plan || 'free'} tier`,
         insights: [
           { title: "🔥 Wise AI Direct Strategy", description: "Regular ad tasks are temporarily unavailable for upgrade. Complete high-yield surveys in the Survey section to maintain your daily earning momentum.", type: "quick_win" },
           { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete at least one survey daily to maintain your 1.5x earnings multiplier!`, type: "strategy" },
-          { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant 2,500 Wisecoin bonus per verified invite.", type: "upgrade" }
+          { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant 2,500 WiseCoins bonus per verified invite.", type: "upgrade" }
         ]
       });
     } finally {
@@ -558,14 +559,14 @@ export default function Home() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <h4 className="font-display font-black text-sm leading-tight uppercase italic text-white group-hover:text-yellow-200 transition-colors">
-                    Weekly Wisecoin Prizes
+                    Weekly WiseCoins Prizes
                   </h4>
                   <div className="bg-yellow-500/20 px-1.5 py-0.5 rounded-full border border-yellow-500/30">
                     <span className="text-[6.5px] font-black text-yellow-300 uppercase tracking-widest">15,000 WC Max</span>
                   </div>
                 </div>
                 <p className="text-slate-400 text-[9.5px] sm:text-[10.5px] font-medium leading-tight max-w-sm sm:max-w-md">
-                  Complete tasks, invite active members and earn XP. Top 10 earners get Wisecoin bonuses every Sunday at 11:59 PM!
+                  Complete tasks, invite active members and earn XP. Top 10 earners get WiseCoins bonuses every Sunday at 11:59 PM!
                 </p>
               </div>
               <div className="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center border border-white/5 group-hover:bg-yellow-500 transition-colors shrink-0">
@@ -754,17 +755,18 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-2.5">
+            <CpxDashboardCard />
              {/* Earning Channels Grid */}
              <div className="grid grid-cols-2 gap-2.5">
                <Link 
-                to="/tasks?category=survey"
+                to="/surveys"
                 className="bg-orange-500/10 border border-orange-500/30 p-2.5 rounded-xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
                >
                  <div className="w-7.5 h-7.5 bg-orange-500 rounded-lg flex items-center justify-center text-white mb-2 shadow-md group-hover:rotate-12 transition-transform">
                    <Search size={12} />
                  </div>
-                 <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Paid Surveys</h4>
-                 <p className="text-orange-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">CPX Network</p>
+                 <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Premium Surveys</h4>
+                 <p className="text-orange-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">Verified Partners</p>
                </Link>
                
                <button 

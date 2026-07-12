@@ -33,6 +33,7 @@ export default function Earnings() {
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [isSubmittingDiagnostic, setIsSubmittingDiagnostic] = useState(false);
+  const [wiseCoinBalance, setWiseCoinBalance] = useState(0);
 
   const depositSuccess = searchParams.get('deposit_success') === 'true';
   const depositAmount = searchParams.get('amount');
@@ -107,6 +108,18 @@ export default function Earnings() {
       unsubComp();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const unsub = onSnapshot(doc(db, 'wise_coin_wallets', profile.uid), (snap) => {
+      if (snap.exists()) {
+        setWiseCoinBalance(snap.data().balance || 0);
+      } else {
+        setWiseCoinBalance(0);
+      }
+    });
+    return () => unsub();
+  }, [profile?.uid]);
 
   return (
     <Layout title="Vault & Wallet">
@@ -187,7 +200,13 @@ export default function Earnings() {
           <AdsterraBanner type="native" />
         </motion.div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+           <div className="bg-slate-900/60 rounded-3xl p-6 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+              <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-2">WiseCoin Balance</p>
+              <h4 className="text-xl font-display font-black text-amber-400 italic">
+                <AnimatedNumber value={wiseCoinBalance} /> <span className="text-xs">WC</span>
+              </h4>
+           </div>
            <div className="bg-slate-900/40 rounded-3xl p-6 border border-white/5">
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Task Wallet</p>
               <h4 className="text-xl font-display font-black text-white italic">₦{(profile?.taskBalance || 0).toLocaleString()}</h4>

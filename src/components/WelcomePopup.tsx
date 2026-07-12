@@ -12,9 +12,12 @@ export default function WelcomePopup() {
     if (user && profile) {
       const hasSeenWelcome = safeStorage.getItem(`welcome_seen_${user.uid}`);
       
-      // If user joined in the last 2 minutes, show the welcome popup
-      const isNewUser = profile.createdAt && 
-        (Date.now() - (profile.createdAt.seconds * 1000) < 120000);
+      // If user joined in the last 10 minutes, show the welcome popup
+      const createdAtTime = profile.createdAt?.seconds 
+        ? profile.createdAt.seconds * 1000 
+        : (profile.createdAt instanceof Date ? profile.createdAt.getTime() : 0);
+      
+      const isNewUser = createdAtTime > 0 && (Date.now() - createdAtTime < 600000); // 10 minutes window
 
       if (!hasSeenWelcome && isNewUser) {
         // Show after a short delay

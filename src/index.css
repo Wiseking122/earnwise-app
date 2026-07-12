@@ -58,22 +58,6 @@
     @apply font-display tracking-tight text-white;
   }
 
-  /* Force CPX notification to be on top and fixed */
-  #notification,
-  [id^="cpx-research"] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 99999 !important;
-    pointer-events: none; /* Allow clicking through the container if it's empty */
-  }
-
-  #notification > *,
-  [id^="cpx-research"] > * {
-    pointer-events: auto; /* Re-enable clicks for the actual notification content */
-  }
-
   input,
   textarea,
   select {

@@ -9,30 +9,46 @@ export const TelegramJoinPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !profile) {
       setIsOpen(false);
       return;
     }
 
-    const hasSeen = safeStorage.getItem(`hasSeenTelegramPopup_${user.uid}`);
-    if (hasSeen) return;
+    const checkAndShow = () => {
+      const hasSeen = safeStorage.getItem(`hasSeenTelegramPopup_${user.uid}`);
+      if (hasSeen) return;
 
-    // To prevent overlapping with the WelcomePopup for brand-new users:
-    const hasSeenWelcome = safeStorage.getItem(`welcome_seen_${user.uid}`);
-    const isNewUser = profile?.createdAt && 
-      (Date.now() - (profile.createdAt.seconds * 1000) < 120000);
+      const createdAtTime = profile.createdAt?.seconds 
+        ? profile.createdAt.seconds * 1000 
+        : (profile.createdAt instanceof Date ? profile.createdAt.getTime() : Date.now());
+      
+      const isVeryNew = Date.now() - createdAtTime < 600000; // 10 minutes
+      const hasSeenWelcome = safeStorage.getItem(`welcome_seen_${user.uid}`);
 
-    if (isNewUser && !hasSeenWelcome) {
-      // Welcome popup has priority. Wait until they close it and see it.
-      return;
-    }
+      if (isVeryNew && !hasSeenWelcome) {
+        return;
+      }
 
-    // Show after a short delay so the dashboard can render beautifully
-    const timer = setTimeout(() => {
+      // Show after a delay to ensure smooth entry
+      const timer = setTimeout(() => {
+        setIsOpen(true);
+      }, 4000);
+
+      return timer;
+    };
+
+    const timer = checkAndShow();
+
+    // Listen for custom event to force show (for admin testing)
+    const handleForceShow = () => {
       setIsOpen(true);
-    }, 2500);
+    };
+    window.addEventListener('earnwise_show_telegram_popup', handleForceShow);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('earnwise_show_telegram_popup', handleForceShow);
+    };
   }, [user, profile]);
 
   const closePopup = () => {

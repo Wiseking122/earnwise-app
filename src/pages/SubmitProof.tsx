@@ -338,7 +338,7 @@ export default function SubmitProof() {
             {offerTitle}
           </h3>
           <p className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-            Reward: {payout.toLocaleString()} Wisecoin
+            Reward: {payout.toLocaleString()} WiseCoins
           </p>
         </div>
 
@@ -455,7 +455,7 @@ export default function SubmitProof() {
                     Proof Submitted!
                   </h3>
                   <p className="text-slate-400 text-xs font-bold uppercase tracking-wider max-w-sm mx-auto leading-relaxed">
-                    Your screenshot has been uploaded and queued for admin review. You will be credited up to <span className="text-emerald-400 font-black">{payout.toLocaleString()} Wisecoin</span> upon manual approval.
+                    Your screenshot has been uploaded and queued for admin review. You will be credited up to <span className="text-emerald-400 font-black">{payout.toLocaleString()} WiseCoins</span> upon manual approval.
                   </p>
                 </div>
                 <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest">

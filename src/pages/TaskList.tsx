@@ -5,7 +5,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Task, TaskType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { PLANS } from '../constants/plans';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -25,15 +25,15 @@ import { MonetagBanner } from '../components/MonetagBanner';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import AdsSection from '../AdsSection';
 import { AoycoOfferwall } from '../components/AoycoOfferwall';
-import { CpxOfferwall } from '../components/CpxOfferwall';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { MaintenanceModal } from '../components/MaintenanceModal';
+import { useCpxSurveys } from '../hooks/useCpxSurveys';
 
-const CATEGORIES: { id: TaskType | 'all', label: string, icon: any, color: string, subtext?: string }[] = [
-  { id: 'all', label: 'All Jobs', icon: SlidersHorizontal, color: 'bg-slate-900' },
-  { id: 'survey', label: 'Surveys and Offer', icon: Search, color: 'bg-orange-500' },
-  { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500' },
-  { id: 'referral', label: 'Banner Ads', icon: ShieldCheck, color: 'bg-purple-500' },
+const CATEGORIES: { id: string, label: string, icon: any, color: string, subtext?: string }[] = [
+  { id: 'offers', label: 'Offers', icon: Zap, color: 'bg-blue-600', subtext: 'OGAds & Aoyco' },
+  { id: 'surveys', label: 'Surveys', icon: Search, color: 'bg-orange-500', subtext: 'CPX Research' },
+  { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500', subtext: 'Montage Ads' },
+  { id: 'all', label: 'Daily Tasks', icon: SlidersHorizontal, color: 'bg-slate-900', subtext: 'Verify & Earn' },
 ];
 
 const taskTypeColors: Record<string, string> = {
@@ -47,6 +47,7 @@ const taskTypeColors: Record<string, string> = {
 
 export default function TaskList() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category');
 
@@ -56,6 +57,7 @@ export default function TaskList() {
   
   const initialCategory = (category as TaskType | 'all') || 'all';
 
+  const { stats: cpxStats } = useCpxSurveys();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +120,8 @@ export default function TaskList() {
     survey: 'LIVE', 
     ad: 'LIVE', 
     referral: tasks.filter(t => t.type === 'referral').length,
+    surveys: cpxStats.loading ? '...' : cpxStats.available_surveys,
+    offers: 'LIVE'
   };
 
   const userPlan = profile?.plan || 'free';
@@ -193,6 +197,14 @@ export default function TaskList() {
                 key={cat.id}
                 data-category={cat.id}
                 onClick={() => {
+                  if (cat.id === 'surveys') {
+                    navigate('/surveys');
+                    return;
+                  }
+                  if (cat.id === 'offers') {
+                    setActiveCategory('survey');
+                    return;
+                  }
                   if (cat.id === 'ad' && adsMaintenanceMode) {
                     setShowMaintenance(true);
                     return;
@@ -201,7 +213,7 @@ export default function TaskList() {
                     setShowRestriction(true);
                     return;
                   }
-                  setActiveCategory(cat.id);
+                  setActiveCategory(cat.id as any);
                 }}
                 className={`p-3.5 rounded-2xl border transition-all flex flex-col items-start gap-3 relative overflow-hidden group ${
                   activeCategory === cat.id
@@ -308,8 +320,6 @@ export default function TaskList() {
 
                <AoycoOfferwall userId={user.uid} />
                
-               <CpxOfferwall userId={user.uid} userName={profile?.displayName} userEmail={user?.email || undefined} />
-
                <Link 
                  to="/submit-survey"
                  className="block w-full p-6 bg-linear-to-br from-amber-500 to-yellow-600 rounded-[2rem] text-center shadow-[0_10px_30px_rgba(245,158,11,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden"
@@ -426,7 +436,7 @@ export default function TaskList() {
                             <p className={`text-base sm:text-2xl font-display font-black tracking-tighter text-right ${
                               isInternal ? 'text-white' : 'text-slate-900'
                             }`}>
-                              {((task.userPayout || 0) * multiplier).toFixed(0)} Wisecoin
+                              {((task.userPayout || 0) * multiplier).toFixed(0)} WiseCoins
                             </p>
                             {multiplier > 1 ? (
                               <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border mt-0.5 ${

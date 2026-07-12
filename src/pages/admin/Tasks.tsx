@@ -211,32 +211,28 @@ export default function AdminTasks() {
 
   const handleVerifyCompletion = async (completion: TaskCompletion, status: 'approved' | 'rejected') => {
     try {
-      let referrerId: string | null = null;
-
-      if (status === 'approved') {
-        const userSnap = await getDoc(doc(db, 'users', completion.userId));
-        const userData = userSnap.data();
-        if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
-          const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', userData.referredBy), limit(1));
-          const referrerSnap = await getDocs(referrerQuery);
-          if (!referrerSnap.empty) {
-            referrerId = referrerSnap.docs[0].id;
-          }
-        }
-      }
-
       await runTransaction(db, async (transaction) => {
         const compRef = doc(db, 'completions', completion.id);
         const userRef = doc(db, 'users', completion.userId);
-        const referrerRef = referrerId ? doc(db, 'users', referrerId) : null;
         const taskRef = completion.taskId ? doc(db, 'tasks', completion.taskId) : null;
 
         // ---- ALL READS FIRST ----
         const uSnap = await transaction.get(userRef);
+        if (!uSnap.exists()) throw new Error("User profile not found.");
+        const uData = uSnap.data();
 
+        let referrerId: string | null = null;
+        let referrerRef = null;
         let referrerSnap = null;
-        if (referrerRef) {
-          referrerSnap = await transaction.get(referrerRef);
+
+        if (status === 'approved' && uData.referredBy && !uData.hasReceivedReferralBonus) {
+          const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', uData.referredBy), limit(1));
+          const referrerDocs = await getDocs(referrerQuery);
+          if (!referrerDocs.empty) {
+            referrerId = referrerDocs.docs[0].id;
+            referrerRef = doc(db, 'users', referrerId);
+            referrerSnap = await transaction.get(referrerRef);
+          }
         }
 
         let taskSnap = null;
@@ -285,48 +281,44 @@ export default function AdminTasks() {
             });
           }
 
-          if (uSnap.exists()) {
-            const uData = uSnap.data();
-            
-            transaction.update(userRef, { 
-              balance: (uData.balance || 0) + completion.rewardEarned,
-              withdrawableBalance: (uData.withdrawableBalance || 0) + completion.rewardEarned,
-              taskBalance: (uData.taskBalance || 0) + completion.rewardEarned,
-              taskEarnings: (uData.taskEarnings || 0) + completion.rewardEarned,
-              updatedAt: serverTimestamp()
-            });
+          transaction.update(userRef, { 
+            balance: (uData.balance || 0) + completion.rewardEarned,
+            withdrawableBalance: (uData.withdrawableBalance || 0) + completion.rewardEarned,
+            taskBalance: (uData.taskBalance || 0) + completion.rewardEarned,
+            taskEarnings: (uData.taskEarnings || 0) + completion.rewardEarned,
+            updatedAt: serverTimestamp()
+          });
 
-            const transRef = doc(collection(db, 'transactions'));
-            transaction.set(transRef, {
-              userId: completion.userId,
-              amount: completion.rewardEarned,
-              type: 'earning',
+          const transRef = doc(collection(db, 'transactions'));
+          transaction.set(transRef, {
+            userId: completion.userId,
+            amount: completion.rewardEarned,
+            type: 'earning',
+            status: 'completed',
+            description: `Manual Reward: ${taskIdent}`,
+            createdAt: serverTimestamp()
+          });
+
+          if (referrerId && referrerRef && referrerSnap && referrerSnap.exists()) {
+            const referralBonus = 2.00;
+            const rData = referrerSnap.data();
+            transaction.update(referrerRef, { 
+              balance: (rData.balance || 0) + referralBonus,
+              withdrawableBalance: (rData.withdrawableBalance || 0) + referralBonus,
+              referralBalance: (rData.referralBalance || 0) + referralBonus,
+              referralEarnings: (rData.referralEarnings || 0) + referralBonus
+            });
+            transaction.update(userRef, { hasReceivedReferralBonus: true });
+
+            const refTransRef = doc(collection(db, 'transactions'));
+            transaction.set(refTransRef, {
+              userId: referrerId,
+              amount: referralBonus,
+              type: 'referral',
               status: 'completed',
-              description: `Manual Reward: ${taskIdent}`,
+              description: `Referral bonus for ${uData.displayName || 'Friend'}`,
               createdAt: serverTimestamp()
             });
-
-            if (referrerId && referrerRef && referrerSnap && referrerSnap.exists()) {
-              const referralBonus = 2.00;
-              const rData = referrerSnap.data();
-              transaction.update(referrerRef, { 
-                balance: (rData.balance || 0) + referralBonus,
-                withdrawableBalance: (rData.withdrawableBalance || 0) + referralBonus,
-                referralBalance: (rData.referralBalance || 0) + referralBonus,
-                referralEarnings: (rData.referralEarnings || 0) + referralBonus
-              });
-              transaction.update(userRef, { hasReceivedReferralBonus: true });
-
-              const refTransRef = doc(collection(db, 'transactions'));
-              transaction.set(refTransRef, {
-                userId: referrerId,
-                amount: referralBonus,
-                type: 'referral',
-                status: 'completed',
-                description: `Referral bonus for ${uData.displayName || 'Friend'}`,
-                createdAt: serverTimestamp()
-              });
-            }
           }
         }
       });
@@ -471,7 +463,7 @@ export default function AdminTasks() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">Total Budget (₦)</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">Total Budget (WC)</label>
                     <input 
                       type="number" placeholder="10000" required step="0.01"
                       className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
@@ -479,7 +471,7 @@ export default function AdminTasks() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">CPA (Cost Per Action) (₦)</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">CPA (Cost Per Action) (WC)</label>
                     <input 
                       type="number" placeholder="50" required step="0.01"
                       className="w-full bg-gray-50 text-slate-900 border-none rounded-xl p-4 text-sm font-bold"
@@ -532,11 +524,11 @@ export default function AdminTasks() {
                 <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-blue-600 mb-1">
                     <span>User Payout (70%)</span>
-                    <span>₦{(parseFloat(newCpa) * 0.7 || 0).toFixed(2)}</span>
+                    <span>{(parseFloat(newCpa) * 0.7 || 0).toFixed(2)} WC</span>
                   </div>
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-blue-400">
                     <span>Platform Margin (30%)</span>
-                    <span>₦{(parseFloat(newCpa) * 0.3 || 0).toFixed(2)}</span>
+                    <span>{(parseFloat(newCpa) * 0.3 || 0).toFixed(2)} WC</span>
                   </div>
                 </div>
 
@@ -564,7 +556,7 @@ export default function AdminTasks() {
                         Creator: {task.advertiserId === 'internal_platform' || !task.advertiserId ? '🛡️ Admin' : `👤 User Advertiser (${task.advertiserId.slice(0, 8)})`}
                       </p>
                       <p className="text-xs font-black text-blue-600 mt-1">
-                        ₦{(task.userPayout || 0).toFixed(2)} Payout • {task.type} • Tag: {task.tag || 'none'}
+                        {(task.userPayout || 0).toFixed(2)} WC Payout • {task.type} • Tag: {task.tag || 'none'}
                       </p>
                       
                       <div className="mt-2 w-64 bg-gray-100 rounded-full h-1.5 overflow-hidden">
@@ -585,7 +577,7 @@ export default function AdminTasks() {
                           {task.status}
                         </span>
                         <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                          Remaining: ₦{task.remainingBudget?.toFixed(2) || '0.00'}
+                          Remaining: {task.remainingBudget?.toFixed(2) || '0.00'} WC
                         </span>
                       </div>
                     </div>
