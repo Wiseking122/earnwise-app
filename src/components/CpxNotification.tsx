@@ -61,7 +61,7 @@ const CpxNotification: React.FC = () => {
       const script4 = {
         div_id: "notification",
         theme_style: 4,
-        position: 4, // Position 4 (Top Right) to prevent overlap with bottom navigation footer
+        position: 1, // Position 1 (Top) to prevent showing at the bottom footer
         text: "Earn 300 WC per survey!",
         link: linkUrl,
         newtab: true
