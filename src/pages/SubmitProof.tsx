@@ -81,11 +81,19 @@ export default function SubmitProof() {
       const completedDateStr = `${watYear}-${watMonth}-${watDay}`;
 
       // 2. Upload image (compression happens inside uploadProofImage)
-      setUploadProgress(20);
-      const uploadResult = await uploadProofImage(image, user.uid, offerId, 'offer-proofs');
+      const uploadResult = await uploadProofImage(
+        image, 
+        user.uid, 
+        offerId, 
+        'offer-proofs',
+        (progress) => {
+          // Map 0-100% upload progress to 20-80% UI progress range
+          setUploadProgress(20 + (progress * 0.6));
+        }
+      );
       const storageUrl = uploadResult.downloadUrl;
       
-      setUploadProgress(60);
+      setUploadProgress(85);
 
       // 3. Submit via backend endpoint
       // The backend already performs duplicate checks, so we save time by not doing it here.

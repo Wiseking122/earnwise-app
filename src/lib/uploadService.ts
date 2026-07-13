@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
 
 /**
@@ -19,10 +19,9 @@ export function base64ToBlob(base64Data: string): Blob {
 /**
  * Compresses an image file or blob to ensure it is under 1MB and resized nicely.
  */
-export async function compressImage(fileOrBlob: File | Blob, maxWidth = 1000, maxHeight = 1000, quality = 0.5): Promise<Blob> {
-  // If it's already very small, we can skip processing, but for proofs
-  // we usually want to normalize them to JPEG anyway.
-  if (fileOrBlob.size <= 50 * 1024 && fileOrBlob.type === 'image/jpeg') {
+export async function compressImage(fileOrBlob: File | Blob, maxWidth = 800, maxHeight = 800, quality = 0.4): Promise<Blob> {
+  // If it's already tiny, return as is
+  if (fileOrBlob.size <= 30 * 1024 && fileOrBlob.type === 'image/jpeg') {
     return fileOrBlob;
   }
 
@@ -132,7 +131,7 @@ export async function uploadProofImage(
   userId: string,
   taskId: string,
   folder = 'proof-images',
-  maxRetries = 2
+  onProgress?: (progress: number) => void
 ): Promise<{ downloadUrl: string; fileName: string; fileSize: number; timestamp: number }> {
   let blobToUpload: Blob;
 
@@ -157,42 +156,36 @@ export async function uploadProofImage(
 
   const storageRef = ref(storage, filePath);
 
-  let attempt = 0;
-  while (attempt < maxRetries) {
-    try {
-      // Use Promise.race to force a timeout in case Firebase hangs
-      const uploadPromise = async () => {
-        console.log(`[UPLOAD] Starting Firebase Storage upload for ${filePath}...`);
-        const snapshot = await uploadBytes(storageRef, blobToUpload);
-        console.log(`[UPLOAD] Upload successful, getting download URL...`);
-        return await getDownloadURL(snapshot.ref);
-      };
-      
-      const timeoutPromise = new Promise<string>((_, reject) => {
-        setTimeout(() => reject(new Error('Firebase Storage upload timed out')), 30000);
-      });
-      
-      const downloadUrl = await Promise.race([uploadPromise(), timeoutPromise]);
-      
-      console.log(`[UPLOAD] Complete! URL length: ${downloadUrl.length}`);
-      return {
-        downloadUrl,
-        fileName,
-        fileSize: blobToUpload.size,
-        timestamp,
-      };
-    } catch (error) {
-      attempt++;
-      console.error(`Upload attempt ${attempt} failed:`, error);
-      if (attempt >= maxRetries) {
-        // DO NOT fallback to base64 for large proofs as it breaks Firestore 1MB limit.
-        // Instead, throw a clear error so the user knows they need to try again or check connection.
-        throw new Error('Screenshot upload failed. Please check your internet connection and try again. (Storage Error)');
-      }
-      // Linear backoff: wait 1s before retry
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
+  console.log(`[UPLOAD] Starting Firebase Storage resumable upload for ${filePath}...`);
+  
+  return new Promise((resolve, reject) => {
+    const uploadTask = uploadBytesResumable(storageRef, blobToUpload);
 
-  throw new Error('Upload failed unexpectedly.');
+    uploadTask.on(
+      'state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        if (onProgress) onProgress(progress);
+      },
+      (error) => {
+        console.error('[UPLOAD] Upload failed:', error);
+        reject(new Error('Screenshot upload failed. Please check your internet connection and try again.'));
+      },
+      async () => {
+        try {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          console.log(`[UPLOAD] Complete! URL length: ${downloadUrl.length}`);
+          resolve({
+            downloadUrl,
+            fileName,
+            fileSize: blobToUpload.size,
+            timestamp,
+          });
+        } catch (error) {
+          console.error('[UPLOAD] Failed to get download URL:', error);
+          reject(new Error('Failed to retrieve uploaded image URL.'));
+        }
+      }
+    );
+  });
 }
