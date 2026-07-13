@@ -27,7 +27,11 @@ import {
   UserX
 } from 'lucide-react';
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function AdminUsers() {
+  const { user, profile } = useAuth();
+  const [dbError, setDbError] = useState<string | null>(null);
   const [dbUsers, setDbUsers] = useState<UserProfile[]>([]);
   const [searchUsers, setSearchUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,12 +55,14 @@ export default function AdminUsers() {
 
   // Poll default 150 most recent users
   useEffect(() => {
+    setDbError(null);
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(150));
     const unsub = onSnapshot(q, (snap) => {
       setDbUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any)));
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'users');
+      console.error("Failed to load users list:", error);
+      setDbError(error.message || String(error));
       setLoading(false);
     });
     return () => unsub();
@@ -268,6 +274,27 @@ export default function AdminUsers() {
     <Layout title="User Management" showBack>
       <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-6">
         
+        {dbError && (
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-red-900 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <ShieldAlert size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-sm uppercase tracking-wider text-red-800">Database Access Issue</h3>
+                <p className="text-xs font-bold text-red-700/85 mt-1 leading-relaxed">
+                  Unable to retrieve the user directory collection.
+                </p>
+                <div className="mt-4 bg-white/60 backdrop-blur-xs rounded-xl p-3 border border-red-100 font-mono text-[10px] space-y-1 text-red-800">
+                  <p><strong>Error:</strong> {dbError}</p>
+                  <p><strong>Logged Email:</strong> {user?.email || 'Unknown'}</p>
+                  <p><strong>Document Role:</strong> {profile?.role || 'user'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Metric Cards Strip (Stripe Style) */}
         <div className="grid grid-cols-3 gap-3 sm:gap-5">
           <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-xs relative overflow-hidden group">

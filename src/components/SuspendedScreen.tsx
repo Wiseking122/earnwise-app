@@ -4,6 +4,7 @@ import { ShieldAlert, LogOut, Mail, AlertTriangle, Upload, X, CheckCircle2, Load
 import { useAuth } from '../context/AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, setDoc, query, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { uploadProofImage } from '../lib/uploadService';
 
 // Helper to compress and convert file to base64
 const compressAndGetBase64 = (file: File): Promise<string> => {
@@ -222,9 +223,10 @@ export default function SuspendedScreen() {
     setError(null);
 
     try {
-      let base64Url = '';
+      let storageUrl = '';
       if (image) {
-        base64Url = await compressAndGetBase64(image);
+        const uploadResult = await uploadProofImage(image, profile.uid, 'appeal', 'appeals');
+        storageUrl = uploadResult.downloadUrl;
       }
 
       const appealRef = doc(collection(db, 'appeals'));
@@ -236,7 +238,7 @@ export default function SuspendedScreen() {
         username: username.trim(),
         email: email.trim().toLowerCase(),
         message: message.trim(),
-        screenshot: base64Url,
+        screenshot: storageUrl, // Store Firebase Storage URL
         status: 'Pending',
         suspensionReason: reason,
         createdAt: serverTimestamp(),

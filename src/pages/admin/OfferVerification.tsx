@@ -12,12 +12,21 @@ import {
   serverTimestamp,
   increment,
   runTransaction,
-  addDoc
+  orderBy,
+  startAfter,
+  limit,
+  addDoc,
+  getDocs
 } from 'firebase/firestore';
 import { Check, X, Search, Filter, Loader2, ExternalLink, MessageSquare, ShieldCheck, AlertTriangle, Coins, Calendar, User, Info } from 'lucide-react';
 import { OfferSubmission } from '../../types';
+import { getApiUrl } from '../../lib/config';
+
+import { useAuth } from '../../context/AuthContext';
 
 export default function OfferVerification() {
+  const { user, profile } = useAuth();
+  const [dbError, setDbError] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<OfferSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -29,31 +38,76 @@ export default function OfferVerification() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isBulkRejecting, setIsBulkRejecting] = useState(false);
+
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+  const [submissionsPageAnchors, setSubmissionsPageAnchors] = useState<any[]>([]);
+  const [hasMoreSubmissions, setHasMoreSubmissions] = useState(true);
+
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setSubmissionsPage(1);
+    setSubmissionsPageAnchors([]);
+    setHasMoreSubmissions(true);
+  }, [filter]);
 
   useEffect(() => {
-    setLoading(true);
-    const q = query(
-      collection(db, 'offer_submissions'),
-      where('status', '==', filter)
-    );
+    async function fetchSubmissions() {
+      setLoading(true);
+      const startTime = performance.now();
+      
+      try {
+        setDbError(null);
+        // Load through the server-side API proxy to completely bypass client-side Firestore ISP blocks
+        const response = await fetch(getApiUrl(`/api/admin/offer-submissions?adminId=${user?.uid || ''}&status=${filter}`));
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP status ${response.status}`);
+        }
+        const docs = await response.json() as OfferSubmission[];
 
-    const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OfferSubmission));
-      // Sort client-side by submittedAt desc
-      docs.sort((a, b) => {
-        const timeA = a.submittedAt?.seconds || 0;
-        const timeB = b.submittedAt?.seconds || 0;
-        return timeB - timeA;
-      });
-      setSubmissions(docs);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching submissions:', error);
-      setLoading(false);
-    });
+        // Sort descending in memory by submittedAt to keep newest first
+        docs.sort((a, b) => {
+          const timeA = a.submittedAt?.seconds ? (a.submittedAt.seconds * 1000) : (a.submittedAt ? new Date(a.submittedAt as any).getTime() : 0);
+          const timeB = b.submittedAt?.seconds ? (b.submittedAt.seconds * 1000) : (b.submittedAt ? new Date(b.submittedAt as any).getTime() : 0);
+          return timeB - timeA;
+        });
 
-    return () => unsub();
-  }, [filter]);
+        setSubmissions(docs);
+        setHasMoreSubmissions(false);
+
+        const endTime = performance.now();
+        console.log(`[OFFER_SUBMISSIONS API] Loaded ${docs.length} docs in ${endTime - startTime}ms`);
+      } catch (error: any) {
+        console.warn("[OFFER_SUBMISSIONS API] Failed, falling back to direct Firestore...", error);
+        
+        try {
+          const q = query(
+            collection(db, 'offer_submissions'),
+            where('status', '==', filter),
+            limit(150)
+          );
+          const snap = await getDocs(q);
+          let docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OfferSubmission));
+          
+          docs.sort((a, b) => {
+            const timeA = a.submittedAt?.toMillis?.() || (a.submittedAt?.seconds * 1000) || (a.submittedAt ? new Date(a.submittedAt).getTime() : 0);
+            const timeB = b.submittedAt?.toMillis?.() || (b.submittedAt?.seconds * 1000) || (b.submittedAt ? new Date(b.submittedAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
+          setSubmissions(docs);
+          setHasMoreSubmissions(false);
+        } catch (fbError: any) {
+          console.error("Firestore fallback failed:", fbError);
+          setDbError(fbError?.message || String(fbError));
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSubmissions();
+  }, [filter, user?.uid]);
 
   const handleQuickApprove = async (sub: OfferSubmission) => {
     setProcessingId(sub.id);
@@ -348,7 +402,44 @@ export default function OfferVerification() {
     }
   };
 
+  const handleRejectAll = async () => {
+    const pendingOffers = submissions.filter(s => s.status === 'pending');
+    if (pendingOffers.length === 0) {
+      alert('No pending offers to reject.');
+      return;
+    }
+    
+    if (!window.confirm(`Are you sure you want to reject ALL ${pendingOffers.length} pending offer proofs? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setIsBulkRejecting(true);
+    try {
+      // Process in chunks to avoid firestore limitations and UI freezing
+      const batchSize = 100;
+      for (let i = 0; i < pendingOffers.length; i += batchSize) {
+        const chunk = pendingOffers.slice(i, i + batchSize);
+        await Promise.all(chunk.map(sub => 
+          updateDoc(doc(db, 'offer_submissions', sub.id), {
+            status: 'rejected',
+            rejectedAt: serverTimestamp(),
+            adminReason: 'Bulk rejected by admin request.'
+          })
+        ));
+      }
+      alert(`Successfully rejected ${pendingOffers.length} offers.`);
+      // Refresh local state to reflect changes
+      setSubmissions(prev => prev.map(s => s.status === 'pending' ? { ...s, status: 'rejected' as any } : s));
+    } catch (err: any) {
+      console.error('Bulk rejection error:', err);
+      alert('Failed during bulk rejection: ' + err.message);
+    } finally {
+      setIsBulkRejecting(false);
+    }
+  };
+
   const filteredSubmissions = submissions.filter(sub => {
+    if (sub.status !== filter) return false;
     if (!searchQuery) return true;
     const term = searchQuery.toLowerCase();
     return (
@@ -361,19 +452,59 @@ export default function OfferVerification() {
 
   return (
     <Layout title="Offer Verification">
-      <div className="p-3 sm:p-5 pb-24 space-y-6 max-w-4xl mx-auto text-slate-100 relative">
+      <main className="p-3 sm:p-5 pb-24 space-y-6 max-w-4xl mx-auto text-slate-100 relative">
         <div className="premium-blur" />
+
+        {dbError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-6 text-red-200 shadow-sm relative z-10">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-sm uppercase tracking-wider text-red-400">Database Access Issue</h3>
+                <p className="text-xs font-bold text-red-300 mt-1 leading-relaxed">
+                  Unable to retrieve offer proof submissions.
+                </p>
+                <div className="mt-4 bg-slate-900/50 rounded-xl p-3 border border-white/5 font-mono text-[10px] space-y-1 text-slate-300">
+                  <p><strong>Error:</strong> {dbError}</p>
+                  <p><strong>Logged Email:</strong> {user?.email || 'Unknown'}</p>
+                  <p><strong>Document Role:</strong> {profile?.role || 'user'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Header Summary */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/60 border border-white/5 p-6 rounded-[2rem] shadow-xl">
           <div>
-            <div className="inline-flex items-center gap-1.5 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/15 text-xs font-black uppercase tracking-widest mb-2">
-              <ShieldCheck size={12} />
-              Manual Offer Approvals
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/15 text-xs font-black uppercase tracking-widest mb-2">
+                  <ShieldCheck size={12} />
+                  Manual Offer Approvals
+                </div>
+                <h2 className="text-2xl font-display font-black text-white uppercase italic tracking-tight">
+                  Offer Proof Review
+                </h2>
+              </div>
+
+              {filter === 'pending' && submissions.length > 0 && (
+                <button
+                  onClick={handleRejectAll}
+                  disabled={isBulkRejecting || processingId !== null}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                >
+                  {isBulkRejecting ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <X size={14} />
+                  )}
+                  Reject All Pending
+                </button>
+              )}
             </div>
-            <h2 className="text-2xl font-display font-black text-white uppercase italic tracking-tight">
-              Offer Proof Review
-            </h2>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">
               Verify screenshot proofs uploaded by users for premium CPA offers.
             </p>
@@ -434,7 +565,8 @@ export default function OfferVerification() {
               </p>
             </div>
           ) : (
-            filteredSubmissions.map((sub) => (
+            <div className="space-y-4">
+            {filteredSubmissions.map((sub) => (
               <motion.div
                 key={sub.id}
                 layoutId={sub.id}
@@ -584,9 +716,36 @@ export default function OfferVerification() {
                   </div>
                 </div>
               </motion.div>
-            ))
-          )}
+            ))}
+          </div>
+          ) }
         </div>
+
+        {filteredSubmissions.length > 0 && (
+          <div className="flex items-center justify-between mt-8 bg-slate-900/40 p-4 rounded-3xl border border-white/5 shadow-xl">
+            <button
+              disabled={submissionsPage === 1}
+              onClick={() => {
+                setSubmissionsPage(p => Math.max(1, p - 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl disabled:opacity-30 disabled:hover:bg-white/5 transition-all text-xs border border-white/5"
+            >
+              Previous Page
+            </button>
+            <span className="text-xs font-extrabold text-slate-400">Page {submissionsPage}</span>
+            <button
+              disabled={!hasMoreSubmissions}
+              onClick={() => {
+                setSubmissionsPage(p => p + 1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl disabled:opacity-30 disabled:hover:bg-white/5 transition-all text-xs border border-white/5"
+            >
+              Next Page
+            </button>
+          </div>
+        )}
 
         {/* Lightbox Modal */}
         <AnimatePresence>
@@ -740,7 +899,7 @@ export default function OfferVerification() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </main>
     </Layout>
   );
 }

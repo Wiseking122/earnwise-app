@@ -14,12 +14,20 @@ import {
   serverTimestamp,
   increment,
   getDoc,
-  runTransaction
+  startAfter,
+  limit,
+  runTransaction,
+  getDocs
 } from 'firebase/firestore';
 import { Check, X, Search, Filter, Loader2, ExternalLink, MessageSquare, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { SurveySubmission } from '../../types/wise_coin';
+import { getApiUrl } from '../../lib/config';
+
+import { useAuth } from '../../context/AuthContext';
 
 const SurveyVerification = () => {
+  const { user, profile } = useAuth();
+  const [dbError, setDbError] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<SurveySubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -126,26 +134,74 @@ const SurveyVerification = () => {
     }
   };
 
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+  const [submissionsPageAnchors, setSubmissionsPageAnchors] = useState<any[]>([]);
+  const [hasMoreSubmissions, setHasMoreSubmissions] = useState(true);
+
+  // Reset pagination when filter changes
   useEffect(() => {
-    const q = query(
-      collection(db, 'survey_submissions'),
-      where('status', '==', filter)
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SurveySubmission));
-      // Sort client-side by submittedAt desc
-      docs.sort((a, b) => {
-        const timeA = a.submittedAt?.seconds || 0;
-        const timeB = b.submittedAt?.seconds || 0;
-        return timeB - timeA;
-      });
-      setSubmissions(docs);
-      setLoading(false);
-    });
-
-    return () => unsub();
+    setSubmissionsPage(1);
+    setSubmissionsPageAnchors([]);
+    setHasMoreSubmissions(true);
   }, [filter]);
+
+  useEffect(() => {
+    async function fetchSubmissions() {
+      setLoading(true);
+      const startTime = performance.now();
+      
+      try {
+        setDbError(null);
+        // Load through the server-side API proxy to completely bypass client-side Firestore ISP blocks
+        const response = await fetch(getApiUrl(`/api/admin/survey-submissions?adminId=${user?.uid || ''}&status=${filter}`));
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP status ${response.status}`);
+        }
+        const docs = await response.json() as SurveySubmission[];
+
+        // Sort descending in memory by submittedAt to keep newest first
+        docs.sort((a, b) => {
+          const timeA = a.submittedAt?.seconds ? (a.submittedAt.seconds * 1000) : (a.submittedAt ? new Date(a.submittedAt as any).getTime() : 0);
+          const timeB = b.submittedAt?.seconds ? (b.submittedAt.seconds * 1000) : (b.submittedAt ? new Date(b.submittedAt as any).getTime() : 0);
+          return timeB - timeA;
+        });
+
+        setSubmissions(docs);
+        setHasMoreSubmissions(false);
+
+        const endTime = performance.now();
+        console.log(`[SURVEY_SUBMISSIONS API] Loaded ${docs.length} docs in ${endTime - startTime}ms`);
+      } catch (error: any) {
+        console.warn("[SURVEY_SUBMISSIONS API] Failed, falling back to direct Firestore...", error);
+        
+        try {
+          const q = query(
+            collection(db, 'survey_submissions'),
+            where('status', '==', filter),
+            limit(150)
+          );
+          const snap = await getDocs(q);
+          let docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SurveySubmission));
+          
+          docs.sort((a, b) => {
+            const timeA = a.submittedAt?.toMillis?.() || (a.submittedAt?.seconds * 1000) || (a.submittedAt ? new Date(a.submittedAt).getTime() : 0);
+            const timeB = b.submittedAt?.toMillis?.() || (b.submittedAt?.seconds * 1000) || (b.submittedAt ? new Date(b.submittedAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
+          setSubmissions(docs);
+          setHasMoreSubmissions(false);
+        } catch (fbError: any) {
+          console.error("Firestore fallback failed:", fbError);
+          setDbError(fbError?.message || String(fbError));
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSubmissions();
+  }, [filter, user?.uid]);
 
   const handleApprove = async () => {
     if (!showRewardModal) return;
@@ -271,9 +327,31 @@ const SurveyVerification = () => {
     }
   };
 
+  const filteredSubmissions = submissions.filter(sub => sub.status === filter);
   return (
     <Layout title="Survey Verification" showBack>
       <div className="p-4 space-y-6">
+        {dbError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-6 text-red-200 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-sm uppercase tracking-wider text-red-400">Database Access Issue</h3>
+                <p className="text-xs font-bold text-red-300 mt-1 leading-relaxed">
+                  Unable to retrieve survey submissions collection.
+                </p>
+                <div className="mt-4 bg-slate-900/50 rounded-xl p-3 border border-white/5 font-mono text-[10px] space-y-1 text-slate-300">
+                  <p><strong>Error:</strong> {dbError}</p>
+                  <p><strong>Logged Email:</strong> {user?.email || 'Unknown'}</p>
+                  <p><strong>Document Role:</strong> {profile?.role || 'user'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -302,147 +380,175 @@ const SurveyVerification = () => {
           <Loader2 size={40} className="text-blue-500 animate-spin" />
           <p className="text-slate-500 text-xs font-black uppercase tracking-widest">Scanning Submissions...</p>
         </div>
-      ) : submissions.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {submissions.map((sub) => (
-            <motion.div
-              key={sub.id}
-              layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-slate-900/50 border border-white/10 rounded-2xl overflow-hidden flex flex-col group"
-            >
-              {/* Image Gallery */}
-              {sub.screenshots && sub.screenshots.length > 0 && (
-                <div className="aspect-video bg-slate-950 flex gap-1 p-1 border-b border-white/5">
-                  {(sub.screenshots || []).slice(0, 2).map((url, i) => (
-                    <div key={i} className="flex-1 relative overflow-hidden bg-slate-900/50 rounded-lg group/img flex items-center justify-center">
-                      <img 
-                        src={url} 
-                        alt="Proof" 
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-contain cursor-pointer hover:scale-105 transition-transform duration-500" 
-                        onClick={() => setActiveLightboxImage(url)} 
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
-                        <ExternalLink size={20} className="text-white" />
+      ) : filteredSubmissions.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredSubmissions.map((sub) => (
+              <motion.div
+                key={sub.id}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-900/50 border border-white/10 rounded-2xl overflow-hidden flex flex-col group"
+              >
+                {/* Image Gallery */}
+                {sub.screenshots && sub.screenshots.length > 0 && (
+                  <div className="aspect-video bg-slate-950 flex gap-1 p-1 border-b border-white/5">
+                    {(sub.screenshots || []).slice(0, 2).map((url, i) => (
+                      <div key={i} className="flex-1 relative overflow-hidden bg-slate-900/50 rounded-lg group/img flex items-center justify-center">
+                        <img 
+                          src={url} 
+                          alt="Proof" 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-contain cursor-pointer hover:scale-105 transition-transform duration-500" 
+                          onClick={() => setActiveLightboxImage(url)} 
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                          <ExternalLink size={20} className="text-white" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {sub.screenshots.length > 2 && (
-                    <div className="w-20 bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500 hover:text-white relative rounded-lg cursor-pointer" onClick={() => setActiveLightboxImage(sub.screenshots[2])}>
-                      +{sub.screenshots.length - 2}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-sm font-display font-black text-white uppercase italic truncate max-w-[200px]">
-                      {sub.surveyTitle || 'Untitled Survey'}
-                    </h3>
-                    <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mt-1">{sub.userName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                      {sub.submittedAt?.toDate?.()?.toLocaleString() || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-
-                {sub.note && (
-                  <div className="bg-black/30 p-3 rounded-xl border border-white/5 mb-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <MessageSquare size={10} className="text-slate-500" />
-                      <span className="text-[8px] font-black uppercase text-slate-500">User Note</span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed italic">"{sub.note}"</p>
+                    ))}
+                    {sub.screenshots.length > 2 && (
+                      <div className="w-20 bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500 hover:text-white relative rounded-lg cursor-pointer" onClick={() => setActiveLightboxImage(sub.screenshots[2])}>
+                        +{sub.screenshots.length - 2}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div className="mt-auto space-y-2">
-                  {sub.status === 'pending' && (
-                    <>
-                      {/* Expected Payout Action */}
-                      {parseExpectedPayout(sub.note) > 0 && (
-                        <button
-                          onClick={() => handleQuickApprove(sub)}
-                          disabled={processingId === sub.id}
-                          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-900/20"
-                        >
-                          {processingId === sub.id ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                          Approve Expected ({parseExpectedPayout(sub.note)} WC)
-                        </button>
-                      )}
+                <div className="p-4 flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-sm font-display font-black text-white uppercase italic truncate max-w-[200px]">
+                        {sub.surveyTitle || 'Untitled Survey'}
+                      </h3>
+                      <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mt-1">{sub.userName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        {sub.submittedAt?.toDate?.()?.toLocaleString() || (sub.submittedAt?.seconds ? new Date(sub.submittedAt.seconds * 1000).toLocaleString() : 'N/A')}
+                      </p>
+                    </div>
+                  </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setShowRewardModal(sub)}
-                          disabled={processingId === sub.id}
-                          className="flex-1 bg-white/10 hover:bg-white/20 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest border border-white/5"
-                        >
-                          Custom
-                        </button>
-                        <button
-                          onClick={() => setShowRejectionModal(sub)}
-                          disabled={processingId === sub.id}
-                          className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest"
-                        >
-                          Reject
-                        </button>
+                  {sub.note && (
+                    <div className="bg-black/30 p-3 rounded-xl border border-white/5 mb-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <MessageSquare size={10} className="text-slate-500" />
+                        <span className="text-[8px] font-black uppercase text-slate-500">User Note</span>
                       </div>
-
-                      {/* Quick Presets */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {[50, 100, 250, 500].map(amt => (
-                          <button
-                            key={amt}
-                            onClick={() => handleQuickApprove(sub, amt)}
-                            disabled={processingId === sub.id}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-[9px] font-black border border-white/5 transition-all"
-                          >
-                            +{amt}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Quick Reject Presets */}
-                      <div className="grid grid-cols-2 gap-2">
-                        {['Invalid Proof', 'Already Used'].map(reason => (
-                          <button
-                            key={reason}
-                            onClick={() => handleQuickReject(sub, reason)}
-                            disabled={processingId === sub.id}
-                            className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-2 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
-                          >
-                            Reject: {reason}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {sub.status === 'approved' && (
-                    <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 py-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest">
-                      <ShieldCheck size={14} />
-                      Approved (+{sub.rewardAmount} WC)
+                      <p className="text-xs text-slate-400 leading-relaxed italic">"{sub.note}"</p>
                     </div>
                   )}
-                  {sub.status === 'rejected' && (
-                    <div className="w-full bg-red-500/10 border border-red-500/20 text-red-500 py-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest flex-col text-center">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle size={14} />
-                        Rejected
+
+                  <div className="mt-auto space-y-2">
+                    {sub.status === 'pending' && (
+                      <>
+                        {/* Expected Payout Action */}
+                        {parseExpectedPayout(sub.note) > 0 && (
+                          <button
+                            onClick={() => handleQuickApprove(sub)}
+                            disabled={processingId === sub.id}
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-900/20"
+                          >
+                            {processingId === sub.id ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                            Approve Expected ({parseExpectedPayout(sub.note)} WC)
+                          </button>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowRewardModal(sub)}
+                            disabled={processingId === sub.id}
+                            className="flex-1 bg-white/10 hover:bg-white/20 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest border border-white/5"
+                          >
+                            Custom
+                          </button>
+                          <button
+                            onClick={() => setShowRejectionModal(sub)}
+                            disabled={processingId === sub.id}
+                            className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-[10px] uppercase tracking-widest"
+                          >
+                            Reject
+                          </button>
+                        </div>
+
+                        {/* Quick Presets */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {[50, 100, 250, 500].map(amt => (
+                            <button
+                              key={amt}
+                              onClick={() => handleQuickApprove(sub, amt)}
+                              disabled={processingId === sub.id}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-[9px] font-black border border-white/5 transition-all"
+                            >
+                              +{amt}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Quick Reject Presets */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {['Invalid Proof', 'Already Used'].map(reason => (
+                            <button
+                              key={reason}
+                              onClick={() => handleQuickReject(sub, reason)}
+                              disabled={processingId === sub.id}
+                              className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-2 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
+                            >
+                              Reject: {reason}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {sub.status === 'approved' && (
+                      <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 py-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest">
+                        <ShieldCheck size={14} />
+                        Approved (+{sub.rewardAmount} WC)
                       </div>
-                      {sub.rejectionReason && <p className="text-[8px] mt-1 opacity-70 italic">{sub.rejectionReason}</p>}
-                    </div>
-                  )}
+                    )}
+                    {sub.status === 'rejected' && (
+                      <div className="w-full bg-red-500/10 border border-red-500/20 text-red-500 py-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest flex-col text-center">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle size={14} />
+                          Rejected
+                        </div>
+                        {sub.rejectionReason && <p className="text-[8px] mt-1 opacity-70 italic">{sub.rejectionReason}</p>}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {submissions.length > 0 && (
+            <div className="flex items-center justify-between mt-8 bg-slate-900/40 p-4 rounded-3xl border border-white/5 shadow-xl">
+              <button
+                disabled={submissionsPage === 1}
+                onClick={() => {
+                  setSubmissionsPage(p => Math.max(1, p - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl disabled:opacity-30 disabled:hover:bg-white/5 transition-all text-xs border border-white/5"
+              >
+                Previous Page
+              </button>
+              <span className="text-xs font-extrabold text-slate-400">Page {submissionsPage}</span>
+              <button
+                disabled={!hasMoreSubmissions}
+                onClick={() => {
+                  setSubmissionsPage(p => p + 1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl disabled:opacity-30 disabled:hover:bg-white/5 transition-all text-xs border border-white/5"
+              >
+                Next Page
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-24 bg-slate-900/30 border border-white/5 rounded-[3rem] relative overflow-hidden">
           <div className="w-20 h-20 bg-slate-900 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-white/10 shadow-inner">

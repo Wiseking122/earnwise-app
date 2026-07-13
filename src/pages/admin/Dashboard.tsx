@@ -34,7 +34,8 @@ import { sendNotification, NotificationType } from '../../lib/notifications';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const [dbError, setDbError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     users: 0,
     activeTasks: 0,
@@ -77,6 +78,7 @@ export default function AdminDashboard() {
 
   const fetchStatsClientFallback = async () => {
     console.log("[PERF] Falling back to client-side getCountFromServer for admin stats");
+    setDbError(null);
     try {
       const [
         usersCount,
@@ -106,8 +108,9 @@ export default function AdminDashboard() {
         pendingOffers: offersCount.data().count,
         pendingAppeals: appealsCount.data().count
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to fetch admin stats via client fallback:", err);
+      setDbError(err?.message || String(err));
     }
   };
 
@@ -156,10 +159,16 @@ export default function AdminDashboard() {
     // Real-time counts are fine as long as we don't iterate docs
     const unsubComps = onSnapshot(query(collection(db, 'completions'), where('status', '==', 'pending')), (snap) => {
       setStats(prev => ({ ...prev, pendingCompletions: snap.size }));
+    }, (err) => {
+      console.error("Dashboard comps snapshot error:", err);
+      setDbError(prev => prev || `Completions Feed: ${err.message}`);
     });
 
     const unsubWiths = onSnapshot(query(collection(db, 'withdrawals'), where('status', '==', 'pending')), (snap) => {
       setStats(prev => ({ ...prev, pendingWithdrawals: snap.size }));
+    }, (err) => {
+      console.error("Dashboard withdrawals snapshot error:", err);
+      setDbError(prev => prev || `Withdrawals Feed: ${err.message}`);
     });
 
     return () => {
@@ -199,6 +208,59 @@ export default function AdminDashboard() {
   return (
     <Layout title="Admin Panel">
       <div className="p-4 space-y-6">
+        {/* Diagnostic / Admin Role Verification Panel */}
+        {dbError && (
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-red-900 shadow-sm relative overflow-hidden">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <ShieldAlert size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-sm uppercase tracking-wider text-red-800">Database Access Issue</h3>
+                <p className="text-xs font-bold text-red-700/85 mt-1 leading-relaxed">
+                  Your current account cannot fetch full system metrics. This is typically caused by Firestore Security Rules rejecting unauthorized requests.
+                </p>
+                <div className="mt-4 bg-white/60 backdrop-blur-xs rounded-xl p-3 border border-red-100 font-mono text-[10px] space-y-1 text-red-800">
+                  <p><strong>Error Message:</strong> {dbError}</p>
+                  <p><strong>Logged Email:</strong> {user?.email || 'Unknown'}</p>
+                  <p><strong>Document Role:</strong> {profile?.role || 'user'}</p>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Refresh Session
+                  </button>
+                  <p className="text-[9px] text-red-600 font-bold self-center">
+                    Note: If you are wiseking7890@gmail.com, your account is configured for self-healing role resolution.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Informational Role Indicator if no error, but role is user */}
+        {!dbError && profile?.role !== 'admin' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-amber-950 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <ShieldAlert size={20} />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider text-amber-800">Admin Role Status Pending</h3>
+                <p className="text-xs font-bold text-amber-700 mt-1 leading-relaxed">
+                  You are logged in as <span className="font-black underline">{user?.email}</span> but your database profile role is <span className="font-black text-amber-900 uppercase">'{profile?.role || 'user'}'</span>.
+                </p>
+                <p className="text-[10px] text-amber-600 mt-2">
+                  The dashboard might not load any collection details until your administrator profile role is synced.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header Stats */}
         <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden ring-1 ring-white/10">
           <div className="relative z-10">

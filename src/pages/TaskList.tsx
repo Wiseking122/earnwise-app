@@ -27,7 +27,6 @@ import AdsSection from '../AdsSection';
 import { AoycoOfferwall } from '../components/AoycoOfferwall';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { MaintenanceModal } from '../components/MaintenanceModal';
-import { useCpxSurveys } from '../hooks/useCpxSurveys';
 
 const CATEGORIES: { id: string, label: string, icon: any, color: string, subtext?: string }[] = [
   { id: 'offers', label: 'Offers', icon: Zap, color: 'bg-blue-600', subtext: 'OGAds & Aoyco' },
@@ -57,7 +56,6 @@ export default function TaskList() {
   
   const initialCategory = (category as TaskType | 'all') || 'all';
 
-  const { stats: cpxStats } = useCpxSurveys();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +118,7 @@ export default function TaskList() {
     survey: 'LIVE', 
     ad: 'LIVE', 
     referral: tasks.filter(t => t.type === 'referral').length,
-    surveys: cpxStats.loading ? '...' : cpxStats.available_surveys,
+    surveys: 'LIVE',
     offers: 'LIVE'
   };
 

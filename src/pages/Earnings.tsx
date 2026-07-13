@@ -345,7 +345,9 @@ export default function Earnings() {
                                   const batch = writeBatch(db);
                                   const compRef = doc(db, 'completions', c.id);
                                   const userRef = doc(db, 'users', user.uid);
+                                  const walletRef = doc(db, 'wise_coin_wallets', user.uid);
                                   const transRef = doc(collection(db, 'transactions'));
+                                  const wcTransRef = doc(collection(db, 'wise_coin_transactions'));
                                   
                                   batch.update(compRef, {
                                     status: 'approved',
@@ -353,19 +355,32 @@ export default function Earnings() {
                                   });
                                   
                                   batch.update(userRef, {
-                                    balance: increment(c.rewardEarned),
-                                    withdrawableBalance: increment(c.rewardEarned),
-                                    taskBalance: increment(c.rewardEarned),
-                                    taskEarnings: increment(c.rewardEarned),
+                                    wiseCoins: increment(c.rewardEarned),
+                                    tasksCompleted: increment(1),
                                     updatedAt: serverTimestamp()
                                   });
+
+                                  batch.set(walletRef, {
+                                    userId: user.uid,
+                                    balance: increment(c.rewardEarned),
+                                    updatedAt: serverTimestamp()
+                                  }, { merge: true });
                                   
                                   batch.set(transRef, {
                                     userId: user.uid,
                                     amount: c.rewardEarned,
-                                    type: 'earning',
+                                    type: 'task_completion',
                                     status: 'completed',
-                                    description: `Auto-Approved Completion`,
+                                    description: `Auto-Approved Completion: ${c.taskTitle || 'Social Task'}`,
+                                    createdAt: serverTimestamp()
+                                  });
+
+                                  batch.set(wcTransRef, {
+                                    userId: user.uid,
+                                    amount: c.rewardEarned,
+                                    action: 'credit',
+                                    reason: `Auto-Approved Completion: ${c.taskTitle || 'Social Task'}`,
+                                    status: 'completed',
                                     createdAt: serverTimestamp()
                                   });
                                   

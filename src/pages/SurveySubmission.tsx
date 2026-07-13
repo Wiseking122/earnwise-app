@@ -5,6 +5,7 @@ import { Camera, Image as ImageIcon, Send, ArrowLeft, Loader2, Info, CheckCircle
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { uploadProofImage } from '../lib/uploadService';
 
 const compressAndGetBase64 = (file: File): Promise<string> => {
   return new Promise((resolve) => {
@@ -187,35 +188,35 @@ const SurveySubmission = () => {
     console.log('[SURVEY] Starting submission protocol for user:', profile.uid);
 
     try {
-      // 1. Compress images client-side directly into optimized base64 data URLs
+      // 1. Upload images to Firebase Storage
       const imageUrls: string[] = [];
       const totalImages = images.length;
       
       for (let i = 0; i < totalImages; i++) {
         const file = images[i];
-        console.log(`[SURVEY] Optimizing image ${i + 1}/${totalImages}: ${file.name}`);
+        console.log(`[SURVEY] Uploading image ${i + 1}/${totalImages}: ${file.name}`);
         setUploadProgress(10 + Math.round((i / totalImages) * 60));
         
-        const base64Data = await compressAndGetBase64(file);
-        if (base64Data) {
-          imageUrls.push(base64Data);
+        const uploadResult = await uploadProofImage(file, profile.uid, `survey_${i}`, 'survey-proofs');
+        if (uploadResult && uploadResult.downloadUrl) {
+          imageUrls.push(uploadResult.downloadUrl);
         } else {
-          throw new Error(`Failed to optimize and prepare screenshot: ${file.name}`);
+          throw new Error(`Failed to upload screenshot: ${file.name}`);
         }
       }
 
       setUploadProgress(80);
-      console.log('[SURVEY] All screenshots compressed successfully. Total size estimation:', imageUrls.reduce((acc, str) => acc + str.length, 0), 'bytes');
+      console.log('[SURVEY] All screenshots uploaded successfully.');
       console.log('[SURVEY] Creating survey submission in Firestore...');
 
-      // 2. Create submission document with base64 screenshots inside Firestore
+      // 2. Create submission document with Storage URLs inside Firestore
       const submissionData = {
         userId: profile.uid,
         userName: profile.username || profile.email?.split('@')[0] || 'User',
         userEmail: profile.email || '',
         surveyTitle: surveyTitle.trim(),
         note: note.trim(),
-        screenshots: imageUrls,
+        screenshots: imageUrls, // Store Firebase Storage URLs
         status: 'pending',
         submittedAt: serverTimestamp(),
       };

@@ -31,7 +31,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.uid == 'Ik1Ngp1oC9hYXZt9lQEPIeOiCGA3') ||
-        ('email' in request.auth.token && (request.auth.token.email == 'wiseking7890@gmail.com' || request.auth.token.email == 'Wiseking7890@gmail.com' || request.auth.token.email.matches('(?i)^wiseking7890@gmail\\.com$'))) ||
+        (request.auth.token != null && 'email' in request.auth.token && request.auth.token.email != null && 
+         request.auth.token.email.matches('(?i)^wiseking7890@gmail\\.com$')) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
@@ -143,6 +144,10 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (
         isAdmin() ||
+        (request.auth.uid == userId && 
+         'email' in request.auth.token && 
+         request.auth.token.email.matches('(?i)^wiseking7890@gmail\\.com$') &&
+         incoming().role == 'admin') ||
         (request.auth.uid == userId && (
           !incoming().diff(existing()).affectedKeys().hasAny(['role'])
         )) ||

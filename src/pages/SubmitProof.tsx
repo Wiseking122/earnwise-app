@@ -7,101 +7,7 @@ import { getApiUrl } from '../lib/config';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 import Layout from '../components/Layout';
-
-const compressAndGetBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve) => {
-    if (file.size <= 400 * 1024) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        resolve(event.target?.result as string || '');
-      };
-      reader.onerror = () => {
-        resolve('');
-      };
-      reader.readAsDataURL(file);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (!dataUrl) {
-        resolve('');
-        return;
-      }
-      
-      const img = new Image();
-      img.onload = async () => {
-        try {
-          if ('decode' in img) {
-            await img.decode();
-          }
-        } catch (e) {
-          console.warn('[OFFER_PROOF] Image decode failed:', e);
-        }
-
-        const width = img.naturalWidth || img.width;
-        const height = img.naturalHeight || img.height;
-        
-        if (!width || !height) {
-          resolve(dataUrl);
-          return;
-        }
-
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-        let newWidth = width;
-        let newHeight = height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            newHeight = Math.round((height * MAX_WIDTH) / width);
-            newWidth = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            newWidth = Math.round((width * MAX_HEIGHT) / height);
-            newHeight = MAX_HEIGHT;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          const isPng = file.type === 'image/png';
-          
-          if (!isPng) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, newWidth, newHeight);
-          }
-          
-          ctx.drawImage(img, 0, 0, newWidth, newHeight);
-          
-          try {
-            const outputType = isPng ? 'image/png' : 'image/jpeg';
-            const quality = isPng ? undefined : 0.8;
-            const base64Url = canvas.toDataURL(outputType, quality);
-            resolve(base64Url);
-          } catch (e) {
-            resolve(dataUrl);
-          }
-        } else {
-          resolve(dataUrl);
-        }
-      };
-      img.onerror = () => {
-        resolve(dataUrl);
-      };
-      img.src = dataUrl;
-    };
-    reader.onerror = () => {
-      resolve('');
-    };
-    reader.readAsDataURL(file);
-  });
-};
+import { uploadProofImage, compressImage } from '../lib/uploadService';
 
 export default function SubmitProof() {
   const { user, profile } = useAuth();
@@ -118,19 +24,32 @@ export default function SubmitProof() {
   const payout = parseInt(searchParams.get('payout') || '0', 10);
 
   const [note, setNote] = useState('');
-  const [image, setImage] = useState<File | null>(null);
+  const [image, setImage] = useState<File | Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
         setError('Please select a valid image file');
         return;
       }
-      setImage(file);
+      
       setPreview(URL.createObjectURL(file));
       setError(null);
+      
+      // Start background compression immediately
+      setIsCompressing(true);
+      try {
+        const compressed = await compressImage(file);
+        setImage(compressed);
+      } catch (err) {
+        console.warn('Background compression failed:', err);
+        setImage(file);
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -152,7 +71,7 @@ export default function SubmitProof() {
     setUploadProgress(10);
 
     try {
-      // 1. Calculate dates and perform client-side pre-check to fail fast
+      // 1. Calculate dates
       const now = new Date();
       const watMs = now.getTime() + (1 * 60 * 60 * 1000);
       const watDate = new Date(watMs);
@@ -161,94 +80,39 @@ export default function SubmitProof() {
       const watDay = String(watDate.getUTCDate()).padStart(2, '0');
       const completedDateStr = `${watYear}-${watMonth}-${watDay}`;
 
-      const watMidnightInUTC = Date.UTC(watYear, watDate.getUTCMonth(), watDate.getUTCDate(), 0, 0, 0, 0);
-      const startOfDayTime = watMidnightInUTC - (1 * 60 * 60 * 1000);
-
-      const q = query(
-        collection(db, 'offer_submissions'),
-        where('userId', '==', user.uid),
-        where('offerId', '==', offerId)
-      );
+      // 2. Upload image (compression happens inside uploadProofImage)
+      setUploadProgress(20);
+      const uploadResult = await uploadProofImage(image, user.uid, offerId, 'offer-proofs');
+      const storageUrl = uploadResult.downloadUrl;
       
-      const querySnapshot = await getDocs(q);
-      let alreadySubmittedToday = false;
-      const nowTime = now.getTime();
-      querySnapshot.forEach(doc => {
-        const data = doc.data();
-        const unlockField = data.unlockAt || data.unlock_at;
+      setUploadProgress(60);
 
-        if (unlockField) {
-          let unlockDate: Date | null = null;
-          if (typeof unlockField.toDate === 'function') {
-            unlockDate = unlockField.toDate();
-          } else if (unlockField.seconds !== undefined) {
-            unlockDate = new Date(unlockField.seconds * 1000);
-          } else if (unlockField._seconds !== undefined) {
-            unlockDate = new Date(unlockField._seconds * 1000);
-          } else {
-            unlockDate = new Date(unlockField);
-          }
-          if (unlockDate && !isNaN(unlockDate.getTime())) {
-            const isLockedByTime = nowTime < unlockDate.getTime();
-            const isTodayByDate = data.completed_date === completedDateStr;
-            if (isLockedByTime || isTodayByDate) {
-              alreadySubmittedToday = true;
-            }
-          }
-        } else if (data.completed_date) {
-          if (data.completed_date === completedDateStr) {
-            alreadySubmittedToday = true;
-          }
-        } else {
-          let submittedDate: Date | null = null;
-          const subField = data.submittedAt || data.submitted_at;
-          if (subField) {
-            if (typeof subField.toDate === 'function') {
-              submittedDate = subField.toDate();
-            } else if (subField.seconds !== undefined) {
-              submittedDate = new Date(subField.seconds * 1000);
-            } else if (subField._seconds !== undefined) {
-              submittedDate = new Date(subField._seconds * 1000);
-            } else {
-              submittedDate = new Date(subField);
-            }
-          }
-          if (submittedDate && !isNaN(submittedDate.getTime()) && submittedDate.getTime() >= startOfDayTime) {
-            alreadySubmittedToday = true;
-          }
-        }
-      });
-
-      if (alreadySubmittedToday) {
-        throw new Error('You have already completed this offer today. Please come back tomorrow.');
-      }
-
-      setUploadProgress(40);
-      const base64Data = await compressAndGetBase64(image);
+      // 3. Submit via backend endpoint
+      // The backend already performs duplicate checks, so we save time by not doing it here.
+      console.log('[OFFER_SUBMIT] Sending request to:', getApiUrl('/api/v1/offers/submit-proof'));
       
-      if (!base64Data) {
-        throw new Error('Failed to prepare and compress your screenshot');
+      let response;
+      try {
+        response = await fetch(getApiUrl('/api/v1/offers/submit-proof'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            userName: profile.username || profile.email?.split('@')[0] || 'User',
+            userEmail: profile.email || '',
+            offerId,
+            offerTitle,
+            payout,
+            screenshotUrl: storageUrl,
+            note: note.trim(),
+          }),
+        });
+      } catch (fetchErr: any) {
+        console.error('[OFFER_SUBMIT] Network/Fetch Error:', fetchErr);
+        throw new Error(`Connection Error: Could not reach the server. Please check your internet or try again later. (${fetchErr.message})`);
       }
-
-      setUploadProgress(70);
-
-      // Submit via backend endpoint for strict security enforcement
-      const response = await fetch(getApiUrl('/api/v1/offers/submit-proof'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          userName: profile.username || profile.email?.split('@')[0] || 'User',
-          userEmail: profile.email || '',
-          offerId,
-          offerTitle,
-          payout,
-          screenshotUrl: base64Data,
-          note: note.trim(),
-        }),
-      });
 
       const responseData = await response.json();
 
@@ -256,15 +120,14 @@ export default function SubmitProof() {
         throw new Error(responseData.error || responseData.message || 'Failed to submit proof.');
       }
 
+      setUploadProgress(90);
+
       // If backend is in client-fallback mode, perform client-side write
       if (responseData.fallback) {
-        setUploadProgress(85);
-        
         let unlockAtDate: Date;
         if (responseData.unlockAt) {
           unlockAtDate = new Date(responseData.unlockAt);
         } else {
-          // Fallback server midnight calculation on client
           const sNow = new Date();
           const sUnlock = new Date(sNow);
           sUnlock.setHours(24, 0, 0, 0);
@@ -278,16 +141,14 @@ export default function SubmitProof() {
           offerId,
           offerTitle,
           payout,
-          screenshotUrl: base64Data,
+          screenshotUrl: storageUrl,
           note: note.trim(),
           status: 'pending',
           submittedAt: serverTimestamp(),
           unlockAt: Timestamp.fromDate(unlockAtDate),
-          
-          // Snake case representations for robust compatibility
           user_id: user.uid,
           offer_id: offerId,
-          proof: base64Data,
+          proof: storageUrl,
           submitted_at: serverTimestamp(),
           completed_date: completedDateStr,
           unlock_at: Timestamp.fromDate(unlockAtDate),
@@ -422,9 +283,9 @@ export default function SubmitProof() {
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || isCompressing}
                   className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl relative overflow-hidden ${
-                    loading
+                    loading || isCompressing
                       ? 'bg-slate-800 text-slate-400 cursor-not-allowed border border-white/5'
                       : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/10'
                   }`}
@@ -432,6 +293,10 @@ export default function SubmitProof() {
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" /> Submitting Proof ({uploadProgress}%)
+                    </>
+                  ) : isCompressing ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Optimizing Image...
                     </>
                   ) : (
                     <>

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { playRewardSound } from './sounds';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
+import { uploadProofImage } from '../lib/uploadService';
 
 const taskTypeGradients: Record<string, string> = {
   survey: 'bg-gradient-to-b from-orange-50 to-white border-orange-100',
@@ -48,6 +49,8 @@ export default function TaskDetail() {
   const [preTaskTimer, setPreTaskTimer] = useState(300); // 5 minutes in seconds
   const [isPreTimerActive, setIsPreTimerActive] = useState(true);
   const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [screenshotFile, setScreenshotFile] = useState<File | Blob | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
   const [isRenewalRequired, setIsRenewalRequired] = useState(true);
@@ -79,20 +82,22 @@ export default function TaskDetail() {
 
   const isCampaignTask = !!(task?.advertiserId && task?.advertiserId !== 'internal_platform' && task?.advertiserId !== 'admin');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 2 * 1024 * 1024) {
-        setError('Screenshot size must be under 2MB.');
-        return;
+      setScreenshot(URL.createObjectURL(file));
+      setError('');
+      
+      setIsCompressing(true);
+      try {
+        const { compressImage } = await import('../lib/uploadService');
+        const compressedBlob = await compressImage(file);
+        setScreenshotFile(compressedBlob);
+      } catch (err) {
+        setScreenshotFile(file);
+      } finally {
+        setIsCompressing(false);
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setScreenshot(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -106,7 +111,7 @@ export default function TaskDetail() {
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -117,17 +122,20 @@ export default function TaskDetail() {
         setError('Please drop an image file (PNG, JPG, JPEG).');
         return;
       }
-      if (file.size > 2 * 1024 * 1024) {
-        setError('Screenshot size must be under 2MB.');
-        return;
+      
+      setScreenshot(URL.createObjectURL(file));
+      setError('');
+
+      setIsCompressing(true);
+      try {
+        const { compressImage } = await import('../lib/uploadService');
+        const compressedBlob = await compressImage(file);
+        setScreenshotFile(compressedBlob);
+      } catch (err) {
+        setScreenshotFile(file);
+      } finally {
+        setIsCompressing(false);
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setScreenshot(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -145,22 +153,43 @@ export default function TaskDetail() {
     setError('');
     
     try {
+      // 1. Upload screenshot
+      let uploadUrl = '';
+      if (screenshotFile) {
+        const uploadResult = await uploadProofImage(screenshotFile, user.uid, task.id, 'proof-images');
+        uploadUrl = uploadResult.downloadUrl;
+      } else if (screenshot && screenshot.startsWith('data:')) {
+        const uploadResult = await uploadProofImage(screenshot, user.uid, task.id, 'proof-images');
+        uploadUrl = uploadResult.downloadUrl;
+      } else {
+        throw new Error('Screenshot data is invalid.');
+      }
+
+      // 2. Call backend
       const deviceFingerprint = getOrGenerateDeviceFingerprint();
-      const response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          taskId: task.id,
-          taskTitle: task.title,
-          proof: proof || 'Screenshot Proof Provided',
-          rewardAmount: calculatedReward,
-          screenshot: screenshot, // Base64 data
-          deviceFingerprint
-        })
-      });
+      console.log('[TASK-CAMPAIGN] Sending request to:', getApiUrl('/api/v1/tasks/verify-proof'));
+      
+      let response;
+      try {
+        response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            taskId: task.id,
+            taskTitle: task.title,
+            proof: proof || 'Screenshot Proof Provided',
+            rewardAmount: calculatedReward,
+            screenshot: uploadUrl,
+            deviceFingerprint
+          })
+        });
+      } catch (fetchErr: any) {
+        console.error('[TASK-CAMPAIGN] Network/Fetch Error:', fetchErr);
+        throw new Error(`Connection Error: Could not reach verification server. (${fetchErr.message})`);
+      }
 
       const responseText = await response.text();
       let data: any = {};
@@ -186,7 +215,7 @@ export default function TaskDetail() {
           taskTitle: task.title,
           status: 'pending',
           proof: proof || 'Screenshot Proof Provided',
-          screenshot: screenshot || null,
+          screenshot: uploadUrl || null,
           rewardEarned: payoutAmount,
           submittedAt: serverTimestamp(),
           createdAt: serverTimestamp()
@@ -475,22 +504,41 @@ export default function TaskDetail() {
     setError('');
     setWiseAiMessage('');
     try {
+      // 1. Upload screenshot if exists
+      let uploadUrl = '';
+      if (screenshotFile) {
+        const uploadResult = await uploadProofImage(screenshotFile, user.uid, task.id, 'proof-images');
+        uploadUrl = uploadResult.downloadUrl;
+      } else if (screenshot && screenshot.startsWith('data:')) {
+        const uploadResult = await uploadProofImage(screenshot, user.uid, task.id, 'proof-images');
+        uploadUrl = uploadResult.downloadUrl;
+      }
+
+      // 2. Call backend
       const deviceFingerprint = getOrGenerateDeviceFingerprint();
-      const response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          taskId: task.id,
-          taskTitle: task.title,
-          proof: proof || 'Screenshot Proof Provided',
-          screenshot: screenshot, // Send screenshot proof
-          rewardAmount: calculatedReward,
-          deviceFingerprint
-        })
-      });
+      console.log('[TASK-DETAIL] Sending request to:', getApiUrl('/api/v1/tasks/verify-proof'));
+      
+      let response;
+      try {
+        response = await fetch(getApiUrl('/api/v1/tasks/verify-proof'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            taskId: task.id,
+            taskTitle: task.title,
+            proof: proof || 'Screenshot Proof Provided',
+            screenshot: uploadUrl || null,
+            rewardAmount: calculatedReward,
+            deviceFingerprint
+          })
+        });
+      } catch (fetchErr: any) {
+        console.error('[TASK-DETAIL] Network/Fetch Error:', fetchErr);
+        throw new Error(`Connection Error: Could not reach the server. (${fetchErr.message})`);
+      }
 
       const responseText = await response.text();
       let data: any = {};
@@ -516,7 +564,7 @@ export default function TaskDetail() {
             taskTitle: task.title,
             status: 'pending',
             proof: proof || 'Screenshot provided',
-            screenshot: screenshot || null,
+            screenshot: uploadUrl || null,
             rewardEarned: payoutAmount,
             submittedAt: serverTimestamp(),
             createdAt: serverTimestamp()
@@ -873,11 +921,11 @@ export default function TaskDetail() {
                  <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-md space-y-4">
                    <div className="flex items-center gap-2 mb-2">
                      <span className="w-8 h-8 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">★</span>
-                     <h4 className="font-black text-lg text-slate-900">Wise AI Verification Proof</h4>
+                     <h4 className="font-black text-lg text-slate-900">Task Verification Proof</h4>
                    </div>
                    
                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                     Please upload a screenshot of your completed task. Wise AI will review and verify your submission instantly.
+                     Please upload a screenshot of your completed task. Our administrative team will manually review and verify your submission.
                    </p>
 
                    {/* Drag and Drop Zone */}
@@ -993,7 +1041,7 @@ export default function TaskDetail() {
               <CheckCircle2 size={48} />
             </motion.div>
             <h2 className="text-3xl font-black mb-2">Great Job!</h2>
-            <p className="text-gray-500 font-medium mb-2">Verified by Wise AI.</p>
+            <p className="text-gray-500 font-medium mb-2">Awaiting manual verification.</p>
             {wiseAiMessage && <p className="text-sm text-green-600 font-bold mb-8 bg-green-50 p-4 rounded-xl border border-green-100">{wiseAiMessage}</p>}
             <p className="text-xs text-blue-600 font-bold animate-pulse">Redirecting to earnings...</p>
           </motion.div>

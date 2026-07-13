@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, doc, updateDoc, setDoc, onSnapshot, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc, onSnapshot, serverTimestamp, query, orderBy, limit, where, startAfter, getDocs } from 'firebase/firestore';
 import { sendNotification } from '../../lib/notifications';
 import { 
   ShieldAlert, 
@@ -46,6 +46,16 @@ export default function AppealsManager() {
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // Real-time counts
+  const [pendingCount, setPendingCount] = useState(0);
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [rejectedCount, setRejectedCount] = useState(0);
+
+  // Pagination states
+  const [appealsPage, setAppealsPage] = useState(1);
+  const [appealsPageAnchors, setAppealsPageAnchors] = useState<any[]>([]);
+  const [hasMoreAppeals, setHasMoreAppeals] = useState(true);
+
   // Custom confirmation and alert modals
   const [confirmModal, setConfirmModal] = useState<{
     type: 'Approve' | 'Reject';
@@ -58,40 +68,88 @@ export default function AppealsManager() {
     type: 'success' | 'error';
   } | null>(null);
 
-  // Fetch appeals from Firestore
+  // Live count listeners
   useEffect(() => {
-    const q = query(
-      collection(db, 'appeals'),
-      orderBy('createdAt', 'desc'),
-      limit(200)
-    );
-    const unsub = onSnapshot(q, (snapshot) => {
+    const qPending = query(collection(db, 'appeals'), where('status', '==', 'Pending'));
+    const unsubPending = onSnapshot(qPending, (snap) => setPendingCount(snap.size));
+
+    const qApproved = query(collection(db, 'appeals'), where('status', '==', 'Approved'));
+    const unsubApproved = onSnapshot(qApproved, (snap) => setApprovedCount(snap.size));
+
+    const qRejected = query(collection(db, 'appeals'), where('status', '==', 'Rejected'));
+    const unsubRejected = onSnapshot(qRejected, (snap) => setRejectedCount(snap.size));
+
+    return () => {
+      unsubPending();
+      unsubApproved();
+      unsubRejected();
+    };
+  }, []);
+
+  // Reset pagination when tab changes
+  useEffect(() => {
+    setAppealsPage(1);
+    setAppealsPageAnchors([]);
+    setHasMoreAppeals(true);
+  }, [activeTab]);
+
+  // Fetch paginated appeals from Firestore based on activeTab
+  useEffect(() => {
+    async function fetchAppeals() {
+      setLoading(true);
+      const startTime = performance.now();
+      
+      let q = query(
+        collection(db, 'appeals'),
+        where('status', '==', activeTab),
+        orderBy('createdAt', 'desc'),
+        limit(20)
+      );
+
+      if (appealsPage > 1 && appealsPageAnchors[appealsPage - 2]) {
+        q = query(
+          collection(db, 'appeals'),
+          where('status', '==', activeTab),
+          orderBy('createdAt', 'desc'),
+          startAfter(appealsPageAnchors[appealsPage - 2]),
+          limit(20)
+        );
+      }
+
       try {
+        const snapshot = await getDocs(q);
         const list: Appeal[] = snapshot.docs.map(d => ({
           id: d.id,
           ...d.data()
         })) as Appeal[];
         
         setAppeals(list);
+        setHasMoreAppeals(snapshot.docs.length === 20);
+
+        if (snapshot.docs.length > 0) {
+          const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+          setAppealsPageAnchors((prev) => {
+            const updated = [...prev];
+            updated[appealsPage - 1] = lastDoc;
+            return updated;
+          });
+        }
         setError(null);
+        const endTime = performance.now();
+        console.log(`[APPEALS] Query took ${endTime - startTime}ms`);
       } catch (err: any) {
         console.error("Error reading appeals:", err);
         setError("Failed to synchronize appeals database.");
       } finally {
         setLoading(false);
       }
-    }, (err) => {
-      console.error("Firestore subscription error:", err);
-      setError("Permission Denied: Unable to subscribe to appeals.");
-      setLoading(false);
-    });
+    }
 
-    return () => unsub();
-  }, []);
+    fetchAppeals();
+  }, [activeTab, appealsPage]);
 
-  // Filter appeals based on activeTab and searchQuery
+  // Filter appeals based on searchQuery (status is already filtered by DB query)
   const filteredAppeals = appeals.filter(appeal => {
-    const matchesTab = appeal.status === activeTab;
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
       appeal.fullName?.toLowerCase().includes(searchLower) ||
@@ -100,12 +158,14 @@ export default function AppealsManager() {
       appeal.message?.toLowerCase().includes(searchLower) ||
       appeal.userId?.toLowerCase().includes(searchLower);
     
-    return matchesTab && matchesSearch;
+    return matchesSearch;
   });
 
-  // Count helper
+  // Count helper using real-time listener counts
   const countByStatus = (status: 'Pending' | 'Approved' | 'Rejected') => {
-    return appeals.filter(a => a.status === status).length;
+    if (status === 'Pending') return pendingCount;
+    if (status === 'Approved') return approvedCount;
+    return rejectedCount;
   };
 
   // Handle Approve Action
@@ -416,6 +476,32 @@ export default function AppealsManager() {
                 </div>
               </div>
             ))}
+            {/* Pagination Controls */}
+            {filteredAppeals.length > 0 && (
+              <div className="flex items-center justify-between mt-8 bg-slate-900/40 p-4 rounded-3xl border border-white/5 shadow-xl">
+                <button
+                  disabled={appealsPage === 1}
+                  onClick={() => {
+                    setAppealsPage(p => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl disabled:opacity-30 disabled:hover:bg-white/5 transition-all text-xs border border-white/5"
+                >
+                  Previous Page
+                </button>
+                <span className="text-xs font-extrabold text-slate-400">Page {appealsPage}</span>
+                <button
+                  disabled={!hasMoreAppeals}
+                  onClick={() => {
+                    setAppealsPage(p => p + 1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl disabled:opacity-30 disabled:hover:bg-white/5 transition-all text-xs border border-white/5"
+                >
+                  Next Page
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

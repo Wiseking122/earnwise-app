@@ -24,7 +24,7 @@ const SurveyHistory = () => {
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as SurveySubmission))
-        .filter(sub => sub.status === 'approved');
+        ;
       // Sort client-side by submittedAt desc
       docs.sort((a, b) => {
         const timeA = a.submittedAt?.seconds || 0;

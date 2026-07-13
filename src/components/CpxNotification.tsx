@@ -1,73 +1,52 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useCpxSurveys } from '../hooks/useCpxSurveys';
+import { useLocation } from 'react-router-dom';
 import { getApiUrl } from '../lib/config';
 
 /**
  * CpxNotification Component
- * Integrates the official CPX Research notification script.
+ * Integrates the official CPX Research scripts (Notification + Wall).
  * Dynamically handles user identification and prevents duplicate script injection.
  */
 const CpxNotification: React.FC = () => {
   const { user, profile } = useAuth();
-  const { stats } = useCpxSurveys();
+  const location = useLocation();
   const scriptInjectedRef = useRef(false);
-  const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
-    if (stats.loading) return;
+    // Only load if user is authenticated
+    if (!user || !profile) return;
 
-    // Smart Logic: Decide if we should show the notification widget
-    // Condition 1: High paying survey (e.g. > 400 local currency units)
-    const hasHighPaying = stats.max_payout >= 400;
-    // Condition 2: Plenty of surveys available (new batch)
-    const hasManySurveys = stats.available_surveys >= 5;
+    const loadCpx = async () => {
+      let appId = 33341;
+      try {
+        const configRes = await fetch('/api/config/public');
+        const configData = await configRes.json();
+        if (configData.cpxAppId) appId = parseInt(configData.cpxAppId);
+      } catch (err) {}
 
-    if (hasHighPaying || hasManySurveys) {
-      setShouldShow(true);
-    } else {
-      setShouldShow(false);
-    }
-  }, [stats.available_surveys, stats.max_payout, stats.loading]);
-
-  useEffect(() => {
-    // Only load if user is authenticated, we should show it, and script hasn't been injected yet
-    if (!user || !profile || !shouldShow || scriptInjectedRef.current) return;
-
-    const loadCpxNotification = async () => {
-      // Configuration constants - App ID is derived from project settings
-      const appId = 33341; 
       const extUserId = user.uid;
       const username = profile.username || 'User';
       const email = user.email || '';
 
-      // Get the signed URL from our backend
-      let linkUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${extUserId}&username=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}`;
-      
-      try {
-        const queryParams = new URLSearchParams({
-          user_id: extUserId,
-          username: username,
-          email: email
-        });
-        const res = await fetch(getApiUrl(`/api/cpx/signed-url?${queryParams.toString()}`));
-        const data = await res.json();
-        if (data.url) linkUrl = data.url;
-      } catch (err) {
-        console.error('[CPX] Failed to get signed URL:', err);
-      }
+      // Script 1: Survey Wall (Embedded in the Survey Tab)
+      const script1 = {
+        div_id: "cpx-wall-embedded",
+        theme_style: 1, // Standard Survey Wall
+        newtab: false
+      };
 
-      // Define CPX Script 4 Configuration (Notification style)
+      // Script 4: Notification Widget (Floating bottom right)
       const script4 = {
         div_id: "notification",
         theme_style: 4,
-        position: 1, // Position 1 (Top) to prevent showing at the bottom footer
-        text: "Earn 300 WC per survey!",
-        link: linkUrl,
+        position: 5, // 5 = bottom right
+        text: "",
+        link: "https://offers.cpx-research.com/index.php?app_id={app_id}&ext_user_id={ext_user_id}&username={username}&email={email}",
         newtab: true
       };
 
-      // Global CPX Configuration object required by the external script
+      // Global CPX Configuration object
       const config = {
         general_config: {
           app_id: appId,
@@ -86,35 +65,37 @@ const CpxNotification: React.FC = () => {
             stars_filled: "#2b2b2b",
           },
         },
-        script_config: [script4],
-        debug: false
+        script_config: [script1, script4], // Support both embedded wall and floating notification
+        debug: true
       };
 
-      // Attach config to window object as required by CPX v1.1 script
+      // Attach config to window object
       (window as any).config = config;
 
-      // Create and append the external script tag
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.src = 'https://cdn.cpx-research.com/assets/js/script_tag_v1.1.js';
-      script.async = true;
+      if (!scriptInjectedRef.current) {
+        // Create and append the external script tag
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = 'https://cdn.cpx-research.com/assets/js/script_tag_v1.1.js';
+        script.async = true;
 
-      script.onload = () => {
-        console.log('[CPX] Notification script loaded successfully.');
-      };
-
-      script.onerror = (err) => {
-        console.error('[CPX] Failed to load the notification script:', err);
-      };
-
-      document.body.appendChild(script);
-      scriptInjectedRef.current = true;
+        document.body.appendChild(script);
+        scriptInjectedRef.current = true;
+      } else {
+        // If script is already there, try to re-init if CPX provides a method
+        // Most CPX scripts watch for DOM changes or can be manually re-triggered
+        if ((window as any).CPXResearch && typeof (window as any).CPXResearch.init === 'function') {
+          (window as any).CPXResearch.init();
+        }
+      }
     };
 
-    loadCpxNotification();
-  }, [user, profile, shouldShow]);
+    loadCpx();
+  }, [user, profile, location.pathname]);
 
   if (!user) return null;
+
+  const isSurveysPage = location.pathname === '/surveys';
 
   return (
     <>
@@ -123,19 +104,20 @@ const CpxNotification: React.FC = () => {
           pointer-events: auto !important;
         }
       `}</style>
-      <div 
-        id="notification" 
-        style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          zIndex: 99999,
-          pointerEvents: 'none' // Ensures clicks pass through empty spaces of this container
-        }}
-      >
-        {/* The CPX script will inject content into this container */}
-      </div>
+      
+      {/* Floating widget - only visible if NOT on the surveys page */}
+      {!isSurveysPage && (
+        <div 
+          id="notification" 
+          style={{ 
+            position: 'fixed', 
+            bottom: '20px', 
+            right: '20px', 
+            zIndex: 99999,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
     </>
   );
 };

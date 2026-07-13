@@ -51,7 +51,6 @@ import { AnnouncementEngine, ScrollingBanner } from '../components/AnnouncementE
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
 import PayoutTicker from '../components/PayoutTicker';
-import CpxDashboardCard from '../components/CpxDashboardCard';
 
 export default function Home() {
   const { user, profile } = useAuth();
@@ -755,7 +754,6 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-2.5">
-            <CpxDashboardCard />
              {/* Earning Channels Grid */}
              <div className="grid grid-cols-2 gap-2.5">
                <Link 

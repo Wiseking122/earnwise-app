@@ -15,11 +15,13 @@ import {
   runTransaction,
   getDocs,
   limit,
+  startAfter,
   increment
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Task, TaskType, TaskCompletion } from '../../types';
 import { sendNotification, NotificationType } from '../../lib/notifications';
+import { getApiUrl } from '../../lib/config';
 import { 
   Plus, 
   X, 
@@ -35,7 +37,11 @@ import {
   ExternalLink
 } from 'lucide-react';
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function AdminTasks() {
+  const { user, profile } = useAuth();
+  const [dbError, setDbError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completions, setCompletions] = useState<TaskCompletion[]>([]);
   const [adRequests, setAdRequests] = useState<Task[]>([]);
@@ -60,23 +66,70 @@ export default function AdminTasks() {
   const [enableSocialShare, setEnableSocialShare] = useState(false);
   const [adDurations, setAdDurations] = useState<{[key: string]: string}>({});
 
+  const [completionsPage, setCompletionsPage] = useState(1);
+  const [completionsPageAnchors, setCompletionsPageAnchors] = useState<any[]>([]);
+  const [hasMoreCompletions, setHasMoreCompletions] = useState(true);
+
+  useEffect(() => {
+    async function fetchCompletions() {
+      setDbError(null);
+      const startTime = performance.now();
+      
+      try {
+        // Load through the server-side API proxy to completely bypass client-side Firestore ISP blocks
+        const response = await fetch(getApiUrl(`/api/admin/task-completions?adminId=${user?.uid || ''}&status=pending`));
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP status ${response.status}`);
+        }
+        const docs = await response.json() as TaskCompletion[];
+
+        // Sort descending in memory by submittedAt to keep newest first
+        docs.sort((a, b) => {
+          const timeA = a.submittedAt?.seconds ? (a.submittedAt.seconds * 1000) : (a.submittedAt ? new Date(a.submittedAt as any).getTime() : 0);
+          const timeB = b.submittedAt?.seconds ? (b.submittedAt.seconds * 1000) : (b.submittedAt ? new Date(b.submittedAt as any).getTime() : 0);
+          return timeB - timeA;
+        });
+
+        setCompletions(docs);
+        setHasMoreCompletions(false);
+
+        const endTime = performance.now();
+        console.log(`[TASKS API] Loaded ${docs.length} pending completions in ${endTime - startTime}ms`);
+      } catch (error: any) {
+        console.warn("[TASKS API] Failed, falling back to direct Firestore...", error);
+        
+        try {
+          const qComps = query(
+            collection(db, 'completions'),
+            where('status', '==', 'pending'),
+            limit(150)
+          );
+          const snap = await getDocs(qComps);
+          let docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskCompletion));
+          
+          docs.sort((a, b) => {
+            const timeA = a.submittedAt?.toMillis?.() || (a.submittedAt?.seconds * 1000) || (a.submittedAt ? new Date(a.submittedAt).getTime() : 0);
+            const timeB = b.submittedAt?.toMillis?.() || (b.submittedAt?.seconds * 1000) || (b.submittedAt ? new Date(b.submittedAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
+          setCompletions(docs);
+          setHasMoreCompletions(false);
+        } catch (fbError: any) {
+          console.error("Firestore fallback failed:", fbError);
+          setDbError(fbError?.message || String(fbError));
+        }
+      }
+    }
+
+    fetchCompletions();
+  }, [user?.uid]);
+
   useEffect(() => {
     const qTasks = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200));
     const unsubTasks = onSnapshot(qTasks, (snap) => {
       setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'tasks'));
-
-    const qComps = query(collection(db, 'completions'), where('status', '==', 'pending'));
-    const unsubComps = onSnapshot(qComps, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskCompletion));
-      // Sort locally by submittedAt desc
-      docs.sort((a, b) => {
-        const timeA = (a.submittedAt as any)?.toMillis?.() || 0;
-        const timeB = (b.submittedAt as any)?.toMillis?.() || 0;
-        return timeB - timeA;
-      });
-      setCompletions(docs);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'completions'));
 
     const qAds = query(collection(db, 'tasks'), where('status', '==', 'pending'));
     const unsubAds = onSnapshot(qAds, (snap) => {
@@ -85,7 +138,6 @@ export default function AdminTasks() {
 
     return () => {
       unsubTasks();
-      unsubComps();
       unsubAds();
     };
   }, []);
@@ -174,7 +226,7 @@ export default function AdminTasks() {
       await sendNotification({
         userId: 'all',
         title: '🚀 New High-Paying Task!',
-        message: `A new task "${newTitle}" is now live! Earn ₦${userPayout.toLocaleString()} instantly.`,
+        message: `A new task "${newTitle}" is now live! Earn ${userPayout.toLocaleString()} WC instantly.`,
         type: NotificationType.INFO,
         actionLink: `/tasks/${taskRef.id}`
       });
@@ -212,28 +264,37 @@ export default function AdminTasks() {
 
   const handleVerifyCompletion = async (completion: TaskCompletion, status: 'approved' | 'rejected', reason?: string) => {
     try {
+      const userRef = doc(db, 'users', completion.userId);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) throw new Error("User profile not found.");
+      const uData = userSnap.data();
+
+      let referrerId: string | null = null;
+      let referrerRef: any = null;
+
+      if (status === 'approved' && uData.referredBy && !uData.hasReceivedReferralBonus) {
+        const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', uData.referredBy), limit(1));
+        const referrerDocs = await getDocs(referrerQuery);
+        if (!referrerDocs.empty) {
+          referrerId = referrerDocs.docs[0].id;
+          referrerRef = doc(db, 'users', referrerId);
+        }
+      }
+
       await runTransaction(db, async (transaction) => {
         const compRef = doc(db, 'completions', completion.id);
-        const userRef = doc(db, 'users', completion.userId);
         const taskRef = completion.taskId ? doc(db, 'tasks', completion.taskId) : null;
+        const walletRef = doc(db, 'wise_coin_wallets', completion.userId);
 
         // ---- ALL READS FIRST ----
         const uSnap = await transaction.get(userRef);
         if (!uSnap.exists()) throw new Error("User profile not found.");
-        const uData = uSnap.data();
 
-        let referrerId: string | null = null;
-        let referrerRef = null;
+        const walletSnap = await transaction.get(walletRef);
+
         let referrerSnap = null;
-
-        if (status === 'approved' && uData.referredBy && !uData.hasReceivedReferralBonus) {
-          const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', uData.referredBy), limit(1));
-          const referrerDocs = await getDocs(referrerQuery);
-          if (!referrerDocs.empty) {
-            referrerId = referrerDocs.docs[0].id;
-            referrerRef = doc(db, 'users', referrerId);
-            referrerSnap = await transaction.get(referrerRef);
-          }
+        if (referrerRef) {
+          referrerSnap = await transaction.get(referrerRef);
         }
 
         let taskSnap = null;
@@ -251,7 +312,7 @@ export default function AdminTasks() {
         const notifTitle = status === 'approved' ? '✅ Submission Approved!' : '❌ Submission Rejected';
         const taskIdent = completion.taskId ? completion.taskId.slice(0, 5) : 'Task';
         const notifMsg = status === 'approved' 
-          ? `Your submission for task ${taskIdent}... was approved. ₦${completion.rewardEarned} added to your balance.`
+          ? `Your submission for task ${taskIdent}... was approved. ${completion.rewardEarned} WC added to your balance.`
           : `Your submission was rejected. ${reason ? `Reason: ${reason}. ` : ''}Please ensure you followed all instructions and provided clear proof.`;
         
         const notifRef = doc(collection(db, 'notifications'));
@@ -284,31 +345,53 @@ export default function AdminTasks() {
           }
 
           transaction.update(userRef, { 
-            balance: (uData.balance || 0) + completion.rewardEarned,
-            withdrawableBalance: (uData.withdrawableBalance || 0) + completion.rewardEarned,
-            taskBalance: (uData.taskBalance || 0) + completion.rewardEarned,
-            taskEarnings: (uData.taskEarnings || 0) + completion.rewardEarned,
+            wiseCoins: increment(completion.rewardEarned),
+            tasksCompleted: increment(1),
             updatedAt: serverTimestamp()
           });
+
+          if (walletSnap.exists()) {
+            transaction.update(walletRef, {
+              balance: increment(completion.rewardEarned),
+              updatedAt: serverTimestamp()
+            });
+          } else {
+            transaction.set(walletRef, {
+              userId: completion.userId,
+              balance: completion.rewardEarned,
+              updatedAt: serverTimestamp()
+            });
+          }
 
           const transRef = doc(collection(db, 'transactions'));
           transaction.set(transRef, {
             userId: completion.userId,
             amount: completion.rewardEarned,
-            type: 'earning',
+            type: 'task_completion',
             status: 'completed',
             description: `Manual Reward: ${taskIdent}`,
             createdAt: serverTimestamp()
           });
 
+          const taskTitleString = (taskSnap && taskSnap.exists()) ? (taskSnap.data().title || 'Social Task') : 'Social Task';
+
+          const wcTransRef = doc(collection(db, 'wise_coin_transactions'));
+          transaction.set(wcTransRef, {
+            userId: completion.userId,
+            amount: completion.rewardEarned,
+            action: 'credit',
+            reason: `Task Approved: ${taskTitleString}`,
+            status: 'completed',
+            createdAt: serverTimestamp()
+          });
+
           if (referrerId && referrerRef && referrerSnap && referrerSnap.exists()) {
             const referralBonus = 2.00;
-            const rData = referrerSnap.data();
             transaction.update(referrerRef, { 
-              balance: (rData.balance || 0) + referralBonus,
-              withdrawableBalance: (rData.withdrawableBalance || 0) + referralBonus,
-              referralBalance: (rData.referralBalance || 0) + referralBonus,
-              referralEarnings: (rData.referralEarnings || 0) + referralBonus
+              balance: increment(referralBonus),
+              withdrawableBalance: increment(referralBonus),
+              referralBalance: increment(referralBonus),
+              referralEarnings: increment(referralBonus)
             });
             transaction.update(userRef, { hasReceivedReferralBonus: true });
 
@@ -331,9 +414,31 @@ export default function AdminTasks() {
     }
   };
 
+  const pendingCompletions = completions.filter(c => c.status === "pending");
   return (
     <Layout title="Task Admin" showBack>
       <div className="p-4 space-y-6">
+        {dbError && (
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-red-900 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <AlertCircle size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-sm uppercase tracking-wider text-red-800">Database Access Issue</h3>
+                <p className="text-xs font-bold text-red-700/85 mt-1 leading-relaxed">
+                  Unable to retrieve task completions.
+                </p>
+                <div className="mt-4 bg-white/60 backdrop-blur-xs rounded-xl p-3 border border-red-100 font-mono text-[10px] space-y-1 text-red-800">
+                  <p><strong>Error:</strong> {dbError}</p>
+                  <p><strong>Logged Email:</strong> {user?.email || 'Unknown'}</p>
+                  <p><strong>Document Role:</strong> {profile?.role || 'user'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex bg-gray-100 p-1 rounded-2xl">
           <button 
@@ -370,7 +475,7 @@ export default function AdminTasks() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-black text-gray-900">{ad.title}</h4>
-                        <p className="text-xs text-blue-600 font-black">Budget: ₦{ad.totalBudget.toLocaleString()} • Payout: ₦{ad.userPayout}</p>
+                        <p className="text-xs text-blue-600 font-black">Budget: {ad.totalBudget.toLocaleString()} WC • Payout: {ad.userPayout} WC</p>
                       </div>
                       <a href={ad.link} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                         <ExternalLink size={18} />
@@ -603,97 +708,127 @@ export default function AdminTasks() {
           </div>
         ) : (
           <div className="space-y-4">
-            {completions.length > 0 ? (
-              completions.map(comp => {
-                const targetTask = tasks.find(t => t.id === comp.taskId);
-                const isCampaign = !!(comp as any).isCampaignTask || !!comp.screenshot;
+            {pendingCompletions.length > 0 ? (
+              <>
+                <div className="space-y-4">
+                  {pendingCompletions.map(comp => {
+                    const targetTask = tasks.find(t => t.id === comp.taskId);
+                    const isCampaign = !!(comp as any).isCampaignTask || !!comp.screenshot;
 
-                return (
-                  <div key={comp.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <p className="text-[10px] font-black text-gray-400 uppercase">User: {comp.userId.slice(0, 8)}...</p>
-                          {isCampaign ? (
-                            <span className="inline-block bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] uppercase font-black px-2 py-0.5 rounded-full">
-                              Advertiser Campaign Proof
-                            </span>
-                          ) : (
-                            <span className="inline-block bg-slate-50 border border-slate-100 text-slate-600 text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
-                              Standard Proof Submission
-                            </span>
-                          )}
+                    return (
+                      <div key={comp.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap gap-2 items-center">
+                              <p className="text-[10px] font-black text-gray-400 uppercase">User: {comp.userId.slice(0, 8)}...</p>
+                              {isCampaign ? (
+                                <span className="inline-block bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] uppercase font-black px-2 py-0.5 rounded-full">
+                                  Advertiser Campaign Proof
+                                </span>
+                              ) : (
+                                <span className="inline-block bg-slate-50 border border-slate-100 text-slate-600 text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
+                                  Standard Proof Submission
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-extrabold text-gray-900 text-base leading-tight">
+                              {targetTask?.title || "Task Completion"}
+                            </h4>
+                            <p className="text-sm font-black text-green-600">{comp.rewardEarned.toFixed(2)} WC Payout</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] text-gray-400 font-bold">
+                              {comp.submittedAt?.toDate ? new Date(comp.submittedAt.toDate()).toLocaleDateString() : (comp.submittedAt?.seconds ? new Date(comp.submittedAt.seconds * 1000).toLocaleDateString() : 'Just now')}
+                            </p>
+                          </div>
                         </div>
-                        <h4 className="font-extrabold text-gray-900 text-base leading-tight">
-                          {targetTask?.title || "Task Completion"}
-                        </h4>
-                        <p className="text-sm font-black text-green-600">₦{comp.rewardEarned.toFixed(2)} Payout</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-gray-400 font-bold">
-                          {comp.submittedAt?.toDate ? new Date(comp.submittedAt.toDate()).toLocaleDateString() : 'Just now'}
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Proof Description Text */}
-                    <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-100/50 space-y-1">
-                      <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Proof Details / Handle Description:</span>
-                      <p className="text-sm text-slate-700 font-medium leading-relaxed">
-                        {(comp as any).proofText || comp.proof || "No additional text description was provided."}
-                      </p>
-                    </div>
+                        {/* Proof Description Text */}
+                        <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-100/50 space-y-1">
+                          <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Proof Details / Handle Description:</span>
+                          <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                            {(comp as any).proofText || comp.proof || "No additional text description was provided."}
+                          </p>
+                        </div>
 
-                    {/* Screenshot Proof */}
-                    {(comp as any).screenshot && (
-                      <div className="space-y-2">
-                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Screenshot Proof (Click to expand):</span>
-                        <div className="relative inline-block overflow-hidden rounded-2xl border border-slate-200 group">
-                          <img 
-                            src={(comp as any).screenshot} 
-                            alt="Screenshot Proof" 
-                            onClick={() => setSelectedScreenshotForModal((comp as any).screenshot)}
-                            className="max-h-44 object-cover cursor-pointer group-hover:scale-[1.02] active:scale-95 transition-all duration-300" 
-                          />
+                        {/* Screenshot Proof */}
+                        {(comp as any).screenshot && (
+                          <div className="space-y-2">
+                            <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Screenshot Proof (Click to expand):</span>
+                            <div className="relative inline-block overflow-hidden rounded-2xl border border-slate-200 group">
+                              <img 
+                                src={(comp as any).screenshot} 
+                                alt="Screenshot Proof" 
+                                loading="lazy"
+                                onClick={() => setSelectedScreenshotForModal((comp as any).screenshot)}
+                                className="max-h-44 object-cover cursor-pointer group-hover:scale-[1.02] active:scale-95 transition-all duration-300" 
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-3">
+                          <div className="flex gap-3">
+                            <button 
+                              onClick={() => handleVerifyCompletion(comp, 'approved')}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-green-100"
+                            >
+                              <Check size={18} /> Approve & Reward
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const reason = prompt("Enter rejection reason:");
+                                if (reason) handleVerifyCompletion(comp, 'rejected', reason);
+                              }}
+                              className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                            >
+                              <X size={18} /> Reject
+                            </button>
+                          </div>
+
+                          {/* Quick Rejection Presets */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {['Invalid Proof', 'Already Used', 'Blurred Image', 'Incomplete'].map(reason => (
+                              <button
+                                key={reason}
+                                onClick={() => handleVerifyCompletion(comp, 'rejected', reason)}
+                                className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-2 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
+                              >
+                                {reason}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
 
-                    <div className="flex flex-col gap-3">
-                      <div className="flex gap-3">
-                        <button 
-                          onClick={() => handleVerifyCompletion(comp, 'approved')}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-green-100"
-                        >
-                          <Check size={18} /> Approve & Reward
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const reason = prompt("Enter rejection reason:");
-                            if (reason) handleVerifyCompletion(comp, 'rejected', reason);
-                          }}
-                          className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-                        >
-                          <X size={18} /> Reject
-                        </button>
-                      </div>
-
-                      {/* Quick Rejection Presets */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {['Invalid Proof', 'Already Used', 'Blurred Image', 'Incomplete'].map(reason => (
-                          <button
-                            key={reason}
-                            onClick={() => handleVerifyCompletion(comp, 'rejected', reason)}
-                            className="bg-red-500/5 hover:bg-red-500/10 text-red-500/60 py-2 rounded-lg text-[8px] font-black border border-red-500/5 transition-all"
-                          >
-                            {reason}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between mt-8 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
+                  <button
+                    disabled={completionsPage === 1}
+                    onClick={() => {
+                      setCompletionsPage(p => Math.max(1, p - 1));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-black rounded-xl disabled:opacity-50 transition-all text-xs border border-gray-200/50"
+                  >
+                    Previous Page
+                  </button>
+                  <span className="text-xs font-extrabold text-gray-500">Page {completionsPage}</span>
+                  <button
+                    disabled={!hasMoreCompletions}
+                    onClick={() => {
+                      setCompletionsPage(p => p + 1);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-black rounded-xl disabled:opacity-50 transition-all text-xs border border-gray-200/50"
+                  >
+                    Next Page
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="text-center py-20">
                 <AlertCircle size={48} className="text-gray-200 mx-auto mb-4" />
