@@ -257,7 +257,6 @@ export default function Profile() {
     { label: 'Achievement Rewards', icon: Trophy, path: '/achievements' },
     { label: 'Hall of Fame (Leaderboard)', icon: Award, path: '/leaderboard' },
     { label: 'Post Ads (Advertiser)', icon: Megaphone, path: '/advertiser' },
-    { label: 'Survey Submission History', icon: ListTodo, path: '/survey-history' },
     { label: 'Transaction History', icon: History, path: '/transactions' },
     { label: 'Upgrade Membership', icon: Crown, path: '/upgrade' },
     { label: 'Payment Details', icon: CreditCard, path: '/withdrawal' },

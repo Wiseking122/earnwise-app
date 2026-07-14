@@ -39,6 +39,8 @@ export default function TaskDetail() {
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
@@ -50,7 +52,6 @@ export default function TaskDetail() {
   const [isPreTimerActive, setIsPreTimerActive] = useState(true);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotFile, setScreenshotFile] = useState<File | Blob | null>(null);
-  const [isCompressing, setIsCompressing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
   const [isRenewalRequired, setIsRenewalRequired] = useState(true);
@@ -86,18 +87,9 @@ export default function TaskDetail() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setScreenshot(URL.createObjectURL(file));
+      setScreenshotFile(file);
       setError('');
-      
-      setIsCompressing(true);
-      try {
-        const { compressImage } = await import('../lib/uploadService');
-        const compressedBlob = await compressImage(file);
-        setScreenshotFile(compressedBlob);
-      } catch (err) {
-        setScreenshotFile(file);
-      } finally {
-        setIsCompressing(false);
-      }
+
     }
   };
 
@@ -151,19 +143,40 @@ export default function TaskDetail() {
     }
     setSubmitting(true);
     setError('');
+    setUploadProgress(5);
     
     try {
       // 1. Upload screenshot
       let uploadUrl = '';
       if (screenshotFile) {
-        const uploadResult = await uploadProofImage(screenshotFile, user.uid, task.id, 'proof-images');
+        const uploadResult = await uploadProofImage(
+          screenshotFile, 
+          user.uid, 
+          task.id, 
+          'proof-images',
+          (progress) => {
+            const uiProgress = Math.min(85, Math.floor(15 + (progress * 0.7)));
+            setUploadProgress(uiProgress);
+          }
+        );
         uploadUrl = uploadResult.downloadUrl;
       } else if (screenshot && screenshot.startsWith('data:')) {
-        const uploadResult = await uploadProofImage(screenshot, user.uid, task.id, 'proof-images');
+        const uploadResult = await uploadProofImage(
+          screenshot, 
+          user.uid, 
+          task.id, 
+          'proof-images',
+          (progress) => {
+            const uiProgress = Math.min(85, Math.floor(15 + (progress * 0.7)));
+            setUploadProgress(uiProgress);
+          }
+        );
         uploadUrl = uploadResult.downloadUrl;
       } else {
         throw new Error('Screenshot data is invalid.');
       }
+
+      setUploadProgress(88);
 
       // 2. Call backend
       const deviceFingerprint = getOrGenerateDeviceFingerprint();
@@ -503,16 +516,40 @@ export default function TaskDetail() {
     setSubmitting(true);
     setError('');
     setWiseAiMessage('');
+    setUploadProgress(5);
+
     try {
       // 1. Upload screenshot if exists
       let uploadUrl = '';
       if (screenshotFile) {
-        const uploadResult = await uploadProofImage(screenshotFile, user.uid, task.id, 'proof-images');
+        console.log('[TASK-DETAIL] Uploading screenshot file...');
+        const uploadResult = await uploadProofImage(
+          screenshotFile, 
+          user.uid, 
+          task.id, 
+          'proof-images',
+          (progress) => {
+            const uiProgress = Math.min(85, Math.floor(15 + (progress * 0.7)));
+            setUploadProgress(uiProgress);
+          }
+        );
         uploadUrl = uploadResult.downloadUrl;
       } else if (screenshot && screenshot.startsWith('data:')) {
-        const uploadResult = await uploadProofImage(screenshot, user.uid, task.id, 'proof-images');
+        console.log('[TASK-DETAIL] Uploading base64 screenshot...');
+        const uploadResult = await uploadProofImage(
+          screenshot, 
+          user.uid, 
+          task.id, 
+          'proof-images',
+          (progress) => {
+            const uiProgress = Math.min(85, Math.floor(15 + (progress * 0.7)));
+            setUploadProgress(uiProgress);
+          }
+        );
         uploadUrl = uploadResult.downloadUrl;
       }
+
+      setUploadProgress(88);
 
       // 2. Call backend
       const deviceFingerprint = getOrGenerateDeviceFingerprint();
@@ -622,7 +659,6 @@ export default function TaskDetail() {
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, currentColor 0%, transparent 70%)' }} />
           
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg transform rotate-3 ${
-            task.type === 'survey' ? 'bg-orange-500 text-white' :
             task.type === 'ad' ? 'bg-emerald-500 text-white' :
             task.type === 'video' ? 'bg-blue-500 text-white' :
             task.type === 'referral' ? 'bg-purple-500 text-white' :
@@ -914,7 +950,7 @@ export default function TaskDetail() {
                        submitting || !screenshot ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100'
                      }`}
                    >
-                     {submitting ? 'Submitting Proof...' : 'Submit Verification Proof'}
+                     {submitting ? 'Submitting (${uploadProgress}%)' : 'Submit Verification Proof'}
                    </motion.button>
                  </div>
                ) : task?.requiresProof ? (
@@ -1006,7 +1042,7 @@ export default function TaskDetail() {
                        submitting || (!screenshot && !proof) ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100'
                      }`}
                    >
-                     {submitting ? 'Submitting Proof...' : 'Submit Verification Proof'}
+                     {submitting ? 'Submitting (${uploadProgress}%)' : 'Submit Verification Proof'}
                    </motion.button>
                  </div>
                ) : (

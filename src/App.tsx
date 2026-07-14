@@ -27,10 +27,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Support from './pages/Support';
 import Academy from './pages/Academy';
-import SurveySubmission from './pages/SurveySubmission';
-import SurveyHistory from './pages/SurveyHistory';
 import Offers from './pages/Offers';
-import Surveys from './pages/Surveys';
 import SubmitProof from './pages/SubmitProof';
 import PlatformSettings from './pages/admin/PlatformSettings';
 
@@ -41,7 +38,6 @@ import AdminTasks from './pages/admin/Tasks';
 import AdminPayments from './pages/admin/Payments';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
-import SurveyVerification from './pages/admin/SurveyVerification';
 import OfferVerification from './pages/admin/OfferVerification';
 import WiseCoinManager from './pages/admin/WiseCoinManager';
 import AdminAds from './pages/admin/Ads';
@@ -97,10 +93,7 @@ function AppRoutes() {
         <Route path="/advertiser" element={<PrivateRoute><AdvertiserPortal /></PrivateRoute>} />
         <Route path="/achievements" element={<PrivateRoute><Achievements /></PrivateRoute>} />
         <Route path="/academy" element={<PrivateRoute><Academy /></PrivateRoute>} />
-        <Route path="/submit-survey" element={<PrivateRoute><SurveySubmission /></PrivateRoute>} />
-        <Route path="/survey-history" element={<PrivateRoute><SurveyHistory /></PrivateRoute>} />
         <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
-        <Route path="/surveys" element={<PrivateRoute><Surveys /></PrivateRoute>} />
         <Route path="/submit-proof" element={<PrivateRoute><SubmitProof /></PrivateRoute>} />
 
         <Route path="/academy/course/:id" element={<PrivateRoute><CoursePlayer /></PrivateRoute>} />
@@ -114,7 +107,6 @@ function AppRoutes() {
         <Route path="/admin" element={<PrivateRoute adminOnly bypassPlanCheck><AdminDashboard /></PrivateRoute>} />
         <Route path="/admin/tasks" element={<PrivateRoute adminOnly bypassPlanCheck><AdminTasks /></PrivateRoute>} />
         <Route path="/admin/payments" element={<PrivateRoute adminOnly bypassPlanCheck><AdminPayments /></PrivateRoute>} />
-        <Route path="/admin/survey-verification" element={<PrivateRoute adminOnly bypassPlanCheck><SurveyVerification /></PrivateRoute>} />
         <Route path="/admin/proof-review" element={<PrivateRoute adminOnly bypassPlanCheck><OfferVerification /></PrivateRoute>} />
         <Route path="/admin/wise-coin" element={<PrivateRoute adminOnly bypassPlanCheck><WiseCoinManager /></PrivateRoute>} />
         <Route path="/admin/platform-settings" element={<PrivateRoute adminOnly bypassPlanCheck><PlatformSettings /></PrivateRoute>} />

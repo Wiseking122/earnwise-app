@@ -195,7 +195,7 @@ export default function AdminAds() {
   const [ads, setAds] = useState<any[]>([]);
   const [adsConfig, setAdsConfig] = useState<{ adsMaintenanceMode: boolean; maintenanceMessage: string }>({
     adsMaintenanceMode: false,
-    maintenanceMessage: "🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!"
+    maintenanceMessage: "🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Thank you for your patience!"
   });
   const [savingConfig, setSavingConfig] = useState(false);
   const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '' });

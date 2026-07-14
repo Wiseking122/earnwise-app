@@ -1,4 +1,4 @@
-export type TaskType = 'survey' | 'ad' | 'app_download' | 'referral' | 'content_creation' | 'video';
+export type TaskType = 'ad' | 'app_download' | 'referral' | 'content_creation' | 'video' | 'offers' | 'survey';
 export type TaskStatus = 'active' | 'inactive';
 export type CompletionStatus = 'pending' | 'approved' | 'rejected';
 export type WithdrawalStatus = 'pending' | 'approved' | 'completed' | 'rejected';
@@ -36,7 +36,6 @@ export interface UserProfile {
   withdrawableBalance: number;
   depositBalance?: number;
   taskEarnings?: number;
-  totalSurveyEarnings?: number;
   totalOfferwallEarnings?: number;
   referralEarnings?: number;
   bonusEarnings?: number;

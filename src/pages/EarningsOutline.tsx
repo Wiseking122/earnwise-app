@@ -21,7 +21,7 @@ export default function EarningsOutline() {
       title: "1. Complete Daily Tasks",
       color: "bg-blue-500",
       description: "Log in daily to perform simple tasks like liking posts, following accounts, or watching ads. Each task pays real cash into your balance instantly.",
-      features: ["Social Media Tasks", "High-paying Surveys", "Ad Viewing"]
+      features: ["Social Media Tasks", "Premium CPA Offers", "Ad Viewing"]
     },
     {
       icon: Users,

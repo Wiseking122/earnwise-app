@@ -27,7 +27,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { AnnouncementEngine } from './AnnouncementEngine';
 import { playNotificationSound } from '../pages/sounds';
 import TransactionReceipt from './TransactionReceipt';
-import CpxNotification from './CpxNotification';
+import { CpxSurveyNotification } from './CpxSurveyNotification';
 
 interface LayoutProps {
   children: ReactNode;
@@ -239,7 +239,6 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       transition={{ duration: 0.3, type: "spring", bounce: 0 }}
       className="flex flex-col h-screen bg-transparent text-white overflow-hidden font-sans relative"
     >
-      <CpxNotification />
       {/* Header */}
       <header className="px-4 flex items-center justify-between bg-slate-900/50 backdrop-blur-3xl border-b border-white/5 shadow-xs sticky top-0 z-[100] h-14">
         <div className="flex items-center gap-2">
@@ -291,6 +290,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       <AnnouncementEngine placement="sticky_banner" />
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
       <InstallModal />
+      <CpxSurveyNotification />
       
       {activeReceipt && (
         <TransactionReceipt 

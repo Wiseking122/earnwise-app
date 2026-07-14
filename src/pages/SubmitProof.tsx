@@ -26,7 +26,6 @@ export default function SubmitProof() {
   const [note, setNote] = useState('');
   const [image, setImage] = useState<File | Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [isCompressing, setIsCompressing] = useState(false);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,20 +35,11 @@ export default function SubmitProof() {
         return;
       }
       
-      setPreview(URL.createObjectURL(file));
+      // Do not compress here; uploadProofImage will handle it.
+      setImage(file);
       setError(null);
-      
-      // Start background compression immediately
-      setIsCompressing(true);
-      try {
-        const compressed = await compressImage(file);
-        setImage(compressed);
-      } catch (err) {
-        console.warn('Background compression failed:', err);
-        setImage(file);
-      } finally {
-        setIsCompressing(false);
-      }
+      setPreview(URL.createObjectURL(file));
+
     }
   };
 
@@ -68,35 +58,38 @@ export default function SubmitProof() {
 
     setLoading(true);
     setError(null);
-    setUploadProgress(10);
+    setUploadProgress(5);
 
     try {
-      // 1. Calculate dates
-      const now = new Date();
-      const watMs = now.getTime() + (1 * 60 * 60 * 1000);
-      const watDate = new Date(watMs);
-      const watYear = watDate.getUTCFullYear();
-      const watMonth = String(watDate.getUTCMonth() + 1).padStart(2, '0');
-      const watDay = String(watDate.getUTCDate()).padStart(2, '0');
-      const completedDateStr = `${watYear}-${watMonth}-${watDay}`;
+      if (offerId === 'unknown' || !offerId) {
+        throw new Error('Offer ID is missing. Please go back to the offers page and try again.');
+      }
 
+      setUploadProgress(10);
+
+      // 1. Calculate dates (for local reference if needed)
+      const now = new Date();
+      
       // 2. Upload image (compression happens inside uploadProofImage)
+      console.log('[UPLOAD] Starting uploadProofImage...');
       const uploadResult = await uploadProofImage(
         image, 
         user.uid, 
         offerId, 
         'offer-proofs',
         (progress) => {
-          // Map 0-100% upload progress to 20-80% UI progress range
-          setUploadProgress(20 + (progress * 0.6));
+          // Map 0-100% upload progress to 15-85% UI progress range
+          // If it's just started (progress 0), we show 15%
+          const uiProgress = Math.min(85, Math.floor(15 + (progress * 0.7)));
+          setUploadProgress(uiProgress);
         }
       );
-      const storageUrl = uploadResult.downloadUrl;
       
-      setUploadProgress(85);
+      const storageUrl = uploadResult.downloadUrl;
+      console.log('[UPLOAD] Upload success, URL retrieved');
+      setUploadProgress(88);
 
       // 3. Submit via backend endpoint
-      // The backend already performs duplicate checks, so we save time by not doing it here.
       console.log('[OFFER_SUBMIT] Sending request to:', getApiUrl('/api/v1/offers/submit-proof'));
       
       let response;
@@ -119,7 +112,7 @@ export default function SubmitProof() {
         });
       } catch (fetchErr: any) {
         console.error('[OFFER_SUBMIT] Network/Fetch Error:', fetchErr);
-        throw new Error(`Connection Error: Could not reach the server. Please check your internet or try again later. (${fetchErr.message})`);
+        throw new Error(`Connection Error: Could not reach the server. Please check your internet or try again later.`);
       }
 
       const responseData = await response.json();
@@ -141,6 +134,14 @@ export default function SubmitProof() {
           sUnlock.setHours(24, 0, 0, 0);
           unlockAtDate = sUnlock;
         }
+
+        const now = new Date();
+        const watMs = now.getTime() + (1 * 60 * 60 * 1000);
+        const watDate = new Date(watMs);
+        const watYear = watDate.getUTCFullYear();
+        const watMonth = String(watDate.getUTCMonth() + 1).padStart(2, '0');
+        const watDay = String(watDate.getUTCDate()).padStart(2, '0');
+        const completedDateStr = `${watYear}-${watMonth}-${watDay}`;
 
         const submissionData = {
           userId: user.uid,
@@ -291,9 +292,9 @@ export default function SubmitProof() {
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  disabled={loading || isCompressing}
+                  disabled={loading}
                   className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl relative overflow-hidden ${
-                    loading || isCompressing
+                    loading
                       ? 'bg-slate-800 text-slate-400 cursor-not-allowed border border-white/5'
                       : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/10'
                   }`}
@@ -301,10 +302,6 @@ export default function SubmitProof() {
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" /> Submitting Proof ({uploadProgress}%)
-                    </>
-                  ) : isCompressing ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" /> Optimizing Image...
                     </>
                   ) : (
                     <>

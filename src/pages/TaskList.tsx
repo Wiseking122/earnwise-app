@@ -27,10 +27,11 @@ import AdsSection from '../AdsSection';
 import { AoycoOfferwall } from '../components/AoycoOfferwall';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { MaintenanceModal } from '../components/MaintenanceModal';
+import { CpxSurveyWall } from '../components/CpxSurveyWall';
 
 const CATEGORIES: { id: string, label: string, icon: any, color: string, subtext?: string }[] = [
   { id: 'offers', label: 'Offers', icon: Zap, color: 'bg-blue-600', subtext: 'OGAds & Aoyco' },
-  { id: 'surveys', label: 'Surveys', icon: Search, color: 'bg-orange-500', subtext: 'CPX Research' },
+  { id: 'survey', label: 'Surveys', icon: Search, color: 'bg-orange-500', subtext: 'CPX Research' },
   { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500', subtext: 'Montage Ads' },
   { id: 'all', label: 'Daily Tasks', icon: SlidersHorizontal, color: 'bg-slate-900', subtext: 'Verify & Earn' },
 ];
@@ -64,7 +65,7 @@ export default function TaskList() {
   const [isZeydooModalOpen, setZeydooModalOpen] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
   const [showMaintenance, setShowMaintenance] = useState(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!");
+  const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Thank you for your patience!");
   const [adsMaintenanceMode, setAdsMaintenanceMode] = useState(false);
   const [isRenewalRequired, setIsRenewalRequired] = useState(true);
 
@@ -84,7 +85,7 @@ export default function TaskList() {
   useEffect(() => {
     // Prevent direct access to ad category via URL if maintenance is active
     if (activeCategory === 'ad' && adsMaintenanceMode) {
-      setActiveCategory('survey');
+      setActiveCategory('offers');
       setShowMaintenance(true);
     }
   }, [activeCategory, adsMaintenanceMode]);
@@ -115,7 +116,6 @@ export default function TaskList() {
   }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
 
   const taskCounts = {
-    survey: 'LIVE', 
     ad: 'LIVE', 
     referral: tasks.filter(t => t.type === 'referral').length,
     surveys: 'LIVE',
@@ -195,12 +195,12 @@ export default function TaskList() {
                 key={cat.id}
                 data-category={cat.id}
                 onClick={() => {
-                  if (cat.id === 'surveys') {
-                    navigate('/surveys');
+                  if (cat.id === 'survey') {
+                    setActiveCategory('survey');
                     return;
                   }
                   if (cat.id === 'offers') {
-                    setActiveCategory('survey');
+                    setActiveCategory('offers');
                     return;
                   }
                   if (cat.id === 'ad' && adsMaintenanceMode) {
@@ -264,7 +264,7 @@ export default function TaskList() {
         {/* Task List */}
         <div className="space-y-3.5">
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
-          {activeCategory === 'survey' && user && (
+          {activeCategory === 'offers' && user && (
             <div className="space-y-6">
                {isUserFree ? (
                  <button 
@@ -317,20 +317,11 @@ export default function TaskList() {
                )}
 
                <AoycoOfferwall userId={user.uid} />
-               
-               <Link 
-                 to="/submit-survey"
-                 className="block w-full p-6 bg-linear-to-br from-amber-500 to-yellow-600 rounded-[2rem] text-center shadow-[0_10px_30px_rgba(245,158,11,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden"
-               >
-                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.2),transparent)]" />
-                 <div className="relative z-10 flex flex-col items-center gap-2">
-                   <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white mb-1">
-                     <ImageIcon size={24} className="group-hover:rotate-12 transition-transform duration-500" />
-                   </div>
-                   <h3 className="text-xl font-display font-black text-white uppercase italic tracking-tight">Submit Survey / Offer Proof</h3>
-                   <p className="text-white/80 text-[10px] font-black uppercase tracking-widest leading-none">Complete surveys & premium offers, then upload screenshot proof to earn Wise Coins</p>
-                 </div>
-               </Link>
+            </div>
+          )}
+          {activeCategory === 'survey' && user && (
+            <div className="space-y-6">
+              <CpxSurveyWall />
             </div>
           )}
 
@@ -390,7 +381,6 @@ export default function TaskList() {
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate ${
                             isInternal ? 'text-blue-100' : (
-                              task.type === 'survey' ? 'text-orange-600' :
                               task.type === 'ad' ? 'text-emerald-600' :
                               task.type === 'video' ? 'text-blue-600' :
                               task.type === 'referral' ? 'text-purple-600' :
@@ -459,7 +449,6 @@ export default function TaskList() {
 
                 const cardClasses = `w-full text-left block group border p-4 rounded-2xl shadow-sm hover:shadow-lg transition-all active:scale-[0.98] relative overflow-hidden cursor-pointer ${typeStyle}`;
                 const glowColor = isInternal ? 'rgba(255, 255, 255, 0.15)' : (
-                  task.type === 'survey' ? 'rgba(249, 115, 22, 0.1)' :
                   task.type === 'ad' ? 'rgba(16, 185, 129, 0.1)' :
                   task.type === 'video' ? 'rgba(59, 130, 246, 0.1)' :
                   task.type === 'referral' ? 'rgba(168, 85, 247, 0.1)' :
@@ -496,7 +485,7 @@ export default function TaskList() {
                 );
               })}
             </motion.div>
-          ) : (activeCategory === 'ad' || activeCategory === 'survey' || activeCategory === 'video' || activeCategory === 'referral') ? null : (
+          ) : (activeCategory === 'ad' || activeCategory === 'offers' || activeCategory === 'video' || activeCategory === 'referral') ? null : (
             <div className="text-center py-24 bg-white border border-slate-100 rounded-[3rem] shadow-sm relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,0,0,0.02),transparent)]" />
               <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-slate-100 shadow-sm relative z-10">

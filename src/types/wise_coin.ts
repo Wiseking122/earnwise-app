@@ -8,22 +8,6 @@ export interface WiseCoinWallet {
   updatedAt: any;
 }
 
-export interface SurveySubmission {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  surveyTitle?: string;
-  screenshots: string[];
-  note?: string;
-  status: CompletionStatus;
-  rewardAmount?: number;
-  adminId?: string;
-  submittedAt: any;
-  reviewedAt?: any;
-  rejectionReason?: string;
-}
-
 export interface WiseCoinTransaction {
   id: string;
   userId: string;

@@ -481,7 +481,7 @@ export const DailyCheckIn: React.FC = () => {
                 </div>
                 <div className="flex gap-2.5">
                   <div className="font-extrabold text-amber-400">03.</div>
-                  <p>XP values awarded during daily claims help upgrade your account tier rank, multiplying other system payouts (Surveys, Follow actions, and Video play ads).</p>
+                  <p>XP values awarded during daily claims help upgrade your account tier rank, multiplying other system payouts (CPA Offers, Follow actions, and Video play ads).</p>
                 </div>
                 <div className="flex gap-2.5">
                   <div className="font-extrabold text-amber-400">04.</div>

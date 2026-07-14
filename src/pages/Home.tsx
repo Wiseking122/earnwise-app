@@ -67,7 +67,7 @@ export default function Home() {
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [aiInsightsError, setAiInsightsError] = useState<string | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Please continue with Surveys for now. Thank you for your patience!");
+  const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Thank you for your patience!");
   const [adsMaintenanceMode, setAdsMaintenanceMode] = useState(false);
   const [wiseCoinBalance, setWiseCoinBalance] = useState(0);
 
@@ -295,8 +295,8 @@ export default function Home() {
       setAiInsights({
         prediction: `${estimatedEarning.toLocaleString()} WiseCoins daily earning potential based on your ${profile?.plan || 'free'} tier`,
         insights: [
-          { title: "🔥 Wise AI Direct Strategy", description: "Regular ad tasks are temporarily unavailable for upgrade. Complete high-yield surveys in the Survey section to maintain your daily earning momentum.", type: "quick_win" },
-          { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete at least one survey daily to maintain your 1.5x earnings multiplier!`, type: "strategy" },
+          { title: "🔥 Wise AI Direct Strategy", description: "Regular ad tasks are temporarily unavailable for upgrade. Complete high-yield offers in the Offers section to maintain your daily earning momentum.", type: "quick_win" },
+          { title: "Streak Boost Active", description: `You have a ${profile?.streak || 1} day active streak. Complete at least one task daily to maintain your 1.5x earnings multiplier!`, type: "strategy" },
           { title: "VIP Multiplier Tip", description: (profile?.plan === 'free' && !isAdmin) ? "Upgrade to Gold or VIP tier to unlock instant 3x task reward payouts and priority escrow clearance." : "Share your VIP referral link to earn instant 2,500 WiseCoins bonus per verified invite.", type: "upgrade" }
         ]
       });
@@ -521,7 +521,7 @@ export default function Home() {
               <Sparkles size={14} className="text-white" />
             </div>
             <p className="text-[11px] sm:text-xs font-bold text-blue-100 leading-relaxed">
-              🚀 New sponsored tasks are coming soon! Continue earning through Surveys while we upgrade the Task Marketplace.
+              🚀 New sponsored tasks are coming soon! Thank you for your patience while we upgrade the Task Marketplace.
             </p>
           </motion.div>
         )}
@@ -757,14 +757,14 @@ export default function Home() {
              {/* Earning Channels Grid */}
              <div className="grid grid-cols-2 gap-2.5">
                <Link 
-                to="/surveys"
-                className="bg-orange-500/10 border border-orange-500/30 p-2.5 rounded-xl text-left hover:bg-orange-500/20 transition-all active:scale-95 group"
+                to="/offers"
+                className="bg-blue-600/10 border border-blue-600/30 p-2.5 rounded-xl text-left hover:bg-blue-600/20 transition-all active:scale-95 group"
                >
-                 <div className="w-7.5 h-7.5 bg-orange-500 rounded-lg flex items-center justify-center text-white mb-2 shadow-md group-hover:rotate-12 transition-transform">
-                   <Search size={12} />
+                 <div className="w-7.5 h-7.5 bg-blue-600 rounded-lg flex items-center justify-center text-white mb-2 shadow-md group-hover:rotate-12 transition-transform">
+                   <Zap size={12} />
                  </div>
-                 <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Premium Surveys</h4>
-                 <p className="text-orange-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">Verified Partners</p>
+                 <h4 className="font-display font-black text-white text-[10px] sm:text-sm uppercase italic tracking-tighter">Premium Offers</h4>
+                 <p className="text-blue-400 text-[6.5px] sm:text-[8px] font-bold uppercase tracking-widest mt-0.5">High-Yield CPA</p>
                </Link>
                
                <button 

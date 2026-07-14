@@ -42,7 +42,6 @@ export default function AdminDashboard() {
     pendingCompletions: 0,
     pendingWithdrawals: 0,
     pendingEscrow: 0, 
-    pendingSurveys: 0,
     pendingOffers: 0,
     pendingAppeals: 0,
     totalPending: 0,
@@ -85,7 +84,6 @@ export default function AdminDashboard() {
         tasksCount,
         withdrawalsCount,
         completionsCount,
-        surveysCount,
         offersCount,
         appealsCount
       ] = await Promise.all([
@@ -93,7 +91,6 @@ export default function AdminDashboard() {
         getCountFromServer(query(collection(db, 'tasks'), where('status', '==', 'active'))),
         getCountFromServer(query(collection(db, 'withdrawals'), where('status', '==', 'pending'))),
         getCountFromServer(query(collection(db, 'completions'), where('status', '==', 'pending'))),
-        getCountFromServer(query(collection(db, 'survey_submissions'), where('status', '==', 'pending'))),
         getCountFromServer(query(collection(db, 'offer_submissions'), where('status', '==', 'pending'))),
         getCountFromServer(query(collection(db, 'appeals'), where('status', '==', 'Pending')))
       ]);
@@ -104,7 +101,6 @@ export default function AdminDashboard() {
         activeTasks: tasksCount.data().count,
         pendingWithdrawals: withdrawalsCount.data().count,
         pendingCompletions: completionsCount.data().count,
-        pendingSurveys: surveysCount.data().count,
         pendingOffers: offersCount.data().count,
         pendingAppeals: appealsCount.data().count
       }));
@@ -135,7 +131,6 @@ export default function AdminDashboard() {
         activeTasks: data.activeTasks,
         pendingWithdrawals: data.pendingWithdrawals,
         pendingCompletions: data.pendingCompletions,
-        pendingSurveys: data.pendingSurveys,
         pendingOffers: data.pendingOffers,
         pendingAppeals: data.pendingAppeals,
         totalPaidOut: data.totalPaidOut,
@@ -197,7 +192,6 @@ export default function AdminDashboard() {
     { label: 'Payment Requests', icon: CreditCard, path: '/admin/payments', count: stats.pendingWithdrawals + stats.pendingEscrow, color: 'green' },
     { label: 'Verify Tasks', icon: CheckCircle, path: '/admin/tasks', count: stats.pendingCompletions, color: 'orange' },
     { label: 'User Directory', icon: Users, path: '/admin/users', count: stats.users, color: 'purple' },
-    { label: 'Survey Verification', icon: ShieldCheck, path: '/admin/survey-verification', count: stats.pendingSurveys, color: 'orange' },
     { label: 'Offer Proof Review', icon: ShieldCheck, path: '/admin/proof-review', count: stats.pendingOffers, color: 'blue' },
     { label: 'Wise Coin Manager', icon: Coins, path: '/admin/wise-coin', count: 0, color: 'blue' },
     { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },

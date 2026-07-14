@@ -14,6 +14,7 @@ import cron from "node-cron";
 
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import nodemailer from 'nodemailer';
 import { GoogleGenAI, Type } from "@google/genai";
 import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
@@ -35,18 +36,21 @@ try {
 
   firebaseApp = admin.apps.find(app => app?.name === 'earnwise-app') || admin.initializeApp({
     credential: credential || admin.credential.applicationDefault(),
-    projectId: firebaseConfig.projectId
+    projectId: firebaseConfig.projectId,
+    storageBucket: "earnwise-2.appspot.com"
   }, 'earnwise-app');
 } catch (err) {
   console.error("[FIREBASE] Admin App init error, trying default app:", err);
   firebaseApp = admin.apps.length > 0 ? admin.apps[0] : admin.initializeApp({
     credential: admin.credential.applicationDefault(),
-    projectId: firebaseConfig.projectId
+    projectId: firebaseConfig.projectId,
+    storageBucket: "earnwise-2.appspot.com"
   });
 }
 
 // Resilient Firestore initialization
 let dbAdmin: admin.firestore.Firestore;
+let storageAdmin: ReturnType<typeof getStorage>;
 try {
   // Try the specific database ID if it exists
   const dbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)' 
@@ -55,10 +59,12 @@ try {
     
   // @ts-ignore - databaseId exists on newest admin SDK
   dbAdmin = getFirestore(firebaseApp, dbId || '(default)');
+  storageAdmin = getStorage(firebaseApp);
   console.log("[FIREBASE] Using explicit Database ID:", dbId || '(default)');
 } catch (err) {
   console.error("[FIREBASE] Error initializing with explicit DB ID:", err);
   dbAdmin = getFirestore(firebaseApp);
+  storageAdmin = getStorage(firebaseApp);
 }
 
 // Check database capability of the Admin SDK
@@ -1034,12 +1040,13 @@ async function startServer() {
   });
 
   app.post("/api/v1/offers/submit-proof", async (req, res) => {
-    const { userId, userName, userEmail, screenshotUrl, note } = req.body;
+    const { userId, userName, userEmail, screenshotUrl, screenshotData, note } = req.body;
     const offerId = String(req.body.offerId || '').trim().toLowerCase();
     const offerTitle = req.body.offerTitle || 'Premium Offer';
     const payout = req.body.payout || 0;
 
     try {
+      let finalScreenshotUrl = screenshotData || screenshotUrl;
       const now = new Date();
       const unlockAtDate = new Date(now);
       unlockAtDate.setHours(24, 0, 0, 0); // Sets to next midnight in server's local time
@@ -1102,7 +1109,7 @@ async function startServer() {
         offerId: offerId,
         offerTitle: offerTitle || 'Untitled Offer',
         payout: Number(payout) || 0,
-        screenshotUrl: screenshotUrl || '',
+        screenshotUrl: finalScreenshotUrl || '',
         note: note || '',
         status: 'pending', // For admin panel compatibility
         submittedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1111,7 +1118,7 @@ async function startServer() {
         // Snake case requested by user
         user_id: userId,
         offer_id: offerId,
-        proof: screenshotUrl || '',
+        proof: finalScreenshotUrl || '',
         submitted_at: admin.firestore.FieldValue.serverTimestamp(),
         completed_date: completedDateStr,
         unlock_at: admin.firestore.Timestamp.fromDate(unlockAtDate),
@@ -1733,177 +1740,14 @@ async function startServer() {
 
     } catch (err: any) {
       console.error("[WEBHOOK-BITCOTASKS] Uncaught processing error:", err.message);
-      // Never throw 503 or fail HTTP status: return 200 "ok" with error details or fail gracefully
       return res.status(200).send("ok");
     }
   });
 
   app.get("/api/config/public", (req, res) => {
     res.json({
-      cpxAppId: process.env.CPX_APP_ID || '33341',
       paystackPublicKey: process.env.VITE_PAYSTACK_PUBLIC_KEY || ''
     });
-  });
-
-  /**
-   * GET /api/cpx/surveys or /api/partner-surveys/list
-   * Proxy for CPX Research Survey List API to handle CORS and Secure Hash.
-   */
-  app.get(["/api/cpx/surveys", "/api/partner-surveys/list"], async (req, res) => {
-    try {
-      const { user_id } = req.query;
-      if (!user_id) return res.status(400).json({ error: "User ID is required" });
-
-      const appId = process.env.CPX_APP_ID || '33341';
-      const secureHash = process.env.CPX_SECURE_HASH;
-      
-      console.log(`[CPX-PROXY] Fetching surveys for user: ${user_id}. AppId: ${appId}`);
-
-      // Try multiple potential endpoints if the first one fails
-      // Note: get-surveys.php is a reliable fallback that often returns HTML cards if JSON is not enabled
-      const endpoints = [
-        `https://api.cpx-research.com/v1/surveys?app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
-        `https://api.cpx-research.com/api/v1/surveys?app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
-        `https://www.cpx-research.com/api/get-surveys.php?app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
-        `https://www.cpx-research.com/get-surveys.php?app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
-        `https://offers.cpx-research.com/index.php?get_surveys=1&app_id=${appId}&ext_user_id=${user_id}&output_format=json`,
-        `https://api.cpx-research.com/get-surveys.php?app_id=${appId}&ext_user_id=${user_id}&output_format=json`
-      ];
-
-      let lastError = null;
-      for (const baseUrl of endpoints) {
-        try {
-          let url = baseUrl;
-          if (secureHash) {
-            // Try different hash variants depending on the endpoint requirements
-            const hash1 = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
-            const hash2 = crypto.createHash('md5').update(`${appId}-${user_id}-${secureHash}`).digest('hex');
-            const hash3 = crypto.createHash('md5').update(`${user_id}${secureHash}`).digest('hex');
-            
-            // Default to hash1 but add others if it fails
-            url += `&secure_hash=${hash1}&hash=${hash3}&api_hash=${hash2}`;
-          }
-
-          console.log(`[CPX-PROXY] Trying endpoint: ${url.split('?')[0]}`);
-          
-          const response = await axios.get(url, { 
-            timeout: 8000,
-            headers: {
-              'User-Agent': 'EarnWise-Platform/2.0',
-              'Accept': 'application/json, text/html, */*'
-            }
-          });
-          
-          // Case 1: Standard JSON response
-          if (response.data && typeof response.data === 'object' && (response.data.surveys || response.data.status === 'success')) {
-            const surveys = Array.isArray(response.data.surveys) ? response.data.surveys : [];
-            console.log(`[CPX-PROXY] Success (JSON). Found ${surveys.length} surveys.`);
-            
-            return res.json({
-              status: 'success',
-              available_surveys: response.data.available_surveys ?? surveys.length,
-              surveys: surveys.slice(0, 10), // Return more for potential display
-              max_payout: surveys.length > 0 ? Math.max(...surveys.map((s: any) => s.payout_local || s.payout_usd || 0)) : 0,
-              avg_loi: surveys.length > 0 ? Math.round(surveys.reduce((acc: number, s: any) => acc + (s.loi || 0), 0) / surveys.length) : 0
-            });
-          }
-
-          // Case 2: HTML response from get-surveys.php
-          if (typeof response.data === 'string') {
-            // More robust regex for survey IDs (supports single and double quotes)
-            const surveyIds = response.data.match(/id=['"]survey-(\d+)['"]/g) || [];
-            const count = surveyIds.length;
-            
-            if (count > 0) {
-              console.log(`[CPX-PROXY] Success (HTML). Found ${count} survey cards.`);
-              
-              // Extract max payout and avg loi from HTML if possible
-              const payoutMatches = response.data.match(/<h5>(\d+)\s+<span>/g) || [];
-              const payouts = payoutMatches.map(m => parseInt(m.match(/\d+/)![0]));
-              
-              const loiMatches = response.data.match(/~ (\d+)\s+minutes/g) || [];
-              const lois = loiMatches.map(m => parseInt(m.match(/\d+/)![0]));
-
-              return res.json({ 
-                status: 'success', 
-                available_surveys: count,
-                surveys: [], // UI won't use individual cards from HTML
-                max_payout: payouts.length > 0 ? Math.max(...payouts) : 0,
-                avg_loi: lois.length > 0 ? Math.round(lois.reduce((a, b) => a + b, 0) / lois.length) : 0
-              });
-            }
-          }
-        } catch (err: any) {
-          console.warn(`[CPX-PROXY] Endpoint ${baseUrl.split('/')[2]} failed: ${err.message}`);
-          lastError = err;
-          
-          // If we have a secureHash and it failed, try WITHOUT the dash as a fallback for some API versions
-          if (secureHash && !baseUrl.includes('no-dash')) {
-             try {
-               const hash = crypto.createHash('md5').update(`${user_id}${secureHash}`).digest('hex');
-               const retryUrl = baseUrl + `&secure_hash=${hash}&retry=no-dash`;
-               const retryResponse = await axios.get(retryUrl, { timeout: 5000 });
-               if (retryResponse.data && (retryResponse.data.surveys || retryResponse.data.status === 'success')) {
-                 const surveys = Array.isArray(retryResponse.data.surveys) ? retryResponse.data.surveys : [];
-                 return res.json({
-                   status: 'success',
-                   available_surveys: surveys.length,
-                   surveys: surveys.slice(0, 5),
-                   max_payout: surveys.length > 0 ? Math.max(...surveys.map((s: any) => s.payout_local || 0)) : 0,
-                   avg_loi: surveys.length > 0 ? Math.round(surveys.reduce((acc: number, s: any) => acc + (s.loi || 0), 0) / surveys.length) : 0
-                 });
-               }
-             } catch (e) {}
-          }
-        }
-      }
-      
-      // If we reached here, all endpoints failed or returned no surveys
-      console.error("[CPX-PROXY] All endpoints failed. Last error:", lastError?.message);
-      
-      res.json({ 
-        status: lastError ? 'error' : 'success', 
-        available_surveys: 0,
-        surveys: [], 
-        max_payout: 0,
-        avg_loi: 0,
-        message: lastError ? `Survey network error: ${lastError.message}` : "No surveys currently available"
-      });
-    } catch (err: any) {
-      console.error("[CPX-PROXY] Fatal Error:", err.message);
-      res.json({ surveys: [], status: 'error', message: "Connecting to survey network..." });
-    }
-  });
-
-  /**
-   * GET /api/cpx/signed-url or /api/partner-surveys/signed-url
-   * Generates a signed survey URL to keep the secret hash hidden from the client.
-   */
-  app.get(["/api/cpx/signed-url", "/api/partner-surveys/signed-url"], async (req, res) => {
-    try {
-      const { user_id, username, email } = req.query;
-      if (!user_id) return res.status(400).json({ error: "User ID is required" });
-
-      const appId = process.env.CPX_APP_ID || '33341';
-      const secureHash = process.env.CPX_SECURE_HASH;
-      
-      let signedUrl = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user_id}&username=${encodeURIComponent(String(username || ''))}&email=${encodeURIComponent(String(email || ''))}&subid_1=&subid_2=`;
-
-      if (secureHash) {
-        // Try standard hash: md5(user_id + "-" + secure_hash)
-        const hash = crypto.createHash('md5').update(`${user_id}-${secureHash}`).digest('hex');
-        signedUrl += `&secure_hash=${hash}`;
-        
-        // Add a secondary hash param just in case (some CPX versions use it without the dash)
-        const altHash = crypto.createHash('md5').update(`${user_id}${secureHash}`).digest('hex');
-        signedUrl += `&hash_alt=${altHash}`;
-      }
-
-      res.json({ url: signedUrl });
-    } catch (err: any) {
-      console.error("[CPX-SIGNED-URL] Error:", err.message);
-      res.status(500).json({ error: "Failed to generate signed URL" });
-    }
   });
 
   /**

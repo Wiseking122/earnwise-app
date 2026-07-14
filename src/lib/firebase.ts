@@ -15,8 +15,8 @@ export const db = initializeFirestore(app, {
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-storage.maxUploadRetryTime = 60000; // 60 seconds instead of 5s
-storage.maxOperationRetryTime = 60000;
+storage.maxUploadRetryTime = 300000; // 300 seconds instead of 120s
+storage.maxOperationRetryTime = 300000;
 
 
 // Initialize Messaging if supported

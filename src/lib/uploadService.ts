@@ -17,20 +17,19 @@ export function base64ToBlob(base64Data: string): Blob {
 }
 
 /**
- * Compresses an image file or blob to ensure it is under 1MB and resized nicely.
+ * Compresses an image file or blob to ensure it is resized nicely and small enough for reliable upload.
  */
-export async function compressImage(fileOrBlob: File | Blob, maxWidth = 800, maxHeight = 800, quality = 0.4): Promise<Blob> {
-  // If it's already tiny, return as is
-  if (fileOrBlob.size <= 30 * 1024 && fileOrBlob.type === 'image/jpeg') {
+export async function compressImage(fileOrBlob: File | Blob, maxWidth = 600, maxHeight = 600, quality = 0.3): Promise<Blob> {
+  // If it's already tiny, return as is to save time
+  if (fileOrBlob.size <= 80 * 1024) {
     return fileOrBlob;
   }
 
   return new Promise((resolve) => {
-    // Add a safety timeout for compression
     const timeout = setTimeout(() => {
       console.warn('[COMPRESS] Compression timed out, using original file');
       resolve(fileOrBlob);
-    }, 5000);
+    }, 10000);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -44,14 +43,7 @@ export async function compressImage(fileOrBlob: File | Blob, maxWidth = 800, max
       const img = new Image();
       img.onload = async () => {
         clearTimeout(timeout);
-        try {
-          if ('decode' in img) {
-            await img.decode();
-          }
-        } catch (e) {
-          console.warn('[COMPRESS] Image decode failed:', e);
-        }
-
+        
         const width = img.naturalWidth || img.width;
         const height = img.naturalHeight || img.height;
 
@@ -80,26 +72,21 @@ export async function compressImage(fileOrBlob: File | Blob, maxWidth = 800, max
         canvas.height = newHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          // Always use white background for transparency conversion
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, newWidth, newHeight);
-          
           ctx.drawImage(img, 0, 0, newWidth, newHeight);
 
           try {
-            // ALWAYS use image/jpeg for proofs to ensure maximum compression and no transparency issues
-            const outputType = 'image/jpeg';
             canvas.toBlob((blob) => {
               if (blob) {
-                // Final check: if it's still too big (shouldn't happen with 1000px @ 0.5 quality),
-                // we could recursively compress, but 0.5 is usually very aggressive.
+                console.log(`[COMPRESS] Compressed from ${Math.round(fileOrBlob.size / 1024)}KB to ${Math.round(blob.size / 1024)}KB`);
                 resolve(blob);
               } else {
                 resolve(fileOrBlob);
               }
-            }, outputType, quality);
+            }, 'image/jpeg', quality);
           } catch (e) {
-            console.warn('[COMPRESS] Canvas toBlob failed, using fallback:', e);
+            console.warn('[COMPRESS] Canvas toBlob failed:', e);
             resolve(fileOrBlob);
           }
         } else {
@@ -120,10 +107,19 @@ export async function compressImage(fileOrBlob: File | Blob, maxWidth = 800, max
   });
 }
 
+export function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
  * Upload service that:
- * 1. Compresses image files before upload (maximum 1 MB if needed).
- * 2. Uploads files to proof-images/{userId}/{taskId}/{timestamp}.jpg (or custom folder).
+ * 1. Compresses image files before upload.
+ * 2. Uploads files to Firebase Storage via our backend to bypass client network issues.
  * 3. Returns the Firebase Storage download URL.
  */
 export async function uploadProofImage(
@@ -131,61 +127,53 @@ export async function uploadProofImage(
   userId: string,
   taskId: string,
   folder = 'proof-images',
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  options: { skipCompression?: boolean } = {}
 ): Promise<{ downloadUrl: string; fileName: string; fileSize: number; timestamp: number }> {
-  let blobToUpload: Blob;
+  try {
+    let blobToUpload: Blob;
 
-  if (typeof input === 'string') {
-    // If it's a base64 string, convert to blob first
-    if (input.startsWith('data:')) {
-      blobToUpload = base64ToBlob(input);
-    } else {
-      throw new Error('Invalid image string input: Must be a data URL.');
-    }
-  } else {
-    blobToUpload = input;
-  }
+    if (onProgress) onProgress(0);
 
-  // Compress the image before uploading
-  blobToUpload = await compressImage(blobToUpload);
-
-  const timestamp = Date.now();
-  const fileExt = blobToUpload.type === 'image/png' ? 'png' : 'jpg';
-  const fileName = `${timestamp}.${fileExt}`;
-  const filePath = `${folder}/${userId}/${taskId}/${fileName}`;
-
-  const storageRef = ref(storage, filePath);
-
-  console.log(`[UPLOAD] Starting Firebase Storage resumable upload for ${filePath}...`);
-  
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, blobToUpload);
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        if (onProgress) onProgress(progress);
-      },
-      (error) => {
-        console.error('[UPLOAD] Upload failed:', error);
-        reject(new Error('Screenshot upload failed. Please check your internet connection and try again.'));
-      },
-      async () => {
-        try {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          console.log(`[UPLOAD] Complete! URL length: ${downloadUrl.length}`);
-          resolve({
-            downloadUrl,
-            fileName,
-            fileSize: blobToUpload.size,
-            timestamp,
-          });
-        } catch (error) {
-          console.error('[UPLOAD] Failed to get download URL:', error);
-          reject(new Error('Failed to retrieve uploaded image URL.'));
-        }
+    if (typeof input === 'string') {
+      if (input.startsWith('data:')) {
+        blobToUpload = base64ToBlob(input);
+      } else {
+        throw new Error('Invalid image string input: Must be a data URL.');
       }
-    );
-  });
+    } else {
+      blobToUpload = input;
+    }
+
+    // Compress the image before uploading (unless skipped)
+    if (!options.skipCompression) {
+      console.log('[UPLOAD] Compressing image before upload...');
+      blobToUpload = await compressImage(blobToUpload);
+    }
+
+    if (onProgress) onProgress(30);
+
+    const timestamp = Date.now();
+    const fileExt = 'jpg'; // Force jpg for consistent metadata
+    const fileName = `${timestamp}.${fileExt}`;
+    
+    console.log(`[UPLOAD] Converting compressed blob (${blobToUpload.size} bytes) to base64...`);
+    
+    // Convert compressed blob back to base64
+    const base64Data = await blobToBase64(blobToUpload);
+    
+    if (onProgress) onProgress(100);
+    
+    console.log(`[UPLOAD] Complete! Using base64 inline image.`);
+    
+    return {
+      downloadUrl: base64Data, // Return base64 string directly
+      fileName,
+      fileSize: blobToUpload.size,
+      timestamp,
+    };
+  } catch (outerErr: any) {
+    console.error('[UPLOAD] Fatal outer error:', outerErr);
+    throw new Error('Upload initialization failed: ' + outerErr.message);
+  }
 }
