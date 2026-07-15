@@ -18,19 +18,20 @@ import {
   ShieldCheck,
   Zap,
   TrendingUp,
-  Lock
+  Lock,
+  Smartphone,
+  Sparkles
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MonetagBanner } from '../components/MonetagBanner';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import AdsSection from '../AdsSection';
-import { AoycoOfferwall } from '../components/AoycoOfferwall';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 import { MaintenanceModal } from '../components/MaintenanceModal';
 import { CpxSurveyWall } from '../components/CpxSurveyWall';
 
 const CATEGORIES: { id: string, label: string, icon: any, color: string, subtext?: string }[] = [
-  { id: 'offers', label: 'Offers', icon: Zap, color: 'bg-blue-600', subtext: 'OGAds & Aoyco' },
+  { id: 'offers', label: 'Offers', icon: Zap, color: 'bg-blue-600', subtext: 'Premium Offers' },
   { id: 'survey', label: 'Surveys', icon: Search, color: 'bg-orange-500', subtext: 'CPX Research' },
   { id: 'ad', label: 'Ads Center', icon: Play, color: 'bg-emerald-500', subtext: 'Montage Ads' },
   { id: 'all', label: 'Daily Tasks', icon: SlidersHorizontal, color: 'bg-slate-900', subtext: 'Verify & Earn' },
@@ -63,6 +64,7 @@ export default function TaskList() {
   const [activeCategory, setActiveCategory] = useState<TaskType | 'all'>(initialCategory);
   const [searchQuery, setSearchQuery] = useState('');
   const [isZeydooModalOpen, setZeydooModalOpen] = useState(false);
+  const [isWannadsModalOpen, setWannadsModalOpen] = useState(false);
   const [showRestriction, setShowRestriction] = useState(false);
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Thank you for your patience!");
@@ -265,58 +267,208 @@ export default function TaskList() {
         <div className="space-y-3.5">
           {activeCategory === 'ad' && <AdsSection onBack={() => setActiveCategory('all')} />}
           {activeCategory === 'offers' && user && (
-            <div className="space-y-6">
-               {isUserFree ? (
-                 <button 
-                   onClick={() => setShowRestriction(true)}
-                   className="block w-full p-6 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-[2.5rem] text-center shadow-[0_15px_35px_rgba(37,99,235,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden border border-blue-500/35 relative"
-                 >
-                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
-                   <div className="absolute top-4 right-4 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1">
-                      <Lock size={8} /> LOCKED
-                   </div>
-                   <div className="relative z-10 flex flex-col items-center gap-2">
-                     <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-1 border border-white/10 shadow-inner">
-                       <Lock size={24} className="group-hover:scale-110 transition-all duration-500 text-amber-400" />
-                     </div>
-                     <h3 className="text-xl sm:text-2xl font-display font-black text-white uppercase italic tracking-tight flex items-center gap-2">
-                       OGAds Premium Offers
-                     </h3>
-                     <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest leading-none text-center">
-                       Earn High Payouts on Direct App Installs & Action Campaigns
-                     </p>
-                     <div className="mt-3 inline-flex items-center gap-1 bg-white/15 text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-white/10 backdrop-blur-md">
-                       Unlock Offer Wall <ChevronRight size={10} className="stroke-[3px]" />
-                     </div>
-                   </div>
-                 </button>
-               ) : (
-                 <Link 
-                   to="/offers"
-                   className="block w-full p-6 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-[2.5rem] text-center shadow-[0_15px_35px_rgba(37,99,235,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all group relative overflow-hidden border border-blue-500/35"
-                 >
-                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
-                   <div className="absolute top-4 right-4 bg-red-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-bounce">
-                      🔥 HOT
-                   </div>
-                   <div className="relative z-10 flex flex-col items-center gap-2">
-                     <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-1 border border-white/10 shadow-inner">
-                       <Zap size={24} className="group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 fill-white" />
-                     </div>
-                     <h3 className="text-xl sm:text-2xl font-display font-black text-white uppercase italic tracking-tight flex items-center gap-2">
-                       OGAds Premium Offers
-                     </h3>
-                     <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest leading-none">
-                       Earn High Payouts on Direct App Installs & Action Campaigns
-                     </p>
-                     <div className="mt-3 inline-flex items-center gap-1 bg-white/15 text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-white/10 backdrop-blur-md">
-                       Go to Offer Wall <ChevronRight size={10} className="stroke-[3px]" />
-                     </div>
-                   </div>
-                 </Link>
-               )}
+            <div className="grid grid-cols-1 gap-4">
+              
+              {/* Card 1: OGAds Premium Offer Wall */}
+              {isUserFree ? (
+                <button 
+                  onClick={() => setShowRestriction(true)}
+                  className="block w-full p-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(37,99,235,0.2)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-blue-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1">
+                     <Lock size={8} /> LOCKED
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Smartphone size={22} className="group-hover:scale-110 transition-all duration-500 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        OGAds Premium Installs
+                      </h3>
+                      <p className="text-blue-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        Earn High Payouts on Direct App Installs & Actions
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <Link 
+                  to="/offers?network=ogads"
+                  className="block w-full p-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(37,99,235,0.2)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-blue-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-red-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse">
+                     🔥 HOT
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Smartphone size={22} className="group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 fill-white/10" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        OGAds Premium Installs
+                      </h3>
+                      <p className="text-blue-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        Earn High Payouts on Direct App Installs & Actions
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-white shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </Link>
+              )}
 
-               <AoycoOfferwall userId={user.uid} />
+              {/* Card 2: CPAgrip Action Offer Wall */}
+              {isUserFree ? (
+                <button 
+                  onClick={() => setShowRestriction(true)}
+                  className="block w-full p-5 bg-gradient-to-br from-emerald-600 via-teal-600 to-indigo-900 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(16,185,129,0.15)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-emerald-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1">
+                     <Lock size={8} /> LOCKED
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Sparkles size={22} className="group-hover:scale-110 transition-all duration-500 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        CPAgrip Action Offers
+                      </h3>
+                      <p className="text-emerald-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        Complete lead generation, email submits & surveys
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <Link 
+                  to="/offers?network=cpagrip"
+                  className="block w-full p-5 bg-gradient-to-br from-emerald-600 via-teal-600 to-indigo-900 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(16,185,129,0.15)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-emerald-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-blue-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)]">
+                     ⚡ LIVE
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Sparkles size={22} className="group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        CPAgrip Action Offers
+                      </h3>
+                      <p className="text-emerald-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        Complete lead generation, email submits & surveys
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-white shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </Link>
+              )}
+
+              {/* Card 3: Zeydoo Premium Apps */}
+              {isUserFree ? (
+                <button 
+                  onClick={() => setShowRestriction(true)}
+                  className="block w-full p-5 bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-950 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(139,92,246,0.15)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-violet-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1">
+                     <Lock size={8} /> LOCKED
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Target size={22} className="group-hover:scale-110 transition-all duration-500 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        Zeydoo Premium Apps
+                      </h3>
+                      <p className="text-violet-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        Unlock massive multipliers on high-tier mobile campaigns
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setZeydooModalOpen(true)}
+                  className="block w-full p-5 bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-950 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(139,92,246,0.15)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-violet-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-purple-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(167,139,250,0.5)]">
+                     🌟 PREMIUM
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Target size={22} className="group-hover:scale-110 transition-all duration-500 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        Zeydoo Premium Apps
+                      </h3>
+                      <p className="text-violet-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        Unlock massive multipliers on high-tier mobile campaigns
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-white shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </button>
+              )}
+
+              {/* Card 4: Wannads Offerwall */}
+              {isUserFree ? (
+                <button 
+                  onClick={() => setShowRestriction(true)}
+                  className="block w-full p-5 bg-gradient-to-br from-amber-600 via-orange-600 to-indigo-950 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(245,158,11,0.15)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-amber-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1">
+                     <Lock size={8} /> LOCKED
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Sparkles size={22} className="group-hover:scale-110 transition-all duration-500 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        Wannads Offerwall
+                      </h3>
+                      <p className="text-amber-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        High-paying surveys, apps & quizzes with instant rewards
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setWannadsModalOpen(true)}
+                  className="block w-full p-5 bg-gradient-to-br from-amber-600 via-orange-600 to-indigo-950 rounded-[2rem] text-left shadow-[0_10px_25px_rgba(245,158,11,0.15)] hover:scale-[1.01] active:scale-[0.99] transition-all group relative overflow-hidden border border-amber-500/35"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent)] pointer-events-none" />
+                  <div className="absolute top-4 right-4 bg-orange-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(249,115,22,0.5)]">
+                     🌟 POPULAR
+                  </div>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white shrink-0 border border-white/10 shadow-inner">
+                      <Sparkles size={22} className="group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-lg font-display font-black text-white uppercase italic tracking-tight">
+                        Wannads Offerwall
+                      </h3>
+                      <p className="text-amber-100 text-[9px] font-black uppercase tracking-widest leading-normal mt-0.5">
+                        High-paying surveys, apps & quizzes with instant rewards
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-white shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </button>
+              )}
+
             </div>
           )}
           {activeCategory === 'survey' && user && (
@@ -514,6 +666,30 @@ export default function TaskList() {
                 className="w-full h-full border-0 absolute inset-0"
                 allow="autoplay; fullscreen; microphone; camera"
                 title="Zeydoo Offers"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Target Modal for Wannads */}
+      {isWannadsModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col relative animate-in fade-in zoom-in duration-300">
+            <div className="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-950/50">
+               <h3 className="text-white font-display font-black uppercase tracking-widest text-sm">Wannads Offerwall</h3>
+               <button onClick={() => setWannadsModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition">
+                  <span className="text-xl leading-none -mt-0.5">×</span>
+               </button>
+            </div>
+            <div className="flex-1 bg-white relative">
+              <iframe 
+                src={`https://earn.wannads.com/wall?apiKey=6a441f7e5952f548984724&userId=${user?.uid || 'guest'}`}
+                className="w-full h-full border-0 absolute inset-0"
+                scrolling="yes"
+                frameBorder="0"
+                style={{ width: '100%', height: '100%', border: 0, padding: 0, margin: 0 }}
+                title="Wannads Offerwall"
               />
             </div>
           </div>

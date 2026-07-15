@@ -105,8 +105,21 @@ export default function AdminDashboard() {
         pendingAppeals: appealsCount.data().count
       }));
     } catch (err: any) {
-      console.error("Failed to fetch admin stats via client fallback:", err);
-      setDbError(err?.message || String(err));
+      if (err?.message?.includes("Quota exceeded") || String(err).includes("Quota exceeded")) {
+        console.warn("Firestore quota exceeded for count queries. Stats will show as 0.");
+        setStats(prev => ({
+          ...prev,
+          users: 0,
+          activeTasks: 0,
+          pendingWithdrawals: 0,
+          pendingCompletions: 0,
+          pendingOffers: 0,
+          pendingAppeals: 0
+        }));
+      } else {
+        console.error("Failed to fetch admin stats via client fallback:", err);
+        setDbError(err?.message || String(err));
+      }
     }
   };
 
@@ -148,28 +161,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchStats();
-    // Keep a few key listeners for real-time feel, but use getCountFromServer for the rest if possible
-    // For now, we'll keep them as onSnapshot but they are much lighter now since we don't scan docs
     
-    // Real-time counts are fine as long as we don't iterate docs
-    const unsubComps = onSnapshot(query(collection(db, 'completions'), where('status', '==', 'pending')), (snap) => {
-      setStats(prev => ({ ...prev, pendingCompletions: snap.size }));
-    }, (err) => {
-      console.error("Dashboard comps snapshot error:", err);
-      setDbError(prev => prev || `Completions Feed: ${err.message}`);
-    });
-
-    const unsubWiths = onSnapshot(query(collection(db, 'withdrawals'), where('status', '==', 'pending')), (snap) => {
-      setStats(prev => ({ ...prev, pendingWithdrawals: snap.size }));
-    }, (err) => {
-      console.error("Dashboard withdrawals snapshot error:", err);
-      setDbError(prev => prev || `Withdrawals Feed: ${err.message}`);
-    });
-
-    return () => {
-      unsubComps();
-      unsubWiths();
-    };
+    // Polling every 2 minutes instead of onSnapshot to save read quota
+    const interval = setInterval(fetchStats, 120000);
+    
+    return () => clearInterval(interval);
   }, [user?.uid]);
 
   const handleClearEscrow = async () => {

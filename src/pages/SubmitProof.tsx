@@ -163,7 +163,7 @@ export default function SubmitProof() {
           unlock_at: Timestamp.fromDate(unlockAtDate),
         };
 
-        await addDoc(collection(db, 'offer_submissions'), submissionData);
+        addDoc(collection(db, 'offer_submissions'), submissionData).catch(console.error);
       }
 
       // Mark in localStorage as completed today for absolute zero latency

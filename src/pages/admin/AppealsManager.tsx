@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, doc, updateDoc, setDoc, onSnapshot, serverTimestamp, query, orderBy, limit, where, startAfter, getDocs } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc, onSnapshot, serverTimestamp, query, orderBy, limit, where, startAfter, getDocs, getCountFromServer } from 'firebase/firestore';
 import { sendNotification } from '../../lib/notifications';
 import { 
   ShieldAlert, 
@@ -68,22 +68,30 @@ export default function AppealsManager() {
     type: 'success' | 'error';
   } | null>(null);
 
-  // Live count listeners
+  // Static count fetchers instead of live onSnapshot to prevent excessive quota usage
   useEffect(() => {
-    const qPending = query(collection(db, 'appeals'), where('status', '==', 'Pending'));
-    const unsubPending = onSnapshot(qPending, (snap) => setPendingCount(snap.size));
-
-    const qApproved = query(collection(db, 'appeals'), where('status', '==', 'Approved'));
-    const unsubApproved = onSnapshot(qApproved, (snap) => setApprovedCount(snap.size));
-
-    const qRejected = query(collection(db, 'appeals'), where('status', '==', 'Rejected'));
-    const unsubRejected = onSnapshot(qRejected, (snap) => setRejectedCount(snap.size));
-
-    return () => {
-      unsubPending();
-      unsubApproved();
-      unsubRejected();
+    const fetchCounts = async () => {
+      try {
+        const [pending, approved, rejected] = await Promise.all([
+          getCountFromServer(query(collection(db, 'appeals'), where('status', '==', 'Pending'))),
+          getCountFromServer(query(collection(db, 'appeals'), where('status', '==', 'Approved'))),
+          getCountFromServer(query(collection(db, 'appeals'), where('status', '==', 'Rejected')))
+        ]);
+        setPendingCount(pending.data().count);
+        setApprovedCount(approved.data().count);
+        setRejectedCount(rejected.data().count);
+      } catch (err: any) {
+        if (err?.message?.includes("Quota exceeded") || String(err).includes("Quota exceeded")) {
+          console.warn("Firestore quota exceeded for count queries in Appeals. Setting counts to 0.");
+          setPendingCount(0);
+          setApprovedCount(0);
+          setRejectedCount(0);
+        } else {
+          console.error("Failed to fetch appeal counts:", err);
+        }
+      }
     };
+    fetchCounts();
   }, []);
 
   // Reset pagination when tab changes

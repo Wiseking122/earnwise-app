@@ -914,8 +914,75 @@ async function startServer() {
     }
   }
 
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", botActive: !!bot });
+  // CPAgrip Memory Cache
+  const cpaGripCache = new Map<string, { data: any; timestamp: number }>();
+
+  app.get("/api/cpagrip/offers", async (req, res) => {
+    try {
+      const userId = process.env.CPAGRIP_USER_ID;
+      const pubKey = process.env.CPAGRIP_PUBKEY;
+
+      if (!userId || !pubKey) {
+        console.warn("[CPAGRIP] Credentials missing");
+        return res.status(500).json({ error: "Configuration missing" });
+      }
+
+      const xForwardedFor = req.headers['x-forwarded-for'];
+      const ip = typeof xForwardedFor === 'string'
+        ? xForwardedFor.split(',')[0].trim()
+        : (req.socket.remoteAddress || '');
+      
+      const userAgent = req.headers['user-agent'] || '';
+      const trackingId = String(req.query.tracking_id || '');
+      
+      // Cache key based on IP + UA + Tracking ID
+      const cacheKey = `${ip}_${userAgent}_${trackingId}`;
+      const now = Date.now();
+      const cached = cpaGripCache.get(cacheKey);
+
+      // 5 minutes cache
+      if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
+        return res.json(cached.data);
+      }
+
+      const cpaUrl = new URL('https://www.cpagrip.com/common/offer_feed_json.php');
+      cpaUrl.searchParams.append('user_id', userId);
+      cpaUrl.searchParams.append('pubkey', pubKey);
+      if (trackingId) cpaUrl.searchParams.append('tracking_id', trackingId);
+      if (ip) cpaUrl.searchParams.append('ip', ip);
+      if (userAgent) cpaUrl.searchParams.append('ua', userAgent);
+      cpaUrl.searchParams.append('limit', '20');
+
+      // Fetch with retry logic
+      let retries = 3;
+      let apiResponse;
+      let responseData;
+      
+      while (retries > 0) {
+        try {
+          apiResponse = await fetch(cpaUrl.toString());
+          if (!apiResponse.ok) throw new Error(`HTTP ${apiResponse.status}`);
+          responseData = await apiResponse.json();
+          break;
+        } catch (err) {
+          retries--;
+          if (retries === 0) throw err;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Save to cache
+      cpaGripCache.set(cacheKey, { data: responseData, timestamp: now });
+
+      res.json(responseData);
+
+    } catch (error: any) {
+      console.error("[CPAGRIP] Fetch error:", error.message || error);
+      res.status(500).json({ error: "Failed to fetch offers from CPAgrip" });
+    }
+  });
+
+  app.get("/api/health", (req, res) => {    res.json({ status: "ok", botActive: !!bot });
   });
 
   app.get("/api/offers", async (req, res) => {

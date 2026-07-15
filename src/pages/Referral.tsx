@@ -52,20 +52,28 @@ export default function Referral() {
           collection(db, 'users'),
           where('referredBy', 'in', variants)
         );
-        const countSnap = await getCountFromServer(totalReferralsQuery);
-        const actualCount = countSnap.data().count;
-        
-        // If there's a discrepancy, heal it in Firestore
-        if (profile.totalReferrals !== actualCount) {
-          try {
-            const userDocRef = doc(db, 'users', profile.uid);
-            await updateDoc(userDocRef, {
-              totalReferrals: actualCount
-            });
-            console.log(`[REFERRAL_HEAL] Updated referral count to ${actualCount} for user ${profile.uid}`);
-          } catch (healErr) {
-            console.error("Failed to self-heal referral count:", healErr);
+        try {
+          const countSnap = await getCountFromServer(totalReferralsQuery);
+          const actualCount = countSnap.data().count;
+          
+          // If there's a discrepancy, heal it in Firestore
+          if (profile.totalReferrals !== actualCount) {
+            try {
+              const userDocRef = doc(db, 'users', profile.uid);
+              await updateDoc(userDocRef, {
+                totalReferrals: actualCount
+              });
+              console.log(`[REFERRAL_HEAL] Updated referral count to ${actualCount} for user ${profile.uid}`);
+            } catch (healErr) {
+              console.error("Failed to self-heal referral count:", healErr);
+            }
           }
+        } catch (countErr: any) {
+           if (countErr?.message?.includes("Quota exceeded") || String(countErr).includes("Quota exceeded")) {
+             console.warn("Firestore quota exceeded for referral count. Skipping self-heal.");
+           } else {
+             console.error("Failed to fetch total referrals count:", countErr);
+           }
         }
 
         // 2. Fetch recent referrals to display in "My Team"
@@ -89,8 +97,12 @@ export default function Referral() {
         });
 
         setReferralsList(list.slice(0, 10));
-      } catch (err) {
-        console.error("Error fetching referrals:", err);
+      } catch (err: any) {
+        if (err?.message?.includes("Quota exceeded") || String(err).includes("Quota exceeded")) {
+          console.warn("Firestore quota exceeded while fetching referrals. Skipping update.");
+        } else {
+          console.error("Error fetching referrals:", err);
+        }
       } finally {
         setLoadingReferrals(false);
       }

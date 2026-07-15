@@ -222,7 +222,7 @@ export default function TaskDetail() {
         const completionDocRef = doc(db, 'completions', `${user.uid}_${task.id}`);
         const payoutAmount = calculatedReward;
 
-        await setDoc(completionDocRef, {
+        setDoc(completionDocRef, {
           userId: user.uid,
           taskId: task.id,
           taskTitle: task.title,
@@ -419,7 +419,7 @@ export default function TaskDetail() {
         const payoutAmount = calculatedReward;
 
         // Perform writes directly
-        await setDoc(completionDocRef, {
+        setDoc(completionDocRef, {
           userId: user.uid,
           taskId: task.id,
           status: 'approved',
@@ -427,19 +427,19 @@ export default function TaskDetail() {
           submittedAt: serverTimestamp()
         });
 
-        await updateDoc(userDocRef, {
+        updateDoc(userDocRef, {
           wiseCoins: increment(payoutAmount),
           tasksCompleted: increment(1),
           updatedAt: serverTimestamp()
         });
 
-        await setDoc(doc(db, 'wise_coin_wallets', user.uid), {
+        setDoc(doc(db, 'wise_coin_wallets', user.uid), {
           userId: user.uid,
           balance: increment(payoutAmount),
           updatedAt: serverTimestamp()
         }, { merge: true });
 
-        await setDoc(transactionRef, {
+        setDoc(transactionRef, {
           userId: user.uid,
           amount: payoutAmount,
           type: 'earning',
@@ -470,7 +470,7 @@ export default function TaskDetail() {
           setTask(taskData);
 
           // Increment clicksCount tracking
-          await updateDoc(doc(db, 'tasks', id), {
+          updateDoc(doc(db, 'tasks', id), {
             clicksCount: increment(1)
           }).catch(err => console.error("Error incrementing clicksCount:", err));
 
@@ -595,7 +595,7 @@ export default function TaskDetail() {
         const completionDocRef = doc(db, 'completions', `${user.uid}_${task.id}`);
         console.log("[DEBUG] Fallback logic running for:", user.uid, "task:", task.id, "payout:", payoutAmount);
         try {
-          await setDoc(completionDocRef, {
+          setDoc(completionDocRef, {
             userId: user.uid,
             taskId: task.id,
             taskTitle: task.title,

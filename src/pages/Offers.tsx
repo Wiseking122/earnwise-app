@@ -1,26 +1,38 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
 import Layout from '../components/Layout';
 import { motion } from 'motion/react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Sparkles, AlertCircle, Smartphone, Globe, RefreshCw, CheckCircle, ExternalLink, ShieldCheck, Clock, Lock } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, Timestamp, doc, onSnapshot } from 'firebase/firestore';
 import { PLANS } from '../constants/plans';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
-interface OGAdsOffer {
+interface CPAGripOffer {
+  campaign_id: string | number;
+  title: string;
+  description: string;
+  payout: string | number;
+  tracking_url: string;
+  category?: string;
+  countries?: string;
+  mobile?: string;
+  offer_photo?: string;
+}
+
+interface ParsedOffer {
   id: string;
   title: string;
   description: string;
-  adcopy: string;
   payout: number;
   imageUrl: string;
   link: string;
   countries: string[];
   devices: string[];
   category: string;
+  network: 'ogads' | 'cpagrip';
 }
 
 const stripHtml = (html: string) => {
@@ -30,39 +42,60 @@ const stripHtml = (html: string) => {
 
 export default function Offers() {
   const { user, profile } = useAuth();
-  const [offers, setOffers] = useState<OGAdsOffer[]>([]);
-  const [filteredOffers, setFilteredOffers] = useState<OGAdsOffer[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const networkParam = searchParams.get('network');
+  
+  const [offers, setOffers] = useState<ParsedOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRenewalRequired, setIsRenewalRequired] = useState(false);
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [deviceFilter, setDeviceFilter] = useState<'all' | 'iphone' | 'ipad' | 'android'>('all');
-  const [countryFilter, setCountryFilter] = useState<string>('');
-  const [submittedOfferIds, setSubmittedOfferIds] = useState<Set<string>>(new Set());
+  const [deviceFilter, setDeviceFilter] = useState<string>('all');
+  const [countryFilter, setCountryFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [networkFilter, setNetworkFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (networkParam === 'ogads' || networkParam === 'cpagrip') {
+      setNetworkFilter(networkParam);
+    } else {
+      setNetworkFilter('all');
+    }
+  }, [networkParam]);
+
   const [clickedOffers, setClickedOffers] = useState<Record<string, boolean>>(() => {
     try {
-      return JSON.parse(localStorage.getItem('clicked_offers') || '{}');
+      const saved = localStorage.getItem('clicked_offers');
+      return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
     }
   });
 
-  // WiseCoin Conversion Rate state (configurable via platform settings)
-  const [ogadsConversionRate, setOgadsConversionRate] = useState<number>(1000);
+  const [submittedOfferIds, setSubmittedOfferIds] = useState<Set<string>>(new Set());
+
+  // Pagination & Infinite Scroll
+  const [visibleCount, setVisibleCount] = useState(15);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Conversion rate
+  const [cpaConversionRate, setCpaConversionRate] = useState<number>(1000);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'system_settings', 'platform'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (data.ogadsConversionRate !== undefined) {
-          setOgadsConversionRate(Number(data.ogadsConversionRate));
+          setCpaConversionRate(Number(data.ogadsConversionRate));
+        } else if (data.cpaConversionRate !== undefined) {
+          setCpaConversionRate(Number(data.cpaConversionRate));
         }
       }
     });
     return () => unsub();
   }, []);
-
-  const [isRenewalRequired, setIsRenewalRequired] = useState(true);
-  const [showRestriction, setShowRestriction] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (snap) => {
@@ -76,405 +109,465 @@ export default function Offers() {
     return () => unsub();
   }, []);
 
-  const isPlanExpired = useMemo(() => {
-    if (!profile?.planEndDate || profile?.plan === 'free' || profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com') return false;
-    const end = profile.planEndDate.toDate ? profile.planEndDate.toDate() : new Date(profile.planEndDate);
-    return new Date() > end;
-  }, [profile?.planEndDate, profile?.plan, profile?.role, user?.email]);
-
-  const isUserFree = useMemo(() => {
-    const baseFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
-    if (baseFree) return true;
-    if (isRenewalRequired && isPlanExpired) return true;
-    return false;
-  }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
-
-  const userPlan = profile?.plan || 'free';
-  const planDetails = PLANS.find(p => p.id === userPlan);
-  const multiplier = planDetails?.multiplier || 1.0;
-  
-  // Real-time listener for current user's submissions to update locks immediately
   useEffect(() => {
-    if (!user?.uid) {
-      setSubmittedOfferIds(new Set());
-      return;
+    async function fetchSubmittedOffers() {
+      if (!user?.uid) return;
+      try {
+        const midnight = new Date();
+        midnight.setHours(0, 0, 0, 0);
+        
+        const q = query(
+          collection(db, 'offer_submissions'),
+          where('userId', '==', user.uid),
+          where('submittedAt', '>=', Timestamp.fromDate(midnight))
+        );
+        const snap = await getDocs(q);
+        const submitted = new Set<string>();
+        snap.forEach(doc => {
+          const data = doc.data();
+          if (data.offerId) {
+            submitted.add(String(data.offerId).trim().toLowerCase());
+          }
+        });
+        setSubmittedOfferIds(submitted);
+      } catch (err) {
+        console.error("Failed to fetch submitted offers", err);
+      }
     }
-
-    const now = new Date();
-    // WAT is UTC+1. Get current WAT milliseconds
-    const watMs = now.getTime() + (1 * 60 * 60 * 1000);
-    const watDate = new Date(watMs);
-    const watYear = watDate.getUTCFullYear();
-    const watMonthNum = watDate.getUTCMonth();
-    const watDayNum = watDate.getUTCDate();
-    const currentCompletedDateStr = `${watYear}-${String(watMonthNum + 1).padStart(2, '0')}-${String(watDayNum).padStart(2, '0')}`;
-    const watMidnightInUTC = Date.UTC(watYear, watMonthNum, watDayNum, 0, 0, 0, 0);
-    const startOfDayTime = watMidnightInUTC - (1 * 60 * 60 * 1000);
-
-    // 1. Instantly read from localStorage for true zero-latency local fallback
-    const initialIds = new Set<string>();
-    try {
-      const localCompletedKey = `completed_offers_${user.uid}`;
-      const localCompletedObj = JSON.parse(localStorage.getItem(localCompletedKey) || '{}');
-      Object.entries(localCompletedObj).forEach(([id, val]) => {
-        const normalizedId = String(id).trim().toLowerCase();
-        if (typeof val === 'string' && val.includes('-') && val.length < 11) {
-          // It's the old YYYY-MM-DD format
-          if (val === currentCompletedDateStr) {
-            initialIds.add(normalizedId);
-          }
-        } else {
-          // It's the new ISO string or epoch
-          const unlockTime = new Date(val as string).getTime();
-          if (Date.now() < unlockTime) {
-            initialIds.add(normalizedId);
-          }
-        }
-      });
-    } catch (e) {
-      console.error("Local storage initialization error", e);
-    }
-    setSubmittedOfferIds(initialIds);
-
-    // 2. Establish standard Firestore real-time updates and merge them
-    const q = query(
-      collection(db, 'offer_submissions'),
-      where('userId', '==', user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ids = new Set<string>(initialIds);
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        let isToday = false;
-
-        const unlockField = data.unlockAt || data.unlock_at;
-        if (unlockField) {
-          let unlockDate: Date | null = null;
-          if (typeof unlockField.toDate === 'function') {
-            unlockDate = unlockField.toDate();
-          } else if (unlockField.seconds !== undefined) {
-            unlockDate = new Date(unlockField.seconds * 1000);
-          } else if (unlockField._seconds !== undefined) {
-            unlockDate = new Date(unlockField._seconds * 1000);
-          } else {
-            unlockDate = new Date(unlockField);
-          }
-          if (unlockDate && !isNaN(unlockDate.getTime())) {
-            const isLockedByTime = unlockDate.getTime() > Date.now();
-            const isTodayByDate = data.completed_date === currentCompletedDateStr;
-            isToday = isLockedByTime || isTodayByDate;
-          }
-        } else if (data.completed_date) {
-          isToday = data.completed_date === currentCompletedDateStr;
-        } else {
-          let submittedDate: Date | null = null;
-          const subField = data.submittedAt || data.submitted_at;
-          if (subField) {
-            if (typeof subField.toDate === 'function') {
-              submittedDate = subField.toDate();
-            } else if (subField.seconds !== undefined) {
-              submittedDate = new Date(subField.seconds * 1000);
-            } else if (subField._seconds !== undefined) {
-              submittedDate = new Date(subField._seconds * 1000);
-            } else {
-              submittedDate = new Date(subField);
-            }
-          }
-          if (submittedDate && !isNaN(submittedDate.getTime()) && submittedDate.getTime() >= startOfDayTime) {
-            isToday = true;
-          }
-        }
-
-        const oid = data.offerId || data.offer_id;
-        if (isToday && oid) {
-          ids.add(String(oid).trim().toLowerCase());
-        }
-      });
-
-      setSubmittedOfferIds(ids);
-    }, (err) => {
-      console.error("Realtime submissions listener error", err);
-    });
-
-    return () => unsubscribe();
+    fetchSubmittedOffers();
   }, [user?.uid]);
 
-  const fetchOffersAndSubmissions = async () => {
+  const loadOffers = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch OGAds Offers
-      const queryParams = new URLSearchParams();
-      if (deviceFilter !== 'all') {
-        queryParams.append('device', deviceFilter);
-      }
-      if (countryFilter) {
-        queryParams.append('country', countryFilter);
+      const [ogadsRes, cpaRes] = await Promise.allSettled([
+        fetch(getApiUrl(`/api/offers?tracking_id=${user.uid}`)),
+        fetch(getApiUrl(`/api/cpagrip/offers?tracking_id=${user.uid}`))
+      ]);
+
+      let parsedOffers: ParsedOffer[] = [];
+
+      if (ogadsRes.status === 'fulfilled' && ogadsRes.value.ok) {
+        const data = await ogadsRes.value.json();
+        const rawOffers = data.offers || [];
+        const parsed = rawOffers.map((o: any) => ({
+          id: String(o.id || Math.random()),
+          title: o.title || 'Premium Offer',
+          description: o.description || o.adcopy || '',
+          payout: parseFloat(String(o.payout || '0')) || 0,
+          imageUrl: o.picture || o.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=256&auto=format&fit=crop',
+          link: o.link || '#',
+          countries: Array.isArray(o.countries) ? o.countries : (typeof o.countries === 'string' ? o.countries.split(',').map((c: string) => c.trim()) : []),
+          devices: Array.isArray(o.devices) ? o.devices : (typeof o.devices === 'string' ? o.devices.split(',').map((d: string) => d.trim().toLowerCase()) : []),
+          category: o.category || 'General',
+          network: 'ogads' as const
+        }));
+        parsedOffers = [...parsedOffers, ...parsed];
       }
 
-      const res = await fetch(getApiUrl(`/api/offers?${queryParams.toString()}`));
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `HTTP Error ${res.status}`);
+      if (cpaRes.status === 'fulfilled' && cpaRes.value.ok) {
+        const data = await cpaRes.value.json();
+        const rawOffers: CPAGripOffer[] = data.offers || [];
+        const parsed: ParsedOffer[] = rawOffers.map((o) => ({
+          id: String(o.campaign_id || Math.random()),
+          title: o.title || 'Premium Offer',
+          description: o.description || '',
+          payout: parseFloat(String(o.payout || '0')) || 0,
+          imageUrl: o.offer_photo || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=256&auto=format&fit=crop',
+          link: o.tracking_url || '#',
+          countries: o.countries ? o.countries.split(',').map(c => c.trim()) : [],
+          devices: o.mobile ? o.mobile.split(',').map(d => d.trim().toLowerCase()) : [],
+          category: o.category || 'General',
+          network: 'cpagrip' as const
+        }));
+        parsedOffers = [...parsedOffers, ...parsed];
       }
 
-      setOffers(data.offers || []);
+      if (parsedOffers.length === 0) {
+        throw new Error('No offers available at the moment.');
+      }
+
+      // Sort by highest payout
+      parsedOffers.sort((a, b) => b.payout - a.payout);
+
+      setOffers(parsedOffers);
     } catch (err: any) {
-      console.error('Error fetching offers:', err);
-      setError(err.message || 'Failed to load offers.');
+      console.error(err);
+      setError('Unable to securely connect to the offer providers. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOffersAndSubmissions();
-  }, [deviceFilter, countryFilter]);
+    loadOffers();
+  }, [user]);
+
+  // Derived filters
+  const uniqueCountries = useMemo(() => {
+    const set = new Set<string>();
+    offers.forEach(o => o.countries.forEach(c => set.add(c)));
+    return Array.from(set).sort();
+  }, [offers]);
+
+  const uniqueCategories = useMemo(() => {
+    const set = new Set<string>();
+    offers.forEach(o => set.add(o.category));
+    return Array.from(set).sort();
+  }, [offers]);
+
+  const filteredOffers = useMemo(() => {
+    return offers.filter(offer => {
+      // Search
+      const term = searchQuery.toLowerCase();
+      if (term && !offer.title.toLowerCase().includes(term) && !offer.description.toLowerCase().includes(term)) {
+        return false;
+      }
+      
+      // Device
+      if (deviceFilter !== 'all') {
+        const devices = offer.devices.join(' ').toLowerCase();
+        if (!devices.includes(deviceFilter)) return false;
+      }
+
+      // Country
+      if (countryFilter !== 'all') {
+        if (!offer.countries.includes(countryFilter)) return false;
+      }
+
+      // Category
+      if (categoryFilter !== 'all') {
+        if (offer.category !== categoryFilter) return false;
+      }
+
+      // Network
+      if (networkFilter !== 'all') {
+        if (offer.network !== networkFilter) return false;
+      }
+
+      return true;
+    });
+  }, [offers, searchQuery, deviceFilter, countryFilter, categoryFilter, networkFilter]);
+
+  const displayedOffers = useMemo(() => filteredOffers.slice(0, visibleCount), [filteredOffers, visibleCount]);
+
+  const handleObserver = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const target = entries[0];
+      if (target.isIntersecting && visibleCount < filteredOffers.length) {
+        setVisibleCount((prev) => prev + 15);
+      }
+    },
+    [visibleCount, filteredOffers.length]
+  );
 
   useEffect(() => {
-    let result = [...offers];
-    if (searchQuery) {
-      result = result.filter(
-        (o) =>
-          o.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.category.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    const observer = new IntersectionObserver(handleObserver, { threshold: 0.1 });
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
     }
-    setFilteredOffers(result);
-  }, [offers, searchQuery]);
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [handleObserver]);
+
+  // Check plan expiration
+  const isPlanExpired = useMemo(() => {
+    if (!profile?.planEndDate || profile?.plan === 'free' || profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com') return false;
+    const end = (profile.planEndDate as any).toDate ? (profile.planEndDate as any).toDate() : new Date(profile.planEndDate as any);
+    return new Date() > end && isRenewalRequired;
+  }, [profile, user, isRenewalRequired]);
+
+  const planData = useMemo(() => {
+    if (!profile?.plan) return PLANS[0];
+    return PLANS.find(p => p.id === profile.plan) || PLANS[0];
+  }, [profile?.plan]);
+  
+  // Use a sensible default multiplier if planData doesn't have an explicit adMultiplier, fallback to multiplier
+  const multiplier = planData ? ((planData as any).adMultiplier || planData.multiplier || 1) : 1;
 
   return (
     <Layout title="Premium Offers">
-      <div className="p-3 sm:p-5 pb-24 space-y-5 sm:space-y-8 max-w-2xl mx-auto relative">
-        <div className="premium-blur" />
+      <div className="max-w-4xl mx-auto space-y-6 pb-24 relative">
 
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/15 text-xs font-black uppercase tracking-widest">
-            <Sparkles size={12} className="animate-pulse" />
-            Earn WiseCoins (WC)
-          </div>
-          <h2 className="text-3xl font-display font-black text-white uppercase italic tracking-tight">
-            Premium Task Wall
-          </h2>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">
-            Complete tasks once per day and earn WiseCoins.
-          </p>
-        </div>
-
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-[2rem] p-4 sm:p-6 space-y-4 shadow-xl">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search premium offers..."
-              className="w-full bg-slate-950/50 border border-white/5 rounded-2xl py-3 pl-11 pr-5 text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium text-white outline-none"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
-              Filter by Device
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {(['all', 'iphone', 'ipad', 'android'] as const).map((device) => (
-                <button
-                  key={device}
-                  onClick={() => setDeviceFilter(device)}
-                  className={`py-2 rounded-xl text-[9px] sm:text-xs font-black uppercase tracking-wider transition-all border ${
-                    deviceFilter === device
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                      : 'bg-slate-950/40 text-slate-400 border-white/5 hover:border-white/10'
-                  }`}
-                >
-                  {device === 'all' ? 'All' : device}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={`skeleton-${i}`} className="h-32 bg-slate-900/40 border border-white/5 rounded-3xl animate-pulse" />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 rounded-3xl text-center space-y-3">
-              <AlertCircle size={32} className="mx-auto text-red-500" />
-              <p className="text-sm font-bold uppercase tracking-wide">{error}</p>
-              <button onClick={fetchOffersAndSubmissions} className="inline-flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-600 transition">
-                <RefreshCw size={14} /> Retry Loading
-              </button>
-            </div>
-          ) : filteredOffers.length === 0 ? (
-            <div className="bg-slate-900/20 border border-white/5 rounded-[3rem] text-center py-16 space-y-4">
-              <div className="w-16 h-16 bg-slate-900/50 rounded-2xl flex items-center justify-center mx-auto border border-white/5">
-                <Smartphone size={28} className="text-slate-500" />
+        {/* Header / Banner */}
+        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-900 to-slate-950 p-6 md:p-8 border border-blue-500/20 shadow-2xl">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 mix-blend-overlay pointer-events-none"></div>
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 bg-blue-500/20 rounded-2xl border border-blue-400/30">
+                <Sparkles size={20} className="text-blue-400" />
               </div>
-              <h3 className="font-display font-black text-white text-xl uppercase tracking-tight italic">No Compatible Offers</h3>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider max-w-sm mx-auto">Check back shortly for fresh matches.</p>
+              <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight font-display">
+                Premium Offers
+              </h1>
             </div>
-          ) : (
-            <div className="space-y-3.5">
-              {filteredOffers.map((offer) => {
-                let wcPayout = Math.round(offer.payout * ogadsConversionRate * multiplier);
-                if (offer.payout > 0 && wcPayout === 0) {
-                  wcPayout = 1;
-                }
-                const isSubmittedToday = submittedOfferIds.has(String(offer.id).trim().toLowerCase());
-
-                return (
-                  <motion.div
-                    key={offer.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`bg-slate-900/40 border border-white/5 rounded-3xl p-5 transition-all duration-300 space-y-4 group ${isSubmittedToday ? 'opacity-75 grayscale-[0.5]' : 'hover:bg-slate-900/60 hover:border-blue-500/20'}`}
-                  >
-                    <div className="flex gap-4">
-                      <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 bg-slate-950 border border-white/5 relative">
-                        <img
-                          src={offer.imageUrl}
-                          alt={offer.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';
-                          }}
-                        />
-                        {isSubmittedToday && (
-                          <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
-                            <CheckCircle className="text-emerald-500" size={32} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 space-y-1 pt-1 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-display font-black text-white text-lg leading-tight uppercase italic group-hover:text-blue-400 transition-colors truncate">
-                            {offer.title}
-                          </h4>
-                          {isSubmittedToday && (
-                            <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                              Submitted
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-                          <Globe size={10} />
-                          {offer.countries.length > 0 ? offer.countries.join(', ') : 'Global'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Description:</p>
-                        <p className="text-slate-300 text-xs leading-relaxed">{stripHtml(offer.description) || "No description available."}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">What you need to do:</p>
-                        <p className="text-slate-300 text-xs leading-relaxed">
-                          {stripHtml(offer.adcopy) || stripHtml(offer.description) || "Please click Earn Now to view the advertiser's requirements."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/5">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Reward:</p>
-                        {isUserFree ? (
-                          <div className="flex items-center gap-1 bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-lg border border-amber-500/20 w-fit">
-                            <Lock size={10} className="stroke-[3px]" />
-                            <span className="text-[9px] font-black uppercase tracking-tight">LOCKED</span>
-                          </div>
-                        ) : (
-                          <p className="font-display font-black text-white text-lg tracking-tight italic">
-                            {wcPayout} WC
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Device:</p>
-                        <p className="text-slate-300 text-xs font-bold uppercase tracking-wider">{offer.devices.join(' / ')}</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex gap-2">
-                      {isUserFree ? (
-                        <button
-                          onClick={() => setShowRestriction(true)}
-                          className="w-full bg-slate-950/60 hover:bg-slate-950/80 border border-amber-500/15 hover:border-amber-500/30 text-amber-400 py-3 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition justify-center"
-                        >
-                          <Lock size={12} /> Unlock Offer Wall
-                        </button>
-                      ) : isSubmittedToday ? (
-                        <div className="bg-slate-950/60 py-3.5 rounded-xl flex flex-col items-center justify-center flex-1 border border-white/5 cursor-not-allowed text-center w-full">
-                          <span className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1">
-                            Completed Today ✓
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-                            Available again tomorrow.
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          <a
-                            href={offer.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => {
-                              const updated = { ...clickedOffers, [offer.id]: true };
-                              setClickedOffers(updated);
-                              localStorage.setItem('clicked_offers', JSON.stringify(updated));
-                            }}
-                            className="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition shadow-lg shadow-blue-600/15 justify-center flex-1"
-                          >
-                            Earn Now <ExternalLink size={12} />
-                          </a>
-                          {clickedOffers[offer.id] && (
-                            <Link
-                              to={`/submit-proof?offerId=${offer.id}&title=${encodeURIComponent(offer.title)}&payout=${wcPayout}`}
-                              className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition shadow-lg shadow-amber-500/15 justify-center animate-bounce"
-                            >
-                              Submit Proof
-                            </Link>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-start gap-3">
-          <ShieldCheck size={20} className="text-emerald-500 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
-              Manual Verification Required
-            </h5>
-            <p className="text-slate-500 text-[9px] leading-relaxed">
-              EarnWise rewards are paid in WiseCoins (WC) after manual proof approval. Each offer can be completed once per 24 hours. Duplicate submissions will be rejected.
+            <p className="text-slate-300 text-xs md:text-sm max-w-xl font-medium leading-relaxed">
+              Complete high-yield premium tasks. Ensure you follow all advertiser instructions carefully. Rewards are credited after proof verification.
             </p>
           </div>
         </div>
+
+        {/* Filters */}
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/5 rounded-[2rem] p-5 shadow-xl space-y-4">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text"
+              placeholder="Search offers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-medium"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
+                Filter by Device
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['all', 'ios', 'android'] as const).map((device) => (
+                  <button
+                    key={device}
+                    onClick={() => setDeviceFilter(device)}
+                    className={`py-2 rounded-xl text-[9px] sm:text-xs font-black uppercase tracking-wider transition-all border ${
+                      deviceFilter === device
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                        : 'bg-slate-950/40 text-slate-400 border-white/5 hover:border-white/10'
+                    }`}
+                  >
+                    {device === 'all' ? 'All' : device}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
+                Network Feed
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['all', 'ogads', 'cpagrip'] as const).map((net) => (
+                  <button
+                    key={net}
+                    onClick={() => setNetworkFilter(net)}
+                    className={`py-2 rounded-xl text-[9px] sm:text-xs font-black uppercase tracking-wider transition-all border ${
+                      networkFilter === net
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                        : 'bg-slate-950/40 text-slate-400 border-white/5 hover:border-white/10'
+                    }`}
+                  >
+                    {net === 'all' ? 'All' : net === 'ogads' ? 'OGAds' : 'CPAgrip'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
+                Country
+              </label>
+              <select
+                value={countryFilter}
+                onChange={(e) => setCountryFilter(e.target.value)}
+                className="w-full bg-slate-950/40 border border-white/5 rounded-xl py-2.5 px-3 text-xs font-bold uppercase tracking-wider text-slate-300 focus:outline-none focus:border-blue-500/50"
+              >
+                <option value="all">ALL COUNTRIES</option>
+                {uniqueCountries.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
+                Category
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full bg-slate-950/40 border border-white/5 rounded-xl py-2.5 px-3 text-xs font-bold uppercase tracking-wider text-slate-300 focus:outline-none focus:border-blue-500/50"
+              >
+                <option value="all">ALL CATEGORIES</option>
+                {uniqueCategories.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* List */}
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="animate-pulse bg-slate-900/40 border border-white/5 rounded-[2rem] p-6 h-40"></div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center">
+            <AlertCircle className="mx-auto h-10 w-10 text-red-400 mb-3" />
+            <h3 className="text-lg font-bold text-red-400 mb-2">Feed Error</h3>
+            <p className="text-slate-400 text-sm">{error}</p>
+            <button onClick={loadOffers} className="mt-4 flex items-center gap-2 mx-auto bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">
+              <RefreshCw size={14} /> Retry
+            </button>
+          </div>
+        ) : displayedOffers.length === 0 ? (
+          <div className="bg-slate-900/40 border border-white/5 rounded-[2rem] p-12 text-center">
+            <ShieldCheck className="mx-auto h-12 w-12 text-slate-600 mb-4" />
+            <h3 className="text-lg font-bold text-white mb-2">No Offers Found</h3>
+            <p className="text-slate-400 text-sm font-medium">Try adjusting your filters or check back later.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {displayedOffers.map(offer => {
+              let wcPayout = Math.round(offer.payout * cpaConversionRate * multiplier);
+              if (offer.payout > 0 && wcPayout === 0) wcPayout = 1;
+              const isSubmittedToday = submittedOfferIds.has(String(offer.id).trim().toLowerCase());
+
+              return (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  key={offer.id} 
+                  className={`bg-slate-900/60 backdrop-blur-sm border rounded-[2rem] overflow-hidden transition-all ${
+                    isSubmittedToday ? 'border-emerald-500/20 opacity-75' : 'border-white/5 hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="p-5 sm:p-6 flex flex-col sm:flex-row gap-5 items-start sm:items-center">
+                    
+                    {/* Thumbnail */}
+                    <div className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-slate-950 rounded-2xl overflow-hidden border border-white/5 flex items-center justify-center p-2 relative group">
+                      <img 
+                        src={offer.imageUrl} 
+                        alt={offer.title} 
+                        className="w-full h-full object-contain rounded-xl"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-base sm:text-lg font-black text-white truncate font-display tracking-tight">
+                          {stripHtml(offer.title)}
+                        </h3>
+                        {isSubmittedToday && (
+                          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle size={10} /> Pending
+                          </span>
+                        )}
+                      </div>
+                      
+                      <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed font-medium mb-3">
+                        {stripHtml(offer.description) || "Complete advertiser requirements to earn."}
+                      </p>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        {offer.devices.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-slate-500">
+                            <Smartphone size={12} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{offer.devices.join(', ')}</span>
+                          </div>
+                        )}
+                        {offer.countries.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-slate-500">
+                            <Globe size={12} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{offer.countries.slice(0, 3).join(', ')}{offer.countries.length > 3 && '...'}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Clock size={12} />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">~2-5 Mins</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Area */}
+                    <div className="w-full sm:w-auto shrink-0 flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-3 bg-slate-950/50 sm:bg-transparent p-4 sm:p-0 rounded-2xl sm:rounded-none">
+                      <div className="text-left sm:text-right">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Reward</div>
+                        <div className="text-lg font-black text-amber-400 font-display flex items-center gap-1">
+                          +{wcPayout.toLocaleString()} <span className="text-xs">WC</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-2 w-full sm:w-auto">
+                        {isPlanExpired ? (
+                          <button
+                            disabled
+                            className="bg-slate-800 text-slate-500 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 justify-center cursor-not-allowed"
+                          >
+                            <Lock size={12} /> Unlock
+                          </button>
+                        ) : (
+                          <>
+                            <a 
+                              href={offer.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => {
+                                const updated = { ...clickedOffers, [offer.id]: true };
+                                setClickedOffers(updated);
+                                localStorage.setItem('clicked_offers', JSON.stringify(updated));
+                              }}
+                              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition justify-center ${
+                                clickedOffers[offer.id] 
+                                  ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' 
+                                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                              }`}
+                            >
+                              {clickedOffers[offer.id] ? 'Continue Offer' : 'Start Offer'} <ExternalLink size={12} />
+                            </a>
+                            
+                            {clickedOffers[offer.id] && !isSubmittedToday && (
+                              <Link
+                                to={`/submit-proof?offerId=${offer.id}&title=${encodeURIComponent(offer.title)}&payout=${wcPayout}`}
+                                className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition shadow-lg shadow-amber-500/15 justify-center"
+                              >
+                                Submit Proof
+                              </Link>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+
+            <div ref={observerTarget} className="h-10"></div>
+          </div>
+        )}
+
+        <div className="text-center mt-12 pb-8">
+          <p className="text-slate-500 text-xs font-medium max-w-lg mx-auto leading-relaxed">
+            EarnWise rewards are paid in WiseCoins (WC) after manual proof approval. Each offer can be completed once per 24 hours.
+          </p>
+        </div>
+
       </div>
 
-      <PlanRestrictionModal 
-        isOpen={showRestriction} 
-        onClose={() => setShowRestriction(false)} 
-        actionName="start or complete tasks" 
-      />
+      {isPlanExpired && (
+        <PlanRestrictionModal 
+          isOpen={isPlanExpired} 
+          onClose={() => {}} 
+          actionName="Premium Offers"
+        />
+      )}
     </Layout>
   );
 }
