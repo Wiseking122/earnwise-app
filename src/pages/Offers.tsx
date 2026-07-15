@@ -11,14 +11,18 @@ import { PLANS } from '../constants/plans';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
 
 interface CPAGripOffer {
-  campaign_id: string | number;
+  offer_id?: string | number;
+  campaign_id?: string | number;
   title: string;
   description: string;
   payout: string | number;
-  tracking_url: string;
+  offerlink?: string;
+  tracking_url?: string;
   category?: string;
+  accepted_countries?: string;
   countries?: string;
   mobile?: string;
+  offerphoto?: string;
   offer_photo?: string;
 }
 
@@ -170,18 +174,25 @@ export default function Offers() {
       if (cpaRes.status === 'fulfilled' && cpaRes.value.ok) {
         const data = await cpaRes.value.json();
         const rawOffers: CPAGripOffer[] = data.offers || [];
-        const parsed: ParsedOffer[] = rawOffers.map((o) => ({
-          id: String(o.campaign_id || Math.random()),
-          title: o.title || 'Premium Offer',
-          description: o.description || '',
-          payout: parseFloat(String(o.payout || '0')) || 0,
-          imageUrl: o.offer_photo || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=256&auto=format&fit=crop',
-          link: o.tracking_url || '#',
-          countries: o.countries ? o.countries.split(',').map(c => c.trim()) : [],
-          devices: o.mobile ? o.mobile.split(',').map(d => d.trim().toLowerCase()) : [],
-          category: o.category || 'General',
-          network: 'cpagrip' as const
-        }));
+        const parsed: ParsedOffer[] = rawOffers.map((o) => {
+          const offerId = o.offer_id || o.campaign_id || String(Math.random());
+          const countriesStr = o.accepted_countries || o.countries || '';
+          const devicesList = o.mobile 
+            ? o.mobile.split(',').map(d => d.trim().toLowerCase()) 
+            : ['mobile', 'desktop'];
+          return {
+            id: String(offerId),
+            title: o.title || 'Premium Offer',
+            description: o.description || '',
+            payout: parseFloat(String(o.payout || '0')) || 0,
+            imageUrl: o.offerphoto || o.offer_photo || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=256&auto=format&fit=crop',
+            link: o.offerlink || o.tracking_url || '#',
+            countries: countriesStr ? countriesStr.split(',').map(c => c.trim()) : [],
+            devices: devicesList,
+            category: o.category || 'General',
+            network: 'cpagrip' as const
+          };
+        });
         parsedOffers = [...parsedOffers, ...parsed];
       }
 
