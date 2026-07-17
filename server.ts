@@ -11,6 +11,7 @@ import axios from "axios";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import cron from "node-cron";
+import sharp from "sharp";
 
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -20,6 +21,48 @@ import { GoogleGenAI, Type } from "@google/genai";
 import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
 
 dotenv.config();
+
+/**
+ * Server-side high-performance image compressor using Sharp.
+ * Resizes and compresses any incoming base64 image to highly legible, ultra-compact JPEGs,
+ * completely bypassing browser-side canvas rendering/blanking bugs.
+ */
+async function compressBase64Image(base64Str: string, maxWidth = 900, maxHeight = 900, quality = 65): Promise<string> {
+  if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
+    return base64Str;
+  }
+
+  try {
+    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return base64Str;
+    }
+
+    const contentType = matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    console.log(`[SHARP] Compressing screenshot of type ${contentType}. Input buffer size: ${buffer.length} bytes`);
+
+    // Compress to JPEG using Sharp. This is server-authoritative, multi-threaded, and highly stable.
+    const compressedBuffer = await sharp(buffer)
+      .resize({
+        width: maxWidth,
+        height: maxHeight,
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality })
+      .toBuffer();
+
+    const compressedBase64 = compressedBuffer.toString('base64');
+    console.log(`[SHARP] Compression complete. Output size: ${compressedBuffer.length} bytes`);
+    return `data:image/jpeg;base64,${compressedBase64}`;
+  } catch (err) {
+    console.error('[SHARP COMPRESS ERROR] Failed to compress base64 image on server:', err);
+    return base64Str; // Fallback to original if sharp fails
+  }
+}
 
 // Initialize Firebase Admin
 let firebaseApp;
@@ -78,6 +121,7 @@ async function checkDbAdminCapability() {
     
     // Once capable, run the owner promotion check
     await ensureOwnerAdminStatus();
+    await autoSeedTasks();
   } catch (err: any) {
     isDbAdminCapable = false;
     
@@ -89,6 +133,7 @@ async function checkDbAdminCapability() {
          isDbAdminCapable = true;
          console.log("[FIREBASE] Fallback to (default) database succeeded.");
          await ensureOwnerAdminStatus();
+         await autoSeedTasks();
        } catch (innerErr) {
          isDbAdminCapable = false;
        }
@@ -139,6 +184,177 @@ async function ensureOwnerAdminStatus() {
     }
   } catch (err: any) {
     console.warn("[FIREBASE] Startup admin promotion failed:", err.message);
+  }
+}
+
+async function autoSeedTasks() {
+  if (!isDbAdminCapable) return;
+  try {
+    const tasksSnap = await dbAdmin.collection('tasks').where('status', '==', 'active').get();
+    if (tasksSnap.size >= 4) {
+      console.log(`[SEED] Tasks collection already has ${tasksSnap.size} active tasks. Skipping auto-seed.`);
+      return;
+    }
+    
+    console.log(`[SEED] Only ${tasksSnap.size} active tasks found. Auto-seeding default premium jobs...`);
+    
+    const now = new Date();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 90);
+    
+    const defaultTasks = [
+      {
+        title: "Follow Earnwise on X (Twitter)",
+        description: "Follow our official X handle for announcements, premium code giveaways, and reward opportunities. Take a screenshot of your follow status as proof.",
+        advertiserId: "internal_platform",
+        totalBudget: 100000,
+        remainingBudget: 100000,
+        userPayout: 100,
+        platformMargin: 30,
+        tag: "social",
+        link: "https://x.com/EarnwiseElite",
+        videoUrl: null,
+        imageUrl: null,
+        shareText: null,
+        enableSocialShare: false,
+        type: "ad",
+        status: "active",
+        durationDays: 90,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        requiresProof: true,
+        targetCount: 1000,
+        completedCount: 0,
+        clicksCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      {
+        title: "Watch Earnwise Academy Introduction",
+        description: "Watch the 2-minute introductory video to learn how to maximize your daily earnings on Earnwise. Submit a screenshot of the video completion screen.",
+        advertiserId: "internal_platform",
+        totalBudget: 150000,
+        remainingBudget: 150000,
+        userPayout: 150,
+        platformMargin: 45,
+        tag: "education",
+        link: "https://www.w3schools.com/html/mov_bbb.mp4",
+        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
+        imageUrl: null,
+        shareText: null,
+        enableSocialShare: false,
+        type: "video",
+        status: "active",
+        durationDays: 90,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        requiresProof: true,
+        targetCount: 1000,
+        completedCount: 0,
+        clicksCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      {
+        title: "Download OPay App & Register",
+        description: "Download the OPay app from the Play Store or App Store, register a free account, and submit a screenshot of your home dashboard showing your verified status.",
+        advertiserId: "internal_platform",
+        totalBudget: 500000,
+        remainingBudget: 500000,
+        userPayout: 500,
+        platformMargin: 150,
+        tag: "finance",
+        link: "https://opayweb.com",
+        videoUrl: null,
+        imageUrl: null,
+        shareText: null,
+        enableSocialShare: false,
+        type: "app_download",
+        status: "active",
+        durationDays: 90,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        requiresProof: true,
+        targetCount: 1000,
+        completedCount: 0,
+        clicksCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      {
+        title: "Post Earnwise on WhatsApp Status",
+        description: "Post your Earnwise referral link on your WhatsApp status to invite friends. The status must remain active for at least 1 hour. Upload a screenshot of your status view count as proof.",
+        advertiserId: "internal_platform",
+        totalBudget: 200000,
+        remainingBudget: 200000,
+        userPayout: 200,
+        platformMargin: 60,
+        tag: "social",
+        link: "https://earnwise.ng",
+        videoUrl: null,
+        imageUrl: null,
+        shareText: "Earn daily with Earnwise! Sign up now with my link and get instant welcome bonuses: ",
+        enableSocialShare: true,
+        type: "referral",
+        status: "active",
+        durationDays: 90,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        requiresProof: true,
+        targetCount: 1000,
+        completedCount: 0,
+        clicksCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      {
+        title: "Write an Earnwise Review on Facebook",
+        description: "Write a short, honest review or post about your experience with Earnwise on Facebook or TikTok. Include your referral link in the post and upload a screenshot of your post as proof.",
+        advertiserId: "internal_platform",
+        totalBudget: 350000,
+        remainingBudget: 350000,
+        userPayout: 350,
+        platformMargin: 105,
+        tag: "social",
+        link: "https://facebook.com",
+        videoUrl: null,
+        imageUrl: null,
+        shareText: null,
+        enableSocialShare: false,
+        type: "content_creation",
+        status: "active",
+        durationDays: 90,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        requiresProof: true,
+        targetCount: 1000,
+        completedCount: 0,
+        clicksCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      {
+        title: "Join Earnwise Telegram Channel",
+        description: "Join our official Telegram community to connect with over 50,000 elite earners and receive daily signals, withdrawal receipts, and admin updates.",
+        advertiserId: "internal_platform",
+        totalBudget: 100000,
+        remainingBudget: 100000,
+        userPayout: 100,
+        platformMargin: 30,
+        tag: "social",
+        link: "https://t.me/EarnwiseElite",
+        videoUrl: null,
+        imageUrl: null,
+        shareText: null,
+        enableSocialShare: false,
+        type: "ad",
+        status: "active",
+        durationDays: 90,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        requiresProof: true,
+        targetCount: 1000,
+        completedCount: 0,
+        clicksCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      }
+    ];
+
+    for (const t of defaultTasks) {
+      await dbAdmin.collection('tasks').add(t);
+    }
+    console.log(`[SEED] Successfully seeded ${defaultTasks.length} active premium tasks.`);
+  } catch (err: any) {
+    console.error("[SEED] Error seeding tasks:", err.message);
   }
 }
 
@@ -1114,6 +1330,11 @@ async function startServer() {
 
     try {
       let finalScreenshotUrl = screenshotData || screenshotUrl;
+      if (finalScreenshotUrl && finalScreenshotUrl.startsWith('data:image/')) {
+        console.log('[OFFER_SUBMIT] Compressing screenshot via server-side Sharp...');
+        finalScreenshotUrl = await compressBase64Image(finalScreenshotUrl);
+      }
+
       const now = new Date();
       const unlockAtDate = new Date(now);
       unlockAtDate.setHours(24, 0, 0, 0); // Sets to next midnight in server's local time
@@ -2458,10 +2679,23 @@ GENERAL RULES:
    * POST /api/v1/tasks/verify-proof
    */
   app.post("/api/v1/tasks/verify-proof", async (req, res) => {
-    const { userId, taskId, taskTitle, proof, rewardAmount, screenshot, deviceFingerprint } = req.body;
+    let { userId, taskId, taskTitle, proof, rewardAmount, screenshot, deviceFingerprint } = req.body;
 
     if (!userId || !taskId || (!proof && !screenshot)) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    try {
+      if (proof && typeof proof === 'string' && proof.startsWith('data:image/')) {
+        console.log('[TASK_PROOF] Compressing proof image via Sharp...');
+        proof = await compressBase64Image(proof);
+      }
+      if (screenshot && typeof screenshot === 'string' && screenshot.startsWith('data:image/')) {
+        console.log('[TASK_PROOF] Compressing screenshot image via Sharp...');
+        screenshot = await compressBase64Image(screenshot);
+      }
+    } catch (compressErr) {
+      console.error('[TASK_PROOF_COMPRESS] Failed to compress images:', compressErr);
     }
 
     // Velocity Gate (Anti-Bot & Hardware Pacing)
@@ -2925,8 +3159,8 @@ GENERAL RULES:
     const userDoc = await dbAdmin.collection('users').doc(adminId).get();
     if (userDoc.data()?.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
     
-    if (action === 'approve') await dbAdmin.collection('tasks').doc(id).update({ admin_status: 'active' });
-    else if (action === 'reject') await dbAdmin.collection('tasks').doc(id).update({ admin_status: 'rejected' });
+    if (action === 'approve') await dbAdmin.collection('tasks').doc(id).update({ status: 'active', admin_status: 'active' });
+    else if (action === 'reject') await dbAdmin.collection('tasks').doc(id).update({ status: 'rejected', admin_status: 'rejected' });
     res.json({ status: "updated" });
   });
 

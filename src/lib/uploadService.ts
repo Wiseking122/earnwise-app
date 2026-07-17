@@ -18,91 +18,79 @@ export function base64ToBlob(base64Data: string): Blob {
 
 /**
  * Compresses an image file or blob to ensure it is resized nicely and small enough for reliable upload.
+ * It resizes the image to fit within maxWidth and maxHeight (default 800px) and compresses it to JPEG
+ * with the specified quality (default 0.5), keeping it safely under the Firestore 1MB document limit.
+ * Wrapping the entire execution in try/catch ensures a perfect fallback to the original image in case of any platform issue.
  */
-export async function compressImage(fileOrBlob: File | Blob, maxWidth = 600, maxHeight = 600, quality = 0.3): Promise<Blob> {
-  // If it's already tiny, return as is to save time
-  if (fileOrBlob.size <= 80 * 1024) {
-    return fileOrBlob;
-  }
-
+export async function compressImage(fileOrBlob: File | Blob, maxWidth = 800, maxHeight = 800, quality = 0.5): Promise<Blob> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      console.warn('[COMPRESS] Compression timed out, using original file');
-      resolve(fileOrBlob);
-    }, 10000);
+    // If the image is already small (e.g., under 150KB), skip compression entirely
+    if (fileOrBlob.size < 150 * 1024) {
+      console.log(`[COMPRESS] Image is already small (${Math.round(fileOrBlob.size / 1024)}KB). Skipping compression.`);
+      return resolve(fileOrBlob);
+    }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (!dataUrl) {
-        clearTimeout(timeout);
-        resolve(fileOrBlob);
-        return;
-      }
-
+    reader.onload = (e) => {
       const img = new Image();
-      img.onload = async () => {
-        clearTimeout(timeout);
-        
-        const width = img.naturalWidth || img.width;
-        const height = img.naturalHeight || img.height;
+      img.onload = () => {
+        try {
+          let width = img.width;
+          let height = img.height;
 
-        if (!width || !height) {
-          resolve(fileOrBlob);
-          return;
-        }
-
-        let newWidth = width;
-        let newHeight = height;
-
-        if (width > height) {
-          if (width > maxWidth) {
-            newHeight = Math.round((height * maxWidth) / width);
-            newWidth = maxWidth;
+          // Calculate new dimensions to fit within bounds
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
           }
-        } else {
-          if (height > maxHeight) {
-            newWidth = Math.round((width * maxHeight) / height);
-            newHeight = maxHeight;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            console.warn('[COMPRESS] Failed to get canvas context. Falling back to original.');
+            return resolve(fileOrBlob);
           }
-        }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, newWidth, newHeight);
-          ctx.drawImage(img, 0, 0, newWidth, newHeight);
+          // Draw onto canvas
+          ctx.drawImage(img, 0, 0, width, height);
 
-          try {
-            canvas.toBlob((blob) => {
-              if (blob) {
-                console.log(`[COMPRESS] Compressed from ${Math.round(fileOrBlob.size / 1024)}KB to ${Math.round(blob.size / 1024)}KB`);
-                resolve(blob);
+          // Retrieve compressed JPEG blob
+          canvas.toBlob(
+            (compressedBlob) => {
+              if (compressedBlob) {
+                console.log(`[COMPRESS] Compression complete. Original: ${Math.round(fileOrBlob.size / 1024)}KB, Compressed: ${Math.round(compressedBlob.size / 1024)}KB`);
+                resolve(compressedBlob);
               } else {
+                console.warn('[COMPRESS] toBlob returned null. Falling back to original.');
                 resolve(fileOrBlob);
               }
-            }, 'image/jpeg', quality);
-          } catch (e) {
-            console.warn('[COMPRESS] Canvas toBlob failed:', e);
-            resolve(fileOrBlob);
-          }
-        } else {
+            },
+            'image/jpeg',
+            quality
+          );
+        } catch (err) {
+          console.error('[COMPRESS] Error during compression process. Falling back to original:', err);
           resolve(fileOrBlob);
         }
       };
-      img.onerror = () => {
-        clearTimeout(timeout);
+
+      img.onerror = (err) => {
+        console.error('[COMPRESS] Failed to load image element. Falling back to original:', err);
         resolve(fileOrBlob);
       };
-      img.src = dataUrl;
+
+      img.src = e.target?.result as string;
     };
-    reader.onerror = () => {
-      clearTimeout(timeout);
+
+    reader.onerror = (err) => {
+      console.error('[COMPRESS] FileReader reading error. Falling back to original:', err);
       resolve(fileOrBlob);
     };
+
     reader.readAsDataURL(fileOrBlob);
   });
 }

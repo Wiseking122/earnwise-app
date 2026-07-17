@@ -95,22 +95,27 @@ export const DailyCheckIn: React.FC = () => {
       // 1. Transactionally update user profile document
       const userRef = doc(db, 'users', profile.uid);
       await updateDoc(userRef, {
-        balance: increment(rewardAmount),
-        withdrawableBalance: increment(rewardAmount),
-        taskBalance: increment(rewardAmount),
-        taskEarnings: increment(rewardAmount), // classified under task earnings
+        wiseCoins: increment(rewardAmount), // Credited directly to wise coin balance
         xp: increment(xpAmount),
         lastCheckIn: serverTimestamp(),
       });
 
-      // 2. Add an audit log entry in the user's transactions collection
-      const transRef = doc(collection(db, 'transactions'));
-      await setDoc(transRef, {
+      // 2. Transactionally update wise_coin_wallets document
+      const walletRef = doc(db, 'wise_coin_wallets', profile.uid);
+      await setDoc(walletRef, {
+        userId: profile.uid,
+        balance: increment(rewardAmount),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      // 3. Add an audit log entry in the user's wise_coin_transactions collection
+      const wcTransRef = doc(collection(db, 'wise_coin_transactions'));
+      await setDoc(wcTransRef, {
         userId: profile.uid,
         amount: rewardAmount,
-        type: 'bonus',
+        action: 'credit',
+        reason: `Consecutive Day ${cycleDayNumber} Check-In Bonus`,
         status: 'completed',
-        description: `Consecutive Day ${cycleDayNumber} Check-In Bonus`,
         createdAt: serverTimestamp()
       });
       
@@ -281,7 +286,7 @@ export const DailyCheckIn: React.FC = () => {
                       <span className={`text-[8.5px] sm:text-[10px] font-black block leading-none ${
                         isToday ? 'text-white' : isClaimed ? 'text-slate-400' : 'text-slate-400'
                       }`}>
-                        ₦{item.amount}
+                        {item.amount} WC
                       </span>
                       <span className="text-[6.5px] sm:text-[7.5px] font-bold text-slate-500 block leading-none">
                         +{item.xp} XP
@@ -303,17 +308,17 @@ export const DailyCheckIn: React.FC = () => {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between p-1 rounded bg-slate-950 border border-white/5">
                     <span className="text-slate-400 font-medium">Standard Daily Base</span>
-                    <span className="text-white font-black">₦15.00 / 20 XP</span>
+                    <span className="text-white font-black">15 WC / 20 XP</span>
                   </div>
                   <div className="flex items-center justify-between p-1 rounded bg-slate-950 border border-white/5">
                     <span className="text-slate-400 font-medium">Peak High Yield (Day 6)</span>
-                    <span className="text-amber-400 font-black">₦46.00 / 60 XP</span>
+                    <span className="text-amber-400 font-black">46 WC / 60 XP</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between p-1 rounded bg-slate-950 border border-amber-400/20">
                     <span className="text-amber-400 font-extrabold">Day 7 Grand Reward</span>
-                    <span className="text-yellow-300 font-black">₦75.00 + 120 XP 👑</span>
+                    <span className="text-yellow-300 font-black">75 WC + 120 XP 👑</span>
                   </div>
                   <p className="text-[8px] text-slate-500 font-medium italic pl-1 leading-normal">
                     * The absolute cycle restarts automatically immediately upon Day 7 claim execution. Or breaks instantly if you miss any daily check-in sequence slot.
@@ -363,7 +368,7 @@ export const DailyCheckIn: React.FC = () => {
                 <div className="w-3 h-3 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
               ) : canCheckIn ? (
                 <>
-                  Claim Day {cycleDayNumber} Reward (+₦{currentReward.amount})
+                  Claim Day {cycleDayNumber} Reward (+{currentReward.amount} WC)
                   <ArrowRight size={11} className="group-hover/btn:translate-x-1 transition-transform" />
                 </>
               ) : (
@@ -403,18 +408,18 @@ export const DailyCheckIn: React.FC = () => {
               <div className="space-y-1.5">
                 <h3 className="text-2xl font-black text-white tracking-tight">Claim Succeeded!</h3>
                 <p className="text-slate-400 text-xs">
-                  Your Day {cycleDayNumber} reward has been securely added to your cleared earnings:
+                  Your Day {cycleDayNumber} reward has been securely added to your WiseCoin wallet:
                 </p>
                 <div className="text-2xl font-black text-amber-400 py-1">
-                  +₦{currentReward.amount}.00
+                  +{currentReward.amount} WC
                 </div>
               </div>
 
               {/* Bonus logs visual audit trail block */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 flex items-center justify-center gap-4">
                 <div className="flex flex-col items-center">
-                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-widest">Added Funds</p>
-                  <p className="font-extrabold text-white text-sm">₦{currentReward.amount}</p>
+                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-widest">Added Coins</p>
+                  <p className="font-extrabold text-white text-sm">{currentReward.amount} WC</p>
                 </div>
                 <div className="w-px h-8 bg-slate-850" />
                 <div className="flex flex-col items-center">
@@ -431,7 +436,7 @@ export const DailyCheckIn: React.FC = () => {
               {/* Next Day teaser motivator box */}
               {cycleIndex < 6 && (
                 <div className="bg-slate-900/30 p-3 rounded-xl border border-white/5 text-[10px] text-slate-400 font-medium leading-relaxed">
-                  🔥 Keep up your streak to claim <span className="text-white font-extrabold">₦{DAILY_REWARDS[cycleIndex + 1]?.amount}.00</span> on Day {(cycleIndex + 2)}!
+                  🔥 Keep up your streak to claim <span className="text-white font-extrabold">{DAILY_REWARDS[cycleIndex + 1]?.amount} WC</span> on Day {(cycleIndex + 2)}!
                 </div>
               )}
 

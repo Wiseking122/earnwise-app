@@ -44,7 +44,6 @@ import {
 
 import { DailyCheckIn } from '../components/DailyCheckIn';
 import { useLiveActivities } from '../hooks/useLiveActivities';
-import { DailyGoal } from './DailyGoal';
 import { AdsterraBanner } from '../components/AdsterraBanner';
 import { MaintenanceModal } from '../components/MaintenanceModal';
 import { AnnouncementEngine, ScrollingBanner } from '../components/AnnouncementEngine';
@@ -528,9 +527,6 @@ export default function Home() {
 
         {/* Daily Check-in Dashboard */}
         <DailyCheckIn />
-
-        {/* Daily Tasks Goal Progression */}
-        <DailyGoal />
 
         {/* Weekly Leaderboard (Hall of Fame) Promo Card */}
         <section className="space-y-3">
