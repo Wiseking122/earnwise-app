@@ -2,5 +2,5 @@ services:
   - type: web
     name: earnwise-backend
     env: node
-    buildCommand: npm install --legacy-peer-deps
-    startCommand: npx ts-node server.ts
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: npm run start
