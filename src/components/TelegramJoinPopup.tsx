@@ -15,6 +15,14 @@ export const TelegramJoinPopup = () => {
     }
 
     const checkAndShow = () => {
+      if (localStorage.getItem('show_telegram_signup_popup') === 'true') {
+        const timer = setTimeout(() => {
+          setIsOpen(true);
+          localStorage.removeItem('show_telegram_signup_popup');
+        }, 1500);
+        return timer;
+      }
+
       const hasSeen = safeStorage.getItem(`hasSeenTelegramPopup_${user.uid}`);
       if (hasSeen) return;
 
@@ -90,35 +98,35 @@ export const TelegramJoinPopup = () => {
               </span>
 
               <h2 className="text-2xl font-black text-slate-900 mb-2 font-display">
-                Join our Telegram Group
+                Join our Telegram Community
               </h2>
               <p className="text-slate-500 font-medium text-sm mb-6 max-w-xs mx-auto">
                 Connect with <span className="text-blue-600 font-bold">10,000+ active partners</span> in Nigeria. Share payout proofs, get top tips, and receive automatic updates!
               </p>
 
               <div className="space-y-3 mb-4">
-                {/* Primary Button: Chat Group */}
-                <a
-                  href="https://t.me/Earnwise01"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={closePopup}
-                  className="w-full bg-blue-600 text-white py-3.5 px-4 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2 text-sm"
-                >
-                  <Users size={16} />
-                  Join Earnwise Chat Group
-                </a>
-
-                {/* Secondary Button: Channel Updates */}
+                {/* Primary Button: Community Channel */}
                 <a
                   href="https://t.me/earnwise0"
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={closePopup}
+                  className="w-full bg-blue-600 text-white py-3.5 px-4 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2 text-sm"
+                >
+                  <Send size={16} />
+                  Join Earnwise Telegram Community
+                </a>
+
+                {/* Secondary Button: Chat Group */}
+                <a
+                  href="https://t.me/Earnwise01"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={closePopup}
                   className="w-full bg-slate-100 text-slate-700 py-3.5 px-4 rounded-xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 text-sm border border-slate-200"
                 >
-                  <Bell size={16} className="text-slate-500" />
-                  Subscribe to Announcement Channel
+                  <Users size={16} className="text-slate-500" />
+                  Join Earnwise Chat Group
                 </a>
               </div>
 

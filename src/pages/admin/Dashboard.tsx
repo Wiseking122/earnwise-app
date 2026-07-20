@@ -26,7 +26,8 @@ import {
   BookOpen,
   ShieldCheck,
   Coins,
-  ShieldAlert
+  ShieldAlert,
+  Mail
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { sendNotification, NotificationType } from '../../lib/notifications';
@@ -190,9 +191,11 @@ export default function AdminDashboard() {
     { label: 'User Directory', icon: Users, path: '/admin/users', count: stats.users, color: 'purple' },
     { label: 'Offer Proof Review', icon: ShieldCheck, path: '/admin/proof-review', count: stats.pendingOffers, color: 'blue' },
     { label: 'Wise Coin Manager', icon: Coins, path: '/admin/wise-coin', count: 0, color: 'blue' },
+    { label: 'Gmail & Push Dispatcher', icon: Mail, path: '/admin/notifications', count: 0, color: 'green' },
+    { label: 'App Announcements', icon: Megaphone, path: '/admin/announcements', count: 0, color: 'indigo' },
+    { label: 'Appeals Manager', icon: ShieldAlert, path: '/admin/appeals', count: stats.pendingAppeals, color: 'purple' },
     { label: 'Course Gallery', icon: BookOpen, path: '/admin/courses', count: 12, color: 'blue' },
     { label: 'Ad Management', icon: Megaphone, path: '/admin/ads', count: 0, color: 'indigo' },
-    { label: 'Appeals Manager', icon: ShieldAlert, path: '/admin/appeals', count: stats.pendingAppeals, color: 'purple' },
   ], [stats]);
 
   return (

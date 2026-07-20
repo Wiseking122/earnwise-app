@@ -50,6 +50,7 @@ import { AnnouncementEngine, ScrollingBanner } from '../components/AnnouncementE
 import { ACHIEVEMENTS } from '../data/achievements';
 import Confetti from '../components/Confetti';
 import PayoutTicker from '../components/PayoutTicker';
+import { requestNotificationPermission } from '../lib/notifications';
 
 export default function Home() {
   const { user, profile } = useAuth();
@@ -80,6 +81,17 @@ export default function Home() {
       }
     });
     return () => unsub();
+  }, [profile?.uid]);
+
+  useEffect(() => {
+    if (profile?.uid) {
+      const timer = setTimeout(() => {
+        requestNotificationPermission(profile.uid).catch(err => {
+          console.warn('[FCM] Silent auto-registration status:', err);
+        });
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
   }, [profile?.uid]);
 
   useEffect(() => {

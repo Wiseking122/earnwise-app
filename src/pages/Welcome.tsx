@@ -198,6 +198,9 @@ export default function Welcome() {
           name: userData.displayName
         }).catch(err => console.error("Failed to send welcome email", err));
         
+        // Set flag to show Telegram signup community popup on Home screen
+        localStorage.setItem('show_telegram_signup_popup', 'true');
+        
         if (isTargetAdmin && userData.role !== 'admin') {
           // Force admin role for the owner if they exist but aren't admin
           await setDoc(userDocRef, { role: 'admin' }, { merge: true });

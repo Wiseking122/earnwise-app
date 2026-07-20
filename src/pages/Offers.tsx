@@ -450,7 +450,7 @@ export default function Offers() {
                   animate={{ opacity: 1, y: 0 }}
                   key={offer.id} 
                   className={`bg-slate-900/60 backdrop-blur-sm border rounded-[2rem] overflow-hidden transition-all ${
-                    isSubmittedToday ? 'border-emerald-500/20 opacity-75' : 'border-white/5 hover:border-blue-500/30'
+                    isSubmittedToday ? 'border-amber-500/10 opacity-60' : 'border-white/5 hover:border-blue-500/30'
                   }`}
                 >
                   <div className="p-5 sm:p-6 flex flex-col sm:flex-row gap-5 items-start sm:items-center">
@@ -476,8 +476,8 @@ export default function Offers() {
                           {stripHtml(offer.title)}
                         </h3>
                         {isSubmittedToday && (
-                          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
-                            <CheckCircle size={10} /> Pending
+                          <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                            <Lock size={10} /> Locked until tomorrow
                           </span>
                         )}
                       </div>
@@ -523,6 +523,13 @@ export default function Offers() {
                           >
                             <Lock size={12} /> Unlock
                           </button>
+                        ) : isSubmittedToday ? (
+                          <button
+                            disabled
+                            className="bg-slate-800/80 text-amber-500/80 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 justify-center cursor-not-allowed border border-amber-500/10"
+                          >
+                            <Lock size={12} /> Come back tomorrow
+                          </button>
                         ) : (
                           <>
                             <a 
@@ -543,7 +550,7 @@ export default function Offers() {
                               {clickedOffers[offer.id] ? 'Continue Offer' : 'Start Offer'} <ExternalLink size={12} />
                             </a>
                             
-                            {clickedOffers[offer.id] && !isSubmittedToday && (
+                            {clickedOffers[offer.id] && (
                               <Link
                                 to={`/submit-proof?offerId=${offer.id}&title=${encodeURIComponent(offer.title)}&payout=${wcPayout}`}
                                 className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition shadow-lg shadow-amber-500/15 justify-center"

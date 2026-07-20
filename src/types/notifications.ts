@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type NotificationPriority = 'low' | 'normal' | 'high';
 export type NotificationCategory = 'system' | 'reward' | 'withdrawal' | 'promo' | 'security' | 'task';
-export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'scheduled';
+export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'scheduled' | 'draft';
 
 export interface Notification {
   id?: string;

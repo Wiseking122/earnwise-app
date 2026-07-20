@@ -683,32 +683,345 @@ async function startServer() {
     }
   }
 
+  async function getTokensForAudience(targeting: string, specificUserId?: string) {
+    if (!isDbAdminCapable) return [];
+    let userIds: string[] = [];
+    const now = Date.now();
+
+    if (targeting === 'all') {
+      const tokensSnap = await dbAdmin.collection('device_tokens').get();
+      return tokensSnap.docs.map(d => d.data().token);
+    } else if (targeting === 'specific' && specificUserId) {
+      userIds = [specificUserId];
+    } else {
+      const usersSnap = await dbAdmin.collection('users').get();
+      const targetUsers = usersSnap.docs.filter(doc => {
+        const data = doc.data();
+        if (targeting === 'premium') {
+          return data.plan && data.plan !== 'free';
+        } else if (targeting === 'free') {
+          return !data.plan || data.plan === 'free';
+        } else if (targeting === 'new') {
+          const regTime = data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : new Date(data.createdAt).getTime()) : 0;
+          return regTime >= (now - 7 * 24 * 60 * 60 * 1000);
+        } else if (targeting === 'active') {
+          const lastCheckInTime = data.lastCheckIn ? (data.lastCheckIn.toMillis ? data.lastCheckIn.toMillis() : new Date(data.lastCheckIn).getTime()) : 0;
+          const updatedAtTime = data.updatedAt ? (data.updatedAt.toMillis ? data.updatedAt.toMillis() : new Date(data.updatedAt).getTime()) : 0;
+          const maxActivityTime = Math.max(lastCheckInTime, updatedAtTime);
+          return maxActivityTime >= (now - 14 * 24 * 60 * 60 * 1000);
+        } else if (targeting === 'inactive') {
+          const lastCheckInTime = data.lastCheckIn ? (data.lastCheckIn.toMillis ? data.lastCheckIn.toMillis() : new Date(data.lastCheckIn).getTime()) : 0;
+          const updatedAtTime = data.updatedAt ? (data.updatedAt.toMillis ? data.updatedAt.toMillis() : new Date(data.updatedAt).getTime()) : 0;
+          const maxActivityTime = Math.max(lastCheckInTime, updatedAtTime);
+          return maxActivityTime < (now - 14 * 24 * 60 * 60 * 1000);
+        } else if (targeting === 'with_wisecoins') {
+          return data.wiseCoins && Number(data.wiseCoins) > 0;
+        } else if (targeting === 'active_referrals') {
+          return data.totalReferrals && Number(data.totalReferrals) > 0;
+        }
+        return false;
+      });
+      userIds = targetUsers.map(u => u.id);
+    }
+
+    if (targeting === 'pending_withdrawals') {
+      const pendingWithdrawalsSnap = await dbAdmin.collection('transactions')
+        .where('type', '==', 'withdrawal')
+        .where('status', '==', 'pending')
+        .get();
+      const pendingUserIds = new Set<string>();
+      pendingWithdrawalsSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.userId) pendingUserIds.add(data.userId);
+      });
+      userIds = Array.from(pendingUserIds);
+    }
+
+    if (userIds.length === 0) return [];
+
+    const tokens: string[] = [];
+    for (let i = 0; i < userIds.length; i += 30) {
+      const chunk = userIds.slice(i, i + 30);
+      const tokensSnap = await dbAdmin.collection('device_tokens').where('userId', 'in', chunk).get();
+      tokens.push(...tokensSnap.docs.map(d => d.data().token));
+    }
+    return tokens;
+  }
+
+  async function createInAppNotificationsForAudience(
+    targeting: string, 
+    specificUserId: string | undefined, 
+    title: string, 
+    message: string, 
+    buttonText?: string, 
+    buttonUrl?: string, 
+    category?: string
+  ) {
+    if (!isDbAdminCapable) return;
+    let userIds: string[] = [];
+    const now = Date.now();
+
+    if (targeting === 'all') {
+      await dbAdmin.collection('notifications').add({
+        title,
+        message,
+        userId: 'all',
+        type: category || 'system',
+        buttonText: buttonText || null,
+        buttonUrl: buttonUrl || null,
+        readBy: [],
+        status: 'sent',
+        priority: 'normal',
+        category: category || 'system',
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return;
+    }
+
+    if (targeting === 'specific' && specificUserId) {
+      userIds = [specificUserId];
+    } else {
+      const usersSnap = await dbAdmin.collection('users').get();
+      const targetUsers = usersSnap.docs.filter(doc => {
+        const data = doc.data();
+        if (targeting === 'premium') {
+          return data.plan && data.plan !== 'free';
+        } else if (targeting === 'free') {
+          return !data.plan || data.plan === 'free';
+        } else if (targeting === 'new') {
+          const regTime = data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : new Date(data.createdAt).getTime()) : 0;
+          return regTime >= (now - 7 * 24 * 60 * 60 * 1000);
+        } else if (targeting === 'active') {
+          const lastCheckInTime = data.lastCheckIn ? (data.lastCheckIn.toMillis ? data.lastCheckIn.toMillis() : new Date(data.lastCheckIn).getTime()) : 0;
+          const updatedAtTime = data.updatedAt ? (data.updatedAt.toMillis ? data.updatedAt.toMillis() : new Date(data.updatedAt).getTime()) : 0;
+          const maxActivityTime = Math.max(lastCheckInTime, updatedAtTime);
+          return maxActivityTime >= (now - 14 * 24 * 60 * 60 * 1000);
+        } else if (targeting === 'inactive') {
+          const lastCheckInTime = data.lastCheckIn ? (data.lastCheckIn.toMillis ? data.lastCheckIn.toMillis() : new Date(data.lastCheckIn).getTime()) : 0;
+          const updatedAtTime = data.updatedAt ? (data.updatedAt.toMillis ? data.updatedAt.toMillis() : new Date(data.updatedAt).getTime()) : 0;
+          const maxActivityTime = Math.max(lastCheckInTime, updatedAtTime);
+          return maxActivityTime < (now - 14 * 24 * 60 * 60 * 1000);
+        } else if (targeting === 'with_wisecoins') {
+          return data.wiseCoins && Number(data.wiseCoins) > 0;
+        } else if (targeting === 'active_referrals') {
+          return data.totalReferrals && Number(data.totalReferrals) > 0;
+        }
+        return false;
+      });
+      userIds = targetUsers.map(u => u.id);
+    }
+
+    if (targeting === 'pending_withdrawals') {
+      const pendingWithdrawalsSnap = await dbAdmin.collection('transactions')
+        .where('type', '==', 'withdrawal')
+        .where('status', '==', 'pending')
+        .get();
+      const pendingUserIds = new Set<string>();
+      pendingWithdrawalsSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.userId) pendingUserIds.add(data.userId);
+      });
+      userIds = Array.from(pendingUserIds);
+    }
+
+    for (let i = 0; i < userIds.length; i += 500) {
+      const chunk = userIds.slice(i, i + 500);
+      const batch = dbAdmin.batch();
+      for (const uid of chunk) {
+        const notifRef = dbAdmin.collection('notifications').doc();
+        batch.set(notifRef, {
+          title,
+          message,
+          userId: uid,
+          type: category || 'direct',
+          buttonText: buttonText || null,
+          buttonUrl: buttonUrl || null,
+          status: 'sent',
+          priority: 'normal',
+          category: category || 'system',
+          isRead: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      await batch.commit();
+    }
+  }
+
+  async function sendPushNotificationToTokens(
+    tokens: string[], 
+    title: string, 
+    body: string, 
+    options: { image?: string; buttonText?: string; buttonUrl?: string; category?: string } = {}
+  ) {
+    if (tokens.length === 0) return { success: 0, failure: 0 };
+    
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (let i = 0; i < tokens.length; i += 500) {
+      const batchTokens = tokens.slice(i, i + 500);
+      const payload: any = {
+        notification: { title, body },
+        tokens: batchTokens
+      };
+
+      payload.data = {
+        click_action: options.buttonUrl || '/',
+        buttonText: options.buttonText || '',
+        buttonUrl: options.buttonUrl || '',
+        category: options.category || 'system'
+      };
+
+      if (options.image) {
+        payload.notification.image = options.image;
+        payload.data.image = options.image;
+      }
+
+      try {
+        // @ts-ignore
+        const response = await admin.messaging(firebaseApp).sendEachForMulticast(payload);
+        successCount += response.successCount;
+        failureCount += response.failureCount;
+
+        if (response.failureCount > 0) {
+          const tokensToDelete: string[] = [];
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              const errCode = resp.error?.code;
+              if (errCode === 'messaging/invalid-registration-token' || 
+                  errCode === 'messaging/registration-token-not-registered' || 
+                  errCode === 'messaging/invalid-argument') {
+                tokensToDelete.push(batchTokens[idx]);
+              }
+            }
+          });
+
+          if (tokensToDelete.length > 0) {
+            for (const tok of tokensToDelete) {
+              await dbAdmin.collection('device_tokens').doc(tok).delete().catch(e => console.error("Error deleting invalid token:", e));
+            }
+            console.log(`[FCM] Automatically cleaned up ${tokensToDelete.length} invalid tokens.`);
+          }
+        }
+      } catch (err) {
+        console.error("[FCM] Error sending multicast batch:", err);
+      }
+    }
+
+    return { success: successCount, failure: failureCount };
+  }
+
   async function broadcastPushNotification(title: string, body: string, data = {}) {
     if (!isDbAdminCapable) return;
     try {
-      const usersSnap = await dbAdmin.collection('users').where('pushEnabled', '==', true).get();
-      const allTokens: string[] = [];
-      usersSnap.forEach(doc => {
-        const tokens = doc.data().fcmTokens || [];
-        allTokens.push(...tokens);
-      });
+      const tokensSnap = await dbAdmin.collection('device_tokens').get();
+      const allTokens = tokensSnap.docs.map(d => d.data().token);
       if (allTokens.length === 0) return;
 
-      // FCM sendEachForMulticast limit is 500 tokens per call
-      for (let i = 0; i < allTokens.length; i += 500) {
-        const batch = allTokens.slice(i, i + 500);
-        const message = {
-          notification: { title, body },
-          data,
-          tokens: batch
-        };
-        await admin.messaging(firebaseApp).sendEachForMulticast(message);
-      }
-      console.log(`[FCM] Broadcasted to ${allTokens.length} tokens`);
+      const stats = await sendPushNotificationToTokens(allTokens, title, body, {
+        category: 'system'
+      });
+      console.log(`[FCM] Broadcasted to ${allTokens.length} tokens. Success: ${stats.success}, Failure: ${stats.failure}`);
     } catch (err) {
       console.error("[FCM] Broadcast error:", err);
     }
   }
+
+  // Background scanner for scheduled notifications
+  setInterval(async () => {
+    if (!isDbAdminCapable) return;
+    try {
+      const now = new Date();
+      const scheduledSnap = await dbAdmin.collection('notifications')
+        .where('status', '==', 'scheduled')
+        .where('scheduledAt', '<=', admin.firestore.Timestamp.fromDate(now))
+        .get();
+
+      if (scheduledSnap.empty) return;
+
+      console.log(`[Scheduler] Found ${scheduledSnap.size} scheduled notifications to process.`);
+
+      for (const doc of scheduledSnap.docs) {
+        const data = doc.data();
+        const docId = doc.id;
+
+        // Mark as sent immediately to avoid double processing
+        await doc.ref.update({ status: 'sent', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+        console.log(`[Scheduler] Processing scheduled notification: ${docId} - "${data.title}"`);
+
+        // Fetch tokens
+        const tokens = await getTokensForAudience(data.userId, data.specificUserId || undefined);
+        
+        let success = 0;
+        let failure = 0;
+
+        if (tokens.length > 0) {
+          const stats = await sendPushNotificationToTokens(tokens, data.title, data.message, {
+            image: data.image || undefined,
+            buttonText: data.buttonText || undefined,
+            buttonUrl: data.buttonUrl || undefined,
+            category: data.category || undefined
+          });
+          success = stats.success;
+          failure = stats.failure;
+        }
+
+        // Create in-app notifications
+        await createInAppNotificationsForAudience(
+          data.userId, 
+          data.specificUserId || undefined, 
+          data.title, 
+          data.message, 
+          data.buttonText || undefined, 
+          data.buttonUrl || undefined, 
+          data.category || undefined
+        );
+
+        // Update notification document with stats
+        await doc.ref.update({
+          status: 'sent',
+          successCount: success,
+          failureCount: failure,
+          sentAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // If repeat is set, schedule the next iteration!
+        if (data.repeat && data.repeat !== 'none') {
+          let nextDate = new Date();
+          const currentScheduled = data.scheduledAt ? (data.scheduledAt.toDate ? data.scheduledAt.toDate() : new Date(data.scheduledAt)) : new Date();
+          
+          if (data.repeat === 'daily') {
+            nextDate = new Date(currentScheduled.getTime() + 24 * 60 * 60 * 1000);
+          } else if (data.repeat === 'weekly') {
+            nextDate = new Date(currentScheduled.getTime() + 7 * 24 * 60 * 60 * 1000);
+          }
+
+          await dbAdmin.collection('notifications').add({
+            title: data.title,
+            message: data.message,
+            userId: data.userId,
+            specificUserId: data.specificUserId || null,
+            category: data.category || 'system',
+            priority: data.priority || 'normal',
+            buttonText: data.buttonText || null,
+            buttonUrl: data.buttonUrl || null,
+            image: data.image || null,
+            repeat: data.repeat,
+            status: 'scheduled',
+            scheduledAt: admin.firestore.Timestamp.fromDate(nextDate),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            successCount: 0,
+            failureCount: 0
+          });
+          
+          console.log(`[Scheduler] Scheduled next iteration for repeat at: ${nextDate.toISOString()}`);
+        }
+      }
+    } catch (err) {
+      console.error("[Scheduler] Error in scheduled notification scanner:", err);
+    }
+  }, 30 * 1000);
 
   // --- Telegram Bot Setup ---
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -2034,7 +2347,8 @@ async function startServer() {
 
   app.get("/api/config/public", (req, res) => {
     res.json({
-      paystackPublicKey: process.env.VITE_PAYSTACK_PUBLIC_KEY || ''
+      paystackPublicKey: process.env.VITE_PAYSTACK_PUBLIC_KEY || '',
+      cpxAppId: process.env.CPX_APP_ID || ''
     });
   });
 
@@ -3513,7 +3827,22 @@ GENERAL RULES:
   });
 
   app.post("/api/notifications/send", async (req, res) => {
-    const { adminId, title, message, targeting, userId } = req.body;
+    const { 
+      adminId, 
+      title, 
+      message, 
+      targeting, 
+      userId, 
+      category = 'system', 
+      priority = 'normal',
+      buttonText = '',
+      buttonUrl = '',
+      image = '',
+      status = 'sent',
+      scheduledAt = null,
+      repeat = 'none'
+    } = req.body;
+
     if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
 
     try {
@@ -3522,108 +3851,156 @@ GENERAL RULES:
         return res.status(403).json({ error: "Unauthorized" });
       }
 
-      if (targeting === 'all') {
-        // Create in-app notification for 'all'
-        await dbAdmin.collection('notifications').add({
-          title,
-          message,
-          userId: 'all',
-          type: 'system',
-          readBy: [],
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Broadcast Push
-        await broadcastPushNotification(title, message);
-      } else if (targeting === 'specific' && userId) {
-        await dbAdmin.collection('notifications').add({
-          title,
-          message,
-          userId,
-          type: 'direct',
-          isRead: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Get target user tokens
-        const tokensSnap = await dbAdmin.collection('device_tokens').where('userId', '==', userId).get();
-        const tokens = tokensSnap.docs.map(d => d.data().token);
-        
-        if (tokens.length > 0) {
-          const payload = {
-            notification: { title, body: message },
-            tokens
-          };
-          // @ts-ignore
-          await admin.messaging(firebaseApp).sendEachForMulticast(payload);
-        }
-      } else if (targeting === 'premium' || targeting === 'free' || targeting === 'new') {
-        // Fetch all users to filter by segment
-        const usersSnap = await dbAdmin.collection('users').get();
-        const now = Date.now();
-        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-
-        const targetUsers = usersSnap.docs.filter(doc => {
-          const data = doc.data();
-          if (targeting === 'premium') {
-            return data.plan && data.plan !== 'free';
-          } else if (targeting === 'free') {
-            return !data.plan || data.plan === 'free';
-          } else if (targeting === 'new') {
-            const regTime = data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : new Date(data.createdAt).getTime()) : 0;
-            return regTime >= sevenDaysAgo;
-          }
-          return false;
-        });
-
-        const userIds = targetUsers.map(u => u.id);
-        const tokens: string[] = [];
-
-        if (userIds.length > 0) {
-          // Query device_tokens in chunks of 30 because of Firestore 'in' limitation
-          for (let i = 0; i < userIds.length; i += 30) {
-            const chunk = userIds.slice(i, i + 30);
-            const tokensSnap = await dbAdmin.collection('device_tokens').where('userId', 'in', chunk).get();
-            tokens.push(...tokensSnap.docs.map(d => d.data().token));
-          }
-
-          // Create in-app notifications in batches of 500
-          for (let i = 0; i < userIds.length; i += 500) {
-            const chunk = userIds.slice(i, i + 500);
-            const batch = dbAdmin.batch();
-            for (const uid of chunk) {
-              const notifRef = dbAdmin.collection('notifications').doc();
-              batch.set(notifRef, {
-                title,
-                message,
-                userId: uid,
-                type: 'direct',
-                read: false,
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-              });
-            }
-            await batch.commit();
-          }
-        }
-
-        if (tokens.length > 0) {
-          // FCM multicast limit is 500 tokens per call
-          for (let i = 0; i < tokens.length; i += 500) {
-            const batchTokens = tokens.slice(i, i + 500);
-            const payload = {
-              notification: { title, body: message },
-              tokens: batchTokens
-            };
-            // @ts-ignore
-            await admin.messaging(firebaseApp).sendEachForMulticast(payload);
-          }
-        }
+      if (!title || !message || !targeting) {
+        return res.status(400).json({ error: "Title, message, and targeting are required." });
       }
 
-      res.json({ status: "success" });
-    } catch (err) {
+      // 1. Prepare base notification object
+      const notifData: any = {
+        title,
+        message,
+        userId: targeting === 'specific' ? userId : targeting,
+        specificUserId: targeting === 'specific' ? userId : null,
+        category,
+        priority,
+        buttonText: buttonText || null,
+        buttonUrl: buttonUrl || null,
+        image: image || null,
+        repeat,
+        status,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        successCount: 0,
+        failureCount: 0
+      };
+
+      if (status === 'draft') {
+        // Just save draft
+        const docRef = await dbAdmin.collection('notifications').add(notifData);
+        return res.json({ status: "success", id: docRef.id, message: "Draft saved successfully" });
+      }
+
+      if (status === 'scheduled' && scheduledAt) {
+        // Save scheduled notification
+        notifData.scheduledAt = admin.firestore.Timestamp.fromDate(new Date(scheduledAt));
+        const docRef = await dbAdmin.collection('notifications').add(notifData);
+        return res.json({ status: "success", id: docRef.id, message: "Notification scheduled successfully" });
+      }
+
+      // Immediate Send logic
+      notifData.status = 'sent';
+      const docRef = await dbAdmin.collection('notifications').add(notifData);
+
+      // Fetch tokens based on targeting
+      const tokens = await getTokensForAudience(targeting, userId);
+      let success = 0;
+      let failure = 0;
+
+      if (tokens.length > 0) {
+        const stats = await sendPushNotificationToTokens(tokens, title, message, {
+          image: image || undefined,
+          buttonText: buttonText || undefined,
+          buttonUrl: buttonUrl || undefined,
+          category: category || undefined
+        });
+        success = stats.success;
+        failure = stats.failure;
+      }
+
+      // Create in-app records for target audience
+      await createInAppNotificationsForAudience(targeting, userId, title, message, buttonText, buttonUrl, category);
+
+      // Update stats on main notification object
+      await docRef.update({
+        successCount: success,
+        failureCount: failure,
+        sentAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return res.json({ 
+        status: "success", 
+        id: docRef.id, 
+        successCount: success, 
+        failureCount: failure, 
+        message: `Notification processed immediately. Sent to ${success} devices, ${failure} failed.` 
+      });
+
+    } catch (err: any) {
       console.error("Notification send error:", err);
-      res.status(500).json({ error: "Failed to send notification" });
+      res.status(500).json({ error: err.message || "Failed to process notification" });
+    }
+  });
+
+  app.post("/api/notifications/delete", async (req, res) => {
+    const { adminId, notificationId } = req.body;
+    if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
+
+    try {
+      const adminDoc = await dbAdmin.collection('users').doc(adminId).get();
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email?.toLowerCase() !== 'wiseking7890@gmail.com')) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await dbAdmin.collection('notifications').doc(notificationId).delete();
+      res.json({ status: "success", message: "Notification deleted successfully" });
+    } catch (err: any) {
+      console.error("Notification delete error:", err);
+      res.status(500).json({ error: err.message || "Failed to delete notification" });
+    }
+  });
+
+  app.post("/api/notifications/update", async (req, res) => {
+    const { 
+      adminId, 
+      notificationId,
+      title, 
+      message, 
+      targeting, 
+      userId, 
+      category, 
+      priority,
+      buttonText,
+      buttonUrl,
+      image,
+      status,
+      scheduledAt,
+      repeat
+    } = req.body;
+
+    if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
+
+    try {
+      const adminDoc = await dbAdmin.collection('users').doc(adminId).get();
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email?.toLowerCase() !== 'wiseking7890@gmail.com')) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const notifRef = dbAdmin.collection('notifications').doc(notificationId);
+      const updates: any = {};
+
+      if (title !== undefined) updates.title = title;
+      if (message !== undefined) updates.message = message;
+      if (targeting !== undefined) {
+        updates.userId = targeting === 'specific' ? userId : targeting;
+        updates.specificUserId = targeting === 'specific' ? userId : null;
+      }
+      if (category !== undefined) updates.category = category;
+      if (priority !== undefined) updates.priority = priority;
+      if (buttonText !== undefined) updates.buttonText = buttonText || null;
+      if (buttonUrl !== undefined) updates.buttonUrl = buttonUrl || null;
+      if (image !== undefined) updates.image = image || null;
+      if (repeat !== undefined) updates.repeat = repeat;
+      if (status !== undefined) updates.status = status;
+      if (scheduledAt !== undefined) {
+        updates.scheduledAt = scheduledAt ? admin.firestore.Timestamp.fromDate(new Date(scheduledAt)) : null;
+      }
+
+      updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+      await notifRef.update(updates);
+      res.json({ status: "success", message: "Notification updated successfully" });
+    } catch (err: any) {
+      console.error("Notification update error:", err);
+      res.status(500).json({ error: err.message || "Failed to update notification" });
     }
   });
 
@@ -4451,6 +4828,10 @@ GENERAL RULES:
       let websiteName = 'Earnwise';
       let supportEmail = 'support@earnwise.com';
       
+      let customWelcomeEnabled = true;
+      let customWelcomeSubject = '';
+      let customWelcomeBody = '';
+
       if (isDbAdminCapable) {
         try {
           const settingsSnap = await dbAdmin.collection('settings').doc('system').get();
@@ -4459,6 +4840,17 @@ GENERAL RULES:
             websiteName = data?.websiteName || websiteName;
             supportEmail = data?.supportEmail || supportEmail;
           }
+
+          // Fetch automated templates settings
+          const templateSnap = await dbAdmin.collection('settings').doc('email_templates').get();
+          if (templateSnap.exists) {
+            const templates = templateSnap.data();
+            if (templates?.welcome) {
+              customWelcomeEnabled = templates.welcome.enabled !== false;
+              customWelcomeSubject = templates.welcome.subject || '';
+              customWelcomeBody = templates.welcome.body || '';
+            }
+          }
         } catch (e) {
           console.warn("[AUTH] Failed to fetch settings for email, using defaults.");
         }
@@ -4466,15 +4858,29 @@ GENERAL RULES:
 
       let emailSent = false;
       
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      if (!customWelcomeEnabled) {
+        console.log(`[AUTH] Welcome email is disabled by admin setting. Skipping welcome email dispatch for ${email}.`);
+      } else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
         try {
-          await transporter.sendMail({
-            from: `"${websiteName} Support" <${process.env.EMAIL_USER}>`,
-            to: email,
-            replyTo: supportEmail,
-            subject: `Welcome to ${websiteName}, ${name || ''}!`,
-            text: `Welcome to ${websiteName}! You're now part of Nigeria's #1 digital wealth platform. Complete high-paying tasks, withdraw real cash, and earn referral commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://earnwise1.vercel.app'}`,
-            html: `
+          const rawSubject = customWelcomeSubject || `Welcome to ${websiteName}, {name}!`;
+          const finalSubject = rawSubject.replace(/{name}/g, name || 'Earner');
+          
+          let emailHtml = '';
+          if (customWelcomeBody) {
+            emailHtml = customWelcomeBody.replace(/{name}/g, name || 'Earner');
+            // If it doesn't look like HTML, auto-wrap it in simple layout with newlines converted
+            if (!emailHtml.includes('<div') && !emailHtml.includes('<p') && !emailHtml.includes('<html')) {
+              emailHtml = `
+                <div style="font-family: 'Inter', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f1f5f9; border-radius: 24px; background-color: #ffffff; color: #1e293b; line-height: 1.7;">
+                  <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">${websiteName} Broadcast</h2>
+                  <p style="font-size: 15px; color: #475569;">
+                    ${emailHtml.replace(/\n/g, '<br/>')}
+                  </p>
+                </div>
+              `;
+            }
+          } else {
+            emailHtml = `
               <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
                 <div style="background-color: #2563eb; padding: 40px 20px; text-align: center;">
                   <img src="cid:earnwise_logo" alt="${websiteName} Logo" style="max-width: 80px; margin-bottom: 20px; filter: brightness(0) invert(1);" />
@@ -4521,7 +4927,16 @@ GENERAL RULES:
                   </p>
                 </div>
               </div>
-            `,
+            `;
+          }
+
+          await transporter.sendMail({
+            from: `"${websiteName} Support" <${process.env.EMAIL_USER}>`,
+            to: email,
+            replyTo: supportEmail,
+            subject: finalSubject,
+            text: `Welcome to ${websiteName}! You're now part of Nigeria's #1 digital wealth platform. Complete high-paying tasks, withdraw real cash, and earn referral commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://earnwise1.vercel.app'}`,
+            html: emailHtml,
             attachments: (() => {
               const logoPath = path.join(process.cwd(), 'public/logo.png');
               const iconPath = path.join(process.cwd(), 'public/icon.png');
@@ -4786,6 +5201,182 @@ GENERAL RULES:
     } catch (error: any) {
       console.error("[AUTH] Error in send-daily-encouragement:", error);
       res.status(500).json({ error: "Failed to send daily encouragement email" });
+    }
+  });
+
+  // Get automated templates settings
+  app.get("/api/admin/email-templates", async (req, res) => {
+    try {
+      if (!isDbAdminCapable) {
+        return res.json({ welcome: { enabled: true, subject: "Welcome to Earnwise!", body: "" } });
+      }
+      const templateDoc = await dbAdmin.collection('settings').doc('email_templates').get();
+      if (templateDoc.exists) {
+        return res.json(templateDoc.data());
+      }
+      return res.json({ welcome: { enabled: true, subject: "Welcome to Earnwise!", body: "" } });
+    } catch (err: any) {
+      console.error("[EMAIL] Error reading email templates:", err);
+      res.status(500).json({ error: "Failed to read email templates" });
+    }
+  });
+
+  // Save automated templates settings
+  app.post("/api/admin/email-templates", async (req, res) => {
+    try {
+      if (!isDbAdminCapable) {
+        return res.status(403).json({ error: "Firestore Admin SDK is not initialized." });
+      }
+      const { welcome } = req.body;
+      await dbAdmin.collection('settings').doc('email_templates').set({
+        welcome: {
+          enabled: welcome?.enabled !== false,
+          subject: welcome?.subject || "Welcome to Earnwise!",
+          body: welcome?.body || ""
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      
+      res.json({ status: "success", message: "Templates updated successfully" });
+    } catch (err: any) {
+      console.error("[EMAIL] Error saving email templates:", err);
+      res.status(500).json({ error: "Failed to save templates" });
+    }
+  });
+
+  // Get manual email logs
+  app.get("/api/admin/email-logs", async (req, res) => {
+    try {
+      if (!isDbAdminCapable) {
+        return res.json({ logs: [] });
+      }
+      const logsSnap = await dbAdmin.collection('email_logs')
+        .orderBy('sentAt', 'desc')
+        .limit(100)
+        .get();
+      const logs = logsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        sentAt: doc.data().sentAt ? (doc.data().sentAt.toDate ? doc.data().sentAt.toDate() : doc.data().sentAt) : new Date()
+      }));
+      res.json({ logs });
+    } catch (err: any) {
+      console.error("[EMAIL] Error reading email logs:", err);
+      res.status(500).json({ error: "Failed to read email logs" });
+    }
+  });
+
+  // Send custom manual email based on targeting criteria
+  app.post("/api/admin/send-custom-email", async (req, res) => {
+    const { subject, body, targeting, specificEmail } = req.body;
+    if (!subject || !body) {
+      return res.status(400).json({ error: "Subject and body are required." });
+    }
+
+    try {
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(500).json({ error: "SMTP credentials are not configured in environment variables." });
+      }
+
+      if (!isDbAdminCapable) {
+        return res.status(500).json({ error: "Firestore Admin is not available." });
+      }
+
+      // Determine recipients
+      let recipients: string[] = [];
+
+      if (targeting === 'specific') {
+        if (!specificEmail) return res.status(400).json({ error: "Specific email address is required" });
+        recipients = [specificEmail.trim()];
+      } else if (targeting === 'premium') {
+        const snap = await dbAdmin.collection('users').where('plan', '!=', 'free').get();
+        recipients = snap.docs.map(d => d.data().email).filter(Boolean);
+      } else if (targeting === 'free') {
+        const snap = await dbAdmin.collection('users').where('plan', '==', 'free').get();
+        recipients = snap.docs.map(d => d.data().email).filter(Boolean);
+      } else if (targeting === 'with_wisecoins') {
+        const snap = await dbAdmin.collection('users').where('balance', '>', 100).get();
+        recipients = snap.docs.map(d => d.data().email).filter(Boolean);
+      } else {
+        const snap = await dbAdmin.collection('users').get();
+        recipients = snap.docs.map(d => d.data().email).filter(Boolean);
+      }
+
+      if (recipients.length === 0) {
+        return res.status(404).json({ error: "No matching target users found with valid email addresses." });
+      }
+
+      console.log(`[EMAIL] Dispatching manual email to ${recipients.length} target recipients:`, recipients);
+
+      let websiteName = 'Earnwise';
+      let supportEmail = 'support@earnwise.com';
+      try {
+        const settingsSnap = await dbAdmin.collection('settings').doc('system').get();
+        if (settingsSnap.exists) {
+          const data = settingsSnap.data();
+          websiteName = data?.websiteName || websiteName;
+          supportEmail = data?.supportEmail || supportEmail;
+        }
+      } catch (e) {
+        console.warn("[EMAIL] Failed to fetch settings, using default branding.");
+      }
+
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const email of recipients) {
+        try {
+          await transporter.sendMail({
+            from: `"${websiteName} Info" <${process.env.EMAIL_USER}>`,
+            to: email,
+            replyTo: supportEmail,
+            subject: subject,
+            html: `
+              <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
+                <div style="background-color: #1e293b; padding: 30px 20px; text-align: center;">
+                  <h1 style="color: #ffffff; font-size: 24px; font-weight: 900; margin: 0; letter-spacing: -0.01em;">${websiteName} Broadcast</h1>
+                </div>
+                <div style="padding: 40px 30px; font-size: 15px; color: #334155; line-height: 1.7;">
+                  ${body.replace(/\n/g, '<br/>')}
+                  
+                  <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #f1f5f9;">
+                    <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
+                      You are receiving this system broadcast as an active partner of ${websiteName}.<br/>
+                      Need assistance? Contact our support desk at ${supportEmail}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            `
+          });
+          successCount++;
+        } catch (err: any) {
+          console.error(`[EMAIL] Failed to send to ${email}:`, err.message);
+          failureCount++;
+        }
+      }
+
+      await dbAdmin.collection('email_logs').add({
+        subject,
+        body,
+        targeting,
+        recipientCount: recipients.length,
+        recipients,
+        successCount,
+        failureCount,
+        sentAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({
+        status: "success",
+        message: `Successfully dispatched email to ${successCount} users. ${failureCount > 0 ? `Failed for ${failureCount} users.` : ""}`,
+        recipientCount: recipients.length,
+        successCount,
+        failureCount
+      });
+    } catch (error: any) {
+      console.error("[EMAIL] Global error in send-custom-email route:", error);
+      res.status(500).json({ error: "Failed to dispatch broadcast emails." });
     }
   });
 
