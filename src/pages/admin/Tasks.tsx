@@ -272,7 +272,7 @@ export default function AdminTasks() {
       let referrerId: string | null = null;
       let referrerRef: any = null;
 
-      if (status === 'approved' && uData.referredBy && !uData.hasReceivedReferralBonus) {
+      if (status === 'approved' && uData.referredBy && !(uData.hasReceivedTaskReferralBonus || uData.hasReceivedReferralBonus)) {
         const referrerQuery = query(collection(db, 'users'), where('referralCode', '==', uData.referredBy), limit(1));
         const referrerDocs = await getDocs(referrerQuery);
         if (!referrerDocs.empty) {
@@ -393,7 +393,10 @@ export default function AdminTasks() {
               referralBalance: increment(referralBonus),
               referralEarnings: increment(referralBonus)
             });
-            transaction.update(userRef, { hasReceivedReferralBonus: true });
+            transaction.update(userRef, {
+              hasReceivedTaskReferralBonus: true,
+              hasReceivedReferralBonus: true
+            });
 
             const refTransRef = doc(collection(db, 'transactions'));
             transaction.set(refTransRef, {

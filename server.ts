@@ -112,11 +112,15 @@ try {
 
 // Check database capability of the Admin SDK
 let isDbAdminCapable = false;
+let dbAdminError: Error | null = null;
+let dbCapabilityPromise: Promise<void> | null = null;
+
 async function checkDbAdminCapability() {
   try {
     // Attempt a read on the 'users' collection with the email filter (less likely to fail than a non-existent probe collection if IAM is partial)
     await dbAdmin.collection('users').limit(1).get();
     isDbAdminCapable = true;
+    dbAdminError = null;
     console.log("[FIREBASE] Server Admin SDK successfully authenticated and capable.");
     
     // Once capable, run the owner promotion check
@@ -124,18 +128,24 @@ async function checkDbAdminCapability() {
     await autoSeedTasks();
   } catch (err: any) {
     isDbAdminCapable = false;
+    dbAdminError = err;
+    console.error("[FIREBASE] Primary database capability check failed:", err.message || err);
     
     if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)') {
        try {
+         console.log("[FIREBASE] Attempting fallback to '(default)' database...");
          const fallbackDb = getFirestore(firebaseApp, '(default)');
          await fallbackDb.collection('users').limit(1).get();
          dbAdmin = fallbackDb;
          isDbAdminCapable = true;
+         dbAdminError = null;
          console.log("[FIREBASE] Fallback to (default) database succeeded.");
          await ensureOwnerAdminStatus();
          await autoSeedTasks();
-       } catch (innerErr) {
+       } catch (innerErr: any) {
          isDbAdminCapable = false;
+         dbAdminError = innerErr;
+         console.error("[FIREBASE] Fallback to '(default)' database also failed:", innerErr.message || innerErr);
        }
     }
     
@@ -144,7 +154,7 @@ async function checkDbAdminCapability() {
     }
   }
 }
-checkDbAdminCapability();
+dbCapabilityPromise = checkDbAdminCapability();
 
 // --- PLATFORM SETTINGS CACHE (QUOTA OPTIMIZATION) ---
 let cachedSystemSettings: any = null;
@@ -367,6 +377,18 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error("[NODEMAILER] SMTP connection configuration verification failed:", error.message || error);
+    } else {
+      console.log("[NODEMAILER] SMTP connection successfully verified and ready to send emails.");
+    }
+  });
+} else {
+  console.log("[NODEMAILER] SMTP credentials (EMAIL_USER/EMAIL_PASS) are not configured.");
+}
+
 const PORT = 3000;
 const isProd = process.env.NODE_ENV === "production";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
@@ -482,6 +504,16 @@ async function withRetry<T>(fn: (modelName: string) => Promise<T>, maxRetries = 
 }
 
 async function startServer() {
+  console.log("[SERVER] Awaiting Firebase Admin SDK database capability check...");
+  if (dbCapabilityPromise) {
+    try {
+      await dbCapabilityPromise;
+    } catch (err) {
+      console.error("[SERVER] Database capability check promise rejected:", err);
+    }
+  }
+  console.log("[SERVER] Firebase capability check complete. isDbAdminCapable:", isDbAdminCapable);
+
   const app = express();
   app.set('trust proxy', 1);
   app.use(cors({
@@ -543,7 +575,7 @@ async function startServer() {
    * @param userId The ID of the user who upgraded
    * @param planId The ID of the plan they upgraded to (to calculate 10% commission)
    */
-  async function handleReferralUpgradeBonus(userId: string, planId: string) {
+  async function handleReferralUpgradeBonus(userId: string, planId: string, reference?: string) {
     if (!isDbAdminCapable) return;
     try {
       const userRef = dbAdmin.collection('users').doc(userId);
@@ -553,8 +585,9 @@ async function startServer() {
         return;
       }
       const userData = userDoc.data();
+      const upgradeBonusKey = `hasReceivedUpgradeBonus_${planId}`;
 
-      if (userData?.referredBy && !userData.hasReceivedReferralBonus) {
+      if (userData?.referredBy && !userData[upgradeBonusKey]) {
         // Find referrer document BEFORE the transaction
         const referrerDocBrief = await findReferrerDoc(userData.referredBy);
         if (!referrerDocBrief) {
@@ -575,8 +608,8 @@ async function startServer() {
           }
 
           const currentUserData = userSnap.data()!;
-          if (currentUserData.hasReceivedReferralBonus) {
-            console.log(`[REFERRAL] Bonus already received for user ${userId}. Skipping.`);
+          if (currentUserData[upgradeBonusKey]) {
+            console.log(`[REFERRAL] Bonus already received for plan ${planId} on user ${userId}. Skipping.`);
             return;
           }
 
@@ -599,7 +632,20 @@ async function startServer() {
 
           // Set flag on referred user within the same transaction to prevent duplicate execution
           transaction.update(userRef, {
-            hasReceivedReferralBonus: true
+            [upgradeBonusKey]: true,
+            hasReceivedReferralBonus: true // keeping for backwards compatibility / fallback checks
+          });
+
+          // Create transaction record for referrer
+          const refTransRef = dbAdmin.collection('transactions').doc();
+          transaction.set(refTransRef, {
+            userId: referrerSnap.id,
+            amount: bonusAmount,
+            type: 'referral',
+            status: 'completed',
+            description: `30% Referral upgrade commission for ${currentUserData.displayName || currentUserData.username || 'Friend'}'s upgrade to ${planId.toUpperCase()}`,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            reference: reference || `REF_UPGRADE_${userId}_${planId}_${Date.now()}`
           });
 
           // Set notification for referrer
@@ -607,7 +653,7 @@ async function startServer() {
           transaction.set(notifRef, {
             userId: referrerSnap.id,
             title: '🎁 Referral Upgrade Commission!',
-            message: `Your friend upgraded to ${planId}! You have received a 30% commission of ₦${bonusAmount}.`,
+            message: `Your friend (${currentUserData.displayName || currentUserData.username || 'Someone'}) upgraded to ${planId}! You have received a 30% commission of ₦${bonusAmount}.`,
             type: 'reward',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             readBy: []
@@ -616,7 +662,7 @@ async function startServer() {
           console.log(`[REFERRAL] Successfully awarded ₦${bonusAmount} (30% of ${planId}) bonus to referrer ${referrerSnap.id} for user ${userId}`);
         });
       } else {
-        console.log(`[REFERRAL] Skip award for user ${userId}: already awarded or no referrer found.`);
+        console.log(`[REFERRAL] Skip award for user ${userId}: already awarded plan ${planId} or no referrer found.`);
       }
     } catch (err) {
       console.error("[REFERRAL] FAILED to award upgrade bonus:", err);
@@ -1217,7 +1263,6 @@ async function startServer() {
           console.warn(`[BOT] chat_join_request handler was unable to message user (it requires the user to have interacted with the bot in private before):`, err.message);
           
           const userName = ctx.chatJoinRequest.from.first_name || "New Earnwise Earner";
-          // Fallback: If messaging them privately failed, we post the welcome to the group so they can see their welcome guide and open it!
           const fallbackChatId = ctx.chat.type === 'supergroup' ? ctx.chat.id : '@Earnwise01';
           await bot.telegram.sendMessage(fallbackChatId, `🇳🇬 *Welcome to the Earnwise community, ${userName}!* 🎉\n\nI tried to send you the official Setup Guide in private, but please use the links below to start earning:\n\n📖 *YOUR QUICK START GUIDE:*\n• 1️⃣ Click *"💰 Open Earnwise App"* to register/login.\n• 2️⃣ Go to *Upgrade* inside the app to activate your multiplication tier panels (1.25x - 5.0x).\n• 3️⃣ Click *Tasks* to complete easy social earning tasks.\n• 4️⃣ Withdraw directly to your local Nigerian bank!\n\n👇 Use the active links below to start:`, {
             parse_mode: 'Markdown',
@@ -1237,9 +1282,9 @@ async function startServer() {
       const instanceId = Math.random().toString(36).substring(7);
  
       // Launch bot with a robust retry mechanism
-      async function launchBot(botInstance: Telegraf, retries = 0) {
+      async function launchBot(botInstance: Telegraf) {
         try {
-          console.log(`[BOT-${instanceId}] Attempting to launch... (Retry: ${retries})`);
+          console.log(`[BOT-${instanceId}] Attempting to launch...`);
           // Explicitly delete webhooks to avoid 409 Conflict
           await botInstance.telegram.deleteWebhook();
           
@@ -1251,14 +1296,7 @@ async function startServer() {
           console.log(`[BOT-${instanceId}] Telegram Bot is successfully running.`);
         } catch (err: any) {
           if (err.message.includes('409: Conflict')) {
-            if (retries < 15) {
-              const delay = Math.min(Math.pow(2, retries) * 5000, 60000); // Backoff up to 60s
-              console.warn(`[BOT-${instanceId}] Conflict detected (Another instance might be running). Retrying in ${delay}ms...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              return launchBot(botInstance, retries + 1);
-            } else {
-              console.error(`[BOT-${instanceId}] Failed to launch after multiple retries due to persistent 409 Conflict.`, err.message);
-            }
+            console.warn(`[BOT-${instanceId}] Conflict detected (Another instance of the Telegram bot is already active and running). Skipping bot startup to prevent duplicate instances/crash.`);
           } else {
             console.error(`[BOT-${instanceId}] Launch failed with non-conflict error:`, err.message);
           }
@@ -3843,7 +3881,18 @@ GENERAL RULES:
       repeat = 'none'
     } = req.body;
 
-    if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
+    if (!isDbAdminCapable) {
+      const details = dbAdminError ? (dbAdminError.stack || dbAdminError.message) : "Unknown Firebase Admin capability error";
+      return res.status(503).json({ 
+        error: "Service Unavailable", 
+        message: "Firestore Admin is not fully capable or authenticated.",
+        details: details,
+        firebaseConfig: {
+          projectId: firebaseConfig.projectId,
+          hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+        }
+      });
+    }
 
     try {
       const adminDoc = await dbAdmin.collection('users').doc(adminId).get();
@@ -4120,7 +4169,7 @@ GENERAL RULES:
           });
 
           // Award referral bonus if applicable
-          await handleReferralUpgradeBonus(metadata.userId, metadata.planId);
+          await handleReferralUpgradeBonus(metadata.userId, metadata.planId, reference);
         }
 
         if (metadata?.type === 'advertiser_task') {
@@ -4495,7 +4544,7 @@ GENERAL RULES:
         });
 
         // Award referral bonus and notify user outside the transaction to prevent nested transaction issues
-        await handleReferralUpgradeBonus(userId, planId);
+        await handleReferralUpgradeBonus(userId, planId, reference);
         await sendPushNotification(userId, "⚡ Upgrade Successful", `Your account has been upgraded to the ${planId} plan.`);
 
         return res.json({ status: "success", message: "Plan activated via wallet" });
@@ -4535,7 +4584,7 @@ GENERAL RULES:
         });
 
         // Award referral bonus and wait for completion
-        await handleReferralUpgradeBonus(userId, planId);
+        await handleReferralUpgradeBonus(userId, planId, reference);
 
         return res.json({ status: "success", message: `Upgraded to ${planId} successfully (Simulated)` });
       }
@@ -4612,7 +4661,7 @@ GENERAL RULES:
         });
 
         // Award referral bonus and wait for completion
-        await handleReferralUpgradeBonus(userId, planId);
+        await handleReferralUpgradeBonus(userId, planId, reference);
         await sendPushNotification(userId, "⚡ Upgrade Successful", `Your account has been upgraded to the ${planId} plan.`);
 
         console.log(`[PAYMENT] SUCCESS: User ${userId} upgraded to ${planId}`);
@@ -5279,7 +5328,15 @@ GENERAL RULES:
       }
 
       if (!isDbAdminCapable) {
-        return res.status(500).json({ error: "Firestore Admin is not available." });
+        const details = dbAdminError ? (dbAdminError.stack || dbAdminError.message) : "Unknown Firebase Admin capability error";
+        return res.status(503).json({ 
+          error: "Firestore Admin is not fully capable or authenticated.",
+          details: details,
+          firebaseConfig: {
+            projectId: firebaseConfig.projectId,
+            hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+          }
+        });
       }
 
       // Determine recipients
@@ -5376,7 +5433,11 @@ GENERAL RULES:
       });
     } catch (error: any) {
       console.error("[EMAIL] Global error in send-custom-email route:", error);
-      res.status(500).json({ error: "Failed to dispatch broadcast emails." });
+      res.status(500).json({ 
+        error: "Failed to dispatch broadcast emails.",
+        details: error.message || String(error),
+        stack: error.stack
+      });
     }
   });
 

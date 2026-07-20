@@ -72,7 +72,8 @@ export default function Upgrade() {
           });
 
           // Award referral bonus immediately in client-side fallback
-          if (profile.referredBy && !profile.hasReceivedReferralBonus) {
+          const upgradeBonusKey = `hasReceivedUpgradeBonus_${plan.id}`;
+          if (profile.referredBy && !(profile as any)[upgradeBonusKey]) {
             const bonusAmount = Math.floor(plan.cost * 0.3);
             if (bonusAmount > 0) {
               try {
@@ -97,6 +98,16 @@ export default function Upgrade() {
                     updatedAt: serverTimestamp()
                   });
 
+                  await addDoc(collection(db, 'transactions'), {
+                    userId: referrerDoc.id,
+                    amount: bonusAmount,
+                    type: 'referral',
+                    status: 'completed',
+                    description: `30% Referral upgrade commission for ${profile.displayName || profile.username || 'Friend'}'s upgrade to ${plan.id.toUpperCase()}`,
+                    createdAt: serverTimestamp(),
+                    reference: `REF_UPGRADE_${profile.uid}_${plan.id}_${Date.now()}`
+                  });
+
                   await addDoc(collection(db, 'notifications'), {
                     userId: referrerDoc.id,
                     title: '🎁 Referral Upgrade Commission!',
@@ -108,7 +119,8 @@ export default function Upgrade() {
 
                   // Update the local document to prevent duplicate bonuses
                   await updateDoc(userRef, {
-                    hasReceivedReferralBonus: true
+                    [upgradeBonusKey]: true,
+                    hasReceivedReferralBonus: true // keeping for backwards compatibility / fallback checks
                   });
                 }
               } catch (refErr) {
