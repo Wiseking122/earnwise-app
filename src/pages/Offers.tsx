@@ -117,23 +117,36 @@ export default function Offers() {
     async function fetchSubmittedOffers() {
       if (!user?.uid) return;
       try {
-        const midnight = new Date();
-        midnight.setHours(0, 0, 0, 0);
-        
         const q = query(
           collection(db, 'offer_submissions'),
-          where('userId', '==', user.uid),
-          where('submittedAt', '>=', Timestamp.fromDate(midnight))
+          where('userId', '==', user.uid)
         );
         const snap = await getDocs(q);
-        const submitted = new Set<string>();
+        const locked = new Set<string>();
+        const nowTime = Date.now();
+        
         snap.forEach(doc => {
           const data = doc.data();
-          if (data.offerId) {
-            submitted.add(String(data.offerId).trim().toLowerCase());
+          const offerId = String(data.offerId || data.offer_id || '').trim().toLowerCase();
+          if (offerId) {
+            const unlockField = data.unlockAt || data.unlock_at;
+            if (unlockField) {
+              const unlockTime = unlockField.toDate ? unlockField.toDate().getTime() : new Date(unlockField).getTime();
+              if (nowTime < unlockTime) {
+                locked.add(offerId);
+              }
+            } else if (data.completed_date) {
+              const now = new Date();
+              const watMs = now.getTime() + (1 * 60 * 60 * 1000);
+              const watDate = new Date(watMs);
+              const completedDateStr = `${watDate.getUTCFullYear()}-${String(watDate.getUTCMonth() + 1).padStart(2, '0')}-${String(watDate.getUTCDate()).padStart(2, '0')}`;
+              if (data.completed_date === completedDateStr) {
+                locked.add(offerId);
+              }
+            }
           }
         });
-        setSubmittedOfferIds(submitted);
+        setSubmittedOfferIds(locked);
       } catch (err) {
         console.error("Failed to fetch submitted offers", err);
       }
