@@ -198,7 +198,7 @@ export default function AdminAds() {
     maintenanceMessage: "🚧 Task Marketplace Upgrade Regular tasks are temporarily unavailable while we add better sponsored campaigns. Thank you for your patience!"
   });
   const [savingConfig, setSavingConfig] = useState(false);
-  const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '' });
+  const [newAd, setNewAd] = useState({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '', shareable: true });
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -424,7 +424,7 @@ export default function AdminAds() {
           console.error("Failed to broadcast new ad notification to users:", notifErr);
         }
 
-        setNewAd({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '' });
+        setNewAd({ title: '', type: 'banner', url: '', mediaUrl: '', reward: 0, instructions: '', shareable: true });
         setFile(null);
         showStatus("Ad created successfully!", 'success');
     } catch (error: any) {
@@ -569,6 +569,20 @@ export default function AdminAds() {
                 )}
             </div>
             <input type="number" placeholder="Reward (Points)" className="p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 transition" value={newAd.reward} onChange={e => setNewAd({...newAd, reward: Number(e.target.value)})} />
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl hover:bg-slate-50 cursor-pointer transition">
+                <input 
+                  type="checkbox" 
+                  checked={newAd.shareable} 
+                  onChange={e => setNewAd({...newAd, shareable: e.target.checked})}
+                  className="w-5 h-5 text-indigo-600 rounded-lg focus:ring-indigo-500"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-800 text-sm">Allow Social Sharing</span>
+                  <span className="text-xs text-slate-500">Enable users to share this image/video to WhatsApp and Facebook.</span>
+                </div>
+              </label>
+            </div>
             <textarea placeholder="Ad Instructions (Optional: Tell users what to look for, or special rules to follow before they earn rewards)" className="p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 transition md:col-span-2 h-24 resize-none" value={newAd.instructions} onChange={e => setNewAd({...newAd, instructions: e.target.value})} />
           </div>
 
@@ -597,7 +611,12 @@ export default function AdminAds() {
                     </div>
                     <div>
                       <h3 className="font-bold text-lg text-slate-900 leading-tight">{ad.title}</h3>
-                      <span className="text-[10px] font-mono text-slate-400">ID: {ad.id}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-slate-400">ID: {ad.id}</span>
+                        {ad.shareable !== false && (
+                          <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md">Shareable</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {deletingId === ad.id ? (

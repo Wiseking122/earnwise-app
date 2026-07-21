@@ -10,7 +10,9 @@ import {
   ChevronLeft,
   Image as ImageIcon,
   Video,
-  Lock
+  Lock,
+  Share2,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
@@ -240,6 +242,7 @@ interface AdTask {
   mediaUrl?: string;
   isCustom?: boolean;
   instructions?: string;
+  shareable?: boolean;
 }
 
 interface AdsSectionProps {
@@ -446,7 +449,8 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     link: ad.url || '#',
     mediaUrl: ad.mediaUrl || '',
     isCustom: true,
-    instructions: ad.instructions || ''
+    instructions: ad.instructions || '',
+    shareable: ad.shareable !== false // Default to true if not specified
   }));
 
   const resolveUrl = (url?: string) => {
@@ -586,6 +590,33 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     } else if (task.type === 'click') {
       setActiveTimerTask(task);
       setTimerSecondsLeft(30);
+    }
+  };
+
+  const [sharing, setSharing] = useState<string | null>(null);
+
+  const handleShare = async (task: AdTask, platform: 'whatsapp' | 'facebook' | 'native') => {
+    const shareUrl = task.mediaUrl || task.link || window.location.href;
+    const shareText = `Check out this sponsored ad on Earnwise: ${task.name}. Earn rewards while viewing!`;
+    
+    if (platform === 'native' && navigator.share) {
+      try {
+        await navigator.share({
+          title: task.name,
+          text: shareText,
+          url: shareUrl,
+        });
+        setRewardMsg('Shared successfully!');
+        setTimeout(() => setRewardMsg(null), 3000);
+      } catch (err) {
+        console.error('Native share failed:', err);
+      }
+    } else if (platform === 'whatsapp') {
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+      window.open(whatsappUrl, '_blank');
+    } else if (platform === 'facebook') {
+      const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+      window.open(facebookUrl, '_blank');
     }
   };
 
@@ -745,6 +776,26 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                     Cancel visit
                   </button>
                 </div>
+
+                {activeTimerTask.shareable && (
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest text-center">Spread the Word & Share</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleShare(activeTimerTask, 'whatsapp')}
+                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-emerald-600/20"
+                      >
+                        <Share2 size={14} /> WhatsApp
+                      </button>
+                      <button
+                        onClick={() => handleShare(activeTimerTask, 'facebook')}
+                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-600/20"
+                      >
+                        <Share2 size={14} /> Facebook
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -795,10 +846,26 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
                 </div>
               </div>
               
-              <div className="text-right relative z-10">
-                <p className={`text-xl font-display font-black tracking-tighter ${isInternal ? 'text-white' : 'text-slate-900'}`}>
-                  {completedToday ? 'DONE' : `${task.reward.toFixed(2)} WC`}
-                </p>
+              <div className="text-right relative z-10 flex flex-col items-end gap-2">
+                <div className="flex items-center gap-2">
+                  {task.shareable && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShare(task, 'whatsapp');
+                        }}
+                        className={`p-2 rounded-xl transition-all active:scale-90 ${isInternal ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600'}`}
+                        title="Share to WhatsApp"
+                      >
+                        <Share2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                  <p className={`text-xl font-display font-black tracking-tighter ${isInternal ? 'text-white' : 'text-slate-900'}`}>
+                    {completedToday ? 'DONE' : `${task.reward.toFixed(2)} WC`}
+                  </p>
+                </div>
                 <div className="flex items-center gap-1 justify-end mt-1">
                    <Timer size={10} className={isInternal ? 'text-blue-100' : 'text-slate-400'} />
                    <span className={`text-[8px] font-black uppercase tracking-tighter italic ${isInternal ? 'text-blue-100/70' : 'text-slate-400'}`}>

@@ -22,6 +22,7 @@ import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Task, TaskType, TaskCompletion } from '../../types';
 import { sendNotification, NotificationType } from '../../lib/notifications';
 import { getApiUrl } from '../../lib/config';
+import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
@@ -720,6 +721,28 @@ export default function AdminTasks() {
                       <p className="text-xs font-black text-blue-600 mt-1">
                         {(task.userPayout || 0).toFixed(2)} WC Payout • {task.type} • Tag: {task.tag || 'none'}
                       </p>
+                      
+                      {/* Media Previews */}
+                      {(task.imageUrl || task.videoUrl) && (
+                        <div className="mt-2 flex gap-2">
+                          {task.imageUrl && (
+                            <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-100 group">
+                              <img src={task.imageUrl} alt="Task Image" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ExternalLink size={12} className="text-white" />
+                              </div>
+                            </div>
+                          )}
+                          {task.videoUrl && (
+                            <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-100 bg-black flex items-center justify-center group">
+                              <span className="text-[10px] text-white font-black uppercase tracking-tighter">Video</span>
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ExternalLink size={12} className="text-white" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       <div className="mt-2 w-64 bg-gray-100 rounded-full h-1.5 overflow-hidden">
                         <div 

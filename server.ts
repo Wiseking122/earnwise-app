@@ -12,6 +12,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import cron from "node-cron";
 import sharp from "sharp";
+import multer from "multer";
 
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -80,14 +81,14 @@ try {
   firebaseApp = admin.apps.find(app => app?.name === 'earnwise-app') || admin.initializeApp({
     credential: credential || admin.credential.applicationDefault(),
     projectId: firebaseConfig.projectId,
-    storageBucket: "earnwise-2.appspot.com"
+    storageBucket: firebaseConfig.storageBucket || "earnwise-2.firebasestorage.app"
   }, 'earnwise-app');
 } catch (err) {
   console.error("[FIREBASE] Admin App init error, trying default app:", err);
   firebaseApp = admin.apps.length > 0 ? admin.apps[0] : admin.initializeApp({
     credential: admin.credential.applicationDefault(),
     projectId: firebaseConfig.projectId,
-    storageBucket: "earnwise-2.appspot.com"
+    storageBucket: firebaseConfig.storageBucket || "earnwise-2.firebasestorage.app"
   });
 }
 
@@ -3504,6 +3505,76 @@ GENERAL RULES:
     }
   });
 
+  // Multi-purpose multer upload for tasks, ads, and proofs
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 50 * 1024 * 1024 // 50MB limit
+    }
+  });
+
+  app.post("/api/upload", upload.single('file'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const folder = req.body.folder || 'general';
+    const filename = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+    const destination = `${folder}/${filename}`;
+
+    const saveToLocal = () => {
+      const uploadsDir = path.join(process.cwd(), "uploads", folder);
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const localPath = path.join(uploadsDir, filename);
+      fs.writeFileSync(localPath, req.file!.buffer);
+      return `/uploads/${folder}/${filename}`;
+    };
+
+    try {
+      if (!isDbAdminCapable) {
+        const localUrl = saveToLocal();
+        return res.json({ success: true, url: localUrl });
+      }
+
+      const bucketName = firebaseConfig.storageBucket || `${firebaseConfig.projectId}.appspot.com`;
+      console.log(`[UPLOAD] Attempting upload to bucket: ${bucketName}`);
+      
+      const bucket = storageAdmin.bucket(bucketName);
+      const file = bucket.file(destination);
+
+      await file.save(req.file.buffer, {
+        metadata: {
+          contentType: req.file.mimetype,
+        },
+        public: true
+      });
+
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${destination}`;
+      console.log(`[UPLOAD] Successfully uploaded to: ${publicUrl}`);
+      
+      res.json({
+        success: true,
+        url: publicUrl,
+        filename: filename
+      });
+    } catch (error: any) {
+      console.error("[UPLOAD] Firebase Storage Error, falling back to local:", error.message || error);
+      try {
+        const localUrl = saveToLocal();
+        res.json({ 
+          success: true, 
+          url: localUrl, 
+          warning: "Uploaded to local storage due to Firebase Storage failure: " + (error.message || "Unknown error")
+        });
+      } catch (localErr: any) {
+        console.error("[UPLOAD] Local Fallback also failed:", localErr);
+        res.status(500).json({ error: "Both Firebase Storage and local fallback failed." });
+      }
+    }
+  });
+
   app.post("/api/support/message", async (req, res) => {
     const { subject, message, email } = req.body;
     try {
@@ -3774,52 +3845,59 @@ GENERAL RULES:
       }
 
       // Fetch parallel stats using aggregation
-      const [
-        usersSnap, 
-        tasksSnap, 
-        transSnap, 
-        completionsSnap, 
-        surveysSnap, 
-        offersSnap, 
-        appealsSnap,
-        paidOutAgg,
-        withdrawableAgg,
-        pendingAgg
-      ] = await Promise.all([
-        dbAdmin.collection('users').count().get(),
-        dbAdmin.collection('tasks').where('status', '==', 'active').count().get(),
-        dbAdmin.collection('transactions').where('type', '==', 'withdrawal').where('status', '==', 'pending').count().get(),
-        dbAdmin.collection('completions').where('status', '==', 'pending').count().get(),
-        dbAdmin.collection('survey_submissions').where('status', '==', 'pending').count().get(),
-        dbAdmin.collection('offer_submissions').where('status', '==', 'pending').count().get(),
-        dbAdmin.collection('appeals').where('status', '==', 'Pending').count().get(),
+      const statsPromises = [
+        dbAdmin.collection('users').count().get().then(s => s.data().count).catch(() => 0),
+        dbAdmin.collection('tasks').where('status', '==', 'active').count().get().then(s => s.data().count).catch(() => 0),
+        dbAdmin.collection('transactions').where('type', '==', 'withdrawal').where('status', '==', 'pending').count().get().then(s => s.data().count).catch(() => 0),
+        dbAdmin.collection('completions').where('status', '==', 'pending').count().get().then(s => s.data().count).catch(() => 0),
+        dbAdmin.collection('survey_submissions').where('status', '==', 'pending').count().get().then(s => s.data().count).catch(() => 0),
+        dbAdmin.collection('offer_submissions').where('status', '==', 'pending').count().get().then(s => s.data().count).catch(() => 0),
+        dbAdmin.collection('appeals').where('status', '==', 'Pending').count().get().then(s => s.data().count).catch(() => 0),
         // Aggregations
         dbAdmin.collection('transactions')
           .where('type', '==', 'withdrawal')
           .where('status', '==', 'completed')
           .aggregate({ total: admin.firestore.AggregateField.sum('amount') })
-          .get(),
+          .get().then(s => Math.abs(s.data().total || 0)).catch((err) => {
+            console.warn("[STATS] Missing index for totalPaidOut aggregation:", err.message);
+            return 0;
+          }),
         dbAdmin.collection('users')
           .aggregate({ total: admin.firestore.AggregateField.sum('withdrawableBalance') })
-          .get(),
+          .get().then(s => s.data().total || 0).catch((err) => {
+            console.warn("[STATS] Missing index for totalWithdrawable aggregation:", err.message);
+            return 0;
+          }),
         dbAdmin.collection('users')
           .aggregate({ total: admin.firestore.AggregateField.sum('pendingBalance') })
-          .get()
-      ]);
+          .get().then(s => s.data().total || 0).catch((err) => {
+            console.warn("[STATS] Missing index for totalPending aggregation:", err.message);
+            return 0;
+          })
+      ];
 
-      const totalPaidOut = Math.abs(paidOutAgg.data().total || 0);
-      const totalWithdrawable = withdrawableAgg.data().total || 0;
-      const totalPending = pendingAgg.data().total || 0;
+      const [
+        totalUsers,
+        activeTasks,
+        pendingWithdrawals,
+        pendingCompletions,
+        pendingSurveys,
+        pendingOffers,
+        pendingAppeals,
+        totalPaidOut,
+        totalWithdrawable,
+        totalPending
+      ] = await Promise.all(statsPromises);
 
       console.timeEnd(`StatsFetch_${adminId}`);
       res.json({
-        totalUsers: usersSnap.data().count,
-        activeTasks: tasksSnap.data().count,
-        pendingWithdrawals: transSnap.data().count,
-        pendingCompletions: completionsSnap.data().count,
-        pendingSurveys: surveysSnap.data().count,
-        pendingOffers: offersSnap.data().count,
-        pendingAppeals: appealsSnap.data().count,
+        totalUsers,
+        activeTasks,
+        pendingWithdrawals,
+        pendingCompletions,
+        pendingSurveys,
+        pendingOffers,
+        pendingAppeals,
         totalPaidOut,
         totalWithdrawable,
         totalPending
