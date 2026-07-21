@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
 import Layout from '../components/Layout';
 import { motion } from 'motion/react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Sparkles, AlertCircle, Smartphone, Globe, RefreshCw, CheckCircle, ExternalLink, ShieldCheck, Clock, Lock } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, Timestamp, doc, onSnapshot } from 'firebase/firestore';
@@ -46,6 +46,7 @@ const stripHtml = (html: string) => {
 
 export default function Offers() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const networkParam = searchParams.get('network');
   
@@ -53,6 +54,7 @@ export default function Offers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRenewalRequired, setIsRenewalRequired] = useState(false);
+  const [showRestriction, setShowRestriction] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -306,6 +308,13 @@ export default function Offers() {
     return new Date() > end && isRenewalRequired;
   }, [profile, user, isRenewalRequired]);
 
+  const isUserFree = useMemo(() => {
+    const baseFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (baseFree) return true;
+    if (isRenewalRequired && isPlanExpired) return true;
+    return false;
+  }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
+
   const planData = useMemo(() => {
     if (!profile?.plan) return PLANS[0];
     return PLANS.find(p => p.id === profile.plan) || PLANS[0];
@@ -529,12 +538,12 @@ export default function Offers() {
                       </div>
                       
                       <div className="flex flex-col gap-2 w-full sm:w-auto">
-                        {isPlanExpired ? (
+                        {isUserFree ? (
                           <button
-                            disabled
-                            className="bg-slate-800 text-slate-500 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 justify-center cursor-not-allowed"
+                            onClick={() => setShowRestriction(true)}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition justify-center shadow-lg shadow-blue-500/20"
                           >
-                            <Lock size={12} /> Unlock
+                            Unlock Offer <Lock size={12} />
                           </button>
                         ) : isSubmittedToday ? (
                           <button
@@ -545,11 +554,13 @@ export default function Offers() {
                           </button>
                         ) : (
                           <>
-                            <a 
-                              href={offer.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button 
                               onClick={() => {
+                                if (isUserFree) {
+                                  setShowRestriction(true);
+                                  return;
+                                }
+                                window.open(offer.link, '_blank', 'noopener,noreferrer');
                                 const updated = { ...clickedOffers, [offer.id]: true };
                                 setClickedOffers(updated);
                                 localStorage.setItem('clicked_offers', JSON.stringify(updated));
@@ -561,15 +572,21 @@ export default function Offers() {
                               }`}
                             >
                               {clickedOffers[offer.id] ? 'Continue Offer' : 'Start Offer'} <ExternalLink size={12} />
-                            </a>
+                            </button>
                             
                             {clickedOffers[offer.id] && (
-                              <Link
-                                to={`/submit-proof?offerId=${offer.id}&title=${encodeURIComponent(offer.title)}&payout=${wcPayout}`}
+                              <button
+                                onClick={() => {
+                                  if (isUserFree) {
+                                    setShowRestriction(true);
+                                    return;
+                                  }
+                                  navigate(`/submit-proof?offerId=${offer.id}&title=${encodeURIComponent(offer.title)}&payout=${wcPayout}`);
+                                }}
                                 className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition shadow-lg shadow-amber-500/15 justify-center"
                               >
                                 Submit Proof
-                              </Link>
+                              </button>
                             )}
                           </>
                         )}
@@ -599,6 +616,11 @@ export default function Offers() {
           actionName="Premium Offers"
         />
       )}
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="start or complete premium offers" 
+      />
     </Layout>
   );
 }

@@ -7,7 +7,7 @@ import { getApiUrl } from '../lib/config';
 import { doc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit, addDoc } from 'firebase/firestore';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Zap, 
   CheckCircle2, 
@@ -24,6 +24,8 @@ import DepositTab from '../components/DepositTab';
 export default function Upgrade() {
   const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reason = searchParams.get('reason');
   const [loading, setLoading] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -238,6 +240,22 @@ export default function Upgrade() {
     <Layout title="Membership">
       <div className="p-3.5 sm:p-5 pb-24 space-y-6 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
+        
+        {reason === 'plan_required' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-3 relative z-10"
+          >
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <ShieldCheck className="text-white" size={20} />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm">Account Activation Required</h3>
+              <p className="text-blue-200 text-[11px]">To access tasks, academy, and premium features, please activate a plan below.</p>
+            </div>
+          </motion.div>
+        )}
         
         {/* Header */}
         <div className="text-center pt-4 space-y-2">

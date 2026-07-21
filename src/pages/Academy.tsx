@@ -16,6 +16,8 @@ import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import { COURSES } from '../data/courses';
 import { CoursePurchase } from '../types';
+import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
+import { Lock } from 'lucide-react';
 
 export default function Academy() {
   const { profile, user } = useAuth();
@@ -24,6 +26,9 @@ export default function Academy() {
   const [category, setCategory] = useState('All');
   const [purchasedCourses, setPurchasedCourses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRestriction, setShowRestriction] = useState(false);
+
+  const isUserFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
 
   const categories = ['All', 'Freelancing', 'AI Strategy', 'E-commerce', 'Writing', 'Design', 'Marketing', 'Photography', 'Education'];
 
@@ -242,6 +247,11 @@ export default function Academy() {
           <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Earnwise Elite Academy • Education is Leverage</p>
         </div>
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="access premium courses" 
+      />
     </Layout>
   );
 }

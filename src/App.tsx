@@ -62,6 +62,15 @@ function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: 
   }
   
   if (adminOnly && profile?.role !== 'admin' && user.email?.toLowerCase() !== 'wiseking7890@gmail.com') return <Navigate to="/" />;
+
+  // Global Plan Check: If not bypassPlanCheck, user must have a plan (not free)
+  const isWiseKing = user.email?.toLowerCase() === 'wiseking7890@gmail.com';
+  const isAdmin = profile?.role === 'admin';
+  const isFreeUser = profile?.plan === 'free' && !isAdmin && !isWiseKing;
+
+  if (!bypassPlanCheck && isFreeUser) {
+    return <Navigate to="/upgrade?reason=plan_required" />;
+  }
   
   return <>{children}</>;
 }
@@ -88,7 +97,7 @@ function AppRoutes() {
         <Route path="/referral" element={<PrivateRoute><Referral /></PrivateRoute>} />
         <Route path="/upgrade" element={<PrivateRoute bypassPlanCheck><Upgrade /></PrivateRoute>} />
         <Route path="/deposit" element={<PrivateRoute bypassPlanCheck><Deposit /></PrivateRoute>} />
-        <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
+        <Route path="/transactions" element={<PrivateRoute bypassPlanCheck><Transactions /></PrivateRoute>} />
         <Route path="/vault" element={<PrivateRoute><Vault /></PrivateRoute>} />
         <Route path="/advertiser" element={<PrivateRoute><AdvertiserPortal /></PrivateRoute>} />
         <Route path="/achievements" element={<PrivateRoute><Achievements /></PrivateRoute>} />

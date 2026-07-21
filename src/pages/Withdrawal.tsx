@@ -1018,12 +1018,12 @@ export default function Withdrawal() {
                 {/* Wallet Balance Summary for Bank Withdrawal */}
                 <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs font-black">
                   <div className="space-y-1">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Task Wisecoin Balance</span>
-                    <h3 className="text-lg text-emerald-400">{(profile?.taskBalance || 0).toLocaleString()} WC</h3>
+                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Task Wallet Balance</span>
+                    <h3 className="text-lg text-emerald-400">₦{(profile?.taskBalance || 0).toLocaleString()}</h3>
                   </div>
                   <div className="space-y-1 text-right">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Referral Wisecoin Balance</span>
-                    <h3 className="text-lg text-emerald-400">{(profile?.referralBalance || 0).toLocaleString()} WC</h3>
+                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Referral Wallet Balance</span>
+                    <h3 className="text-lg text-emerald-400">₦{(profile?.referralBalance || 0).toLocaleString()}</h3>
                   </div>
                 </div>
 

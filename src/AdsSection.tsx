@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Play, 
@@ -9,16 +9,18 @@ import {
   Timer,
   ChevronLeft,
   Image as ImageIcon,
-  Video
+  Video,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
-import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from './context/AuthContext';
 import { playRewardSound } from './pages/sounds';
 import VideoAd from './components/VideoAd';
 import VastVideoPlayer from './components/VastVideoPlayer';
 import { getApiUrl } from './lib/config';
+import { PlanRestrictionModal } from './components/PlanRestrictionModal';
 
 export const VAST_ADS = [
   'https://vast.vstserv.com/vast?spot_id=2022826',
@@ -359,8 +361,40 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
       return ad.id === adId && ad.timestamp === today;
     });
   };
+  const [showRestriction, setShowRestriction] = useState(false);
+  const [isRenewalRequired, setIsRenewalRequired] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'system_settings', 'payouts'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.isRenewalRequired !== undefined) {
+          setIsRenewalRequired(!!data.isRenewalRequired);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isPlanExpired = useMemo(() => {
+    if (!profile?.planEndDate || profile?.plan === 'free' || profile?.role === 'admin' || user?.email === 'wiseking7890@gmail.com') return false;
+    const end = profile.planEndDate.toDate ? profile.planEndDate.toDate() : new Date(profile.planEndDate);
+    return new Date() > end;
+  }, [profile?.planEndDate, profile?.plan, profile?.role, user?.email]);
+
+  const isUserFree = useMemo(() => {
+    const baseFree = profile?.plan === 'free' && profile?.role !== 'admin' && user?.email !== 'wiseking7890@gmail.com';
+    if (baseFree) return true;
+    if (isRenewalRequired && isPlanExpired) return true;
+    return false;
+  }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
+
   const handleReward = async (adId: string, amount: number) => {
     if (!user) return;
+    if (isUserFree) {
+      setShowRestriction(true);
+      return;
+    }
     if (isAdCompletedToday(adId)) {
       setRewardMsg('Daily limit reached for this ad.');
       setTimeout(() => setRewardMsg(null), 3000);
@@ -390,7 +424,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
        }, { merge: true });
        
        playRewardSound();
-       setRewardMsg(`Success! +${amount.toFixed(2)} WC credited.`);
+       setRewardMsg(`Success! +${amount.toFixed(2)} WC added to your WiseCoin wallet. Convert to ₦ in Withdrawal section.`);
        setTimeout(() => setRewardMsg(null), 3500);
     } catch (error) {
        console.error('Reward error:', error);
@@ -515,6 +549,10 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   };
 
   const handleTaskClick = (task: AdTask) => {
+    if (isUserFree) {
+      setShowRestriction(true);
+      return;
+    }
     if (isAdCompletedToday(task.id)) {
       setRewardMsg("You've already earned from this ad today!");
       setTimeout(() => setRewardMsg(null), 3000);
@@ -776,6 +814,11 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
           );
         })}
       </div>
+      <PlanRestrictionModal 
+        isOpen={showRestriction} 
+        onClose={() => setShowRestriction(false)} 
+        actionName="start or complete ad tasks" 
+      />
     </div>
   );
 }
