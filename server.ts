@@ -125,7 +125,6 @@ async function checkDbAdminCapability() {
     
     // Once capable, run the owner promotion check
     await ensureOwnerAdminStatus();
-    await autoSeedTasks();
   } catch (err: any) {
     isDbAdminCapable = false;
     dbAdminError = err;
@@ -141,7 +140,6 @@ async function checkDbAdminCapability() {
          dbAdminError = null;
          console.log("[FIREBASE] Fallback to (default) database succeeded.");
          await ensureOwnerAdminStatus();
-         await autoSeedTasks();
        } catch (innerErr: any) {
          isDbAdminCapable = false;
          dbAdminError = innerErr;
@@ -197,196 +195,69 @@ async function ensureOwnerAdminStatus() {
   }
 }
 
-async function autoSeedTasks() {
-  if (!isDbAdminCapable) return;
-  try {
-    const tasksSnap = await dbAdmin.collection('tasks').where('status', '==', 'active').get();
-    if (tasksSnap.size >= 4) {
-      console.log(`[SEED] Tasks collection already has ${tasksSnap.size} active tasks. Skipping auto-seed.`);
-      return;
-    }
-    
-    console.log(`[SEED] Only ${tasksSnap.size} active tasks found. Auto-seeding default premium jobs...`);
-    
-    const now = new Date();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 90);
-    
-    const defaultTasks = [
-      {
-        title: "Follow Earnwise on X (Twitter)",
-        description: "Follow our official X handle for announcements, premium code giveaways, and reward opportunities. Take a screenshot of your follow status as proof.",
-        advertiserId: "internal_platform",
-        totalBudget: 100000,
-        remainingBudget: 100000,
-        userPayout: 100,
-        platformMargin: 30,
-        tag: "social",
-        link: "https://x.com/EarnwiseElite",
-        videoUrl: null,
-        imageUrl: null,
-        shareText: null,
-        enableSocialShare: false,
-        type: "ad",
-        status: "active",
-        durationDays: 90,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        requiresProof: true,
-        targetCount: 1000,
-        completedCount: 0,
-        clicksCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        title: "Watch Earnwise Academy Introduction",
-        description: "Watch the 2-minute introductory video to learn how to maximize your daily earnings on Earnwise. Submit a screenshot of the video completion screen.",
-        advertiserId: "internal_platform",
-        totalBudget: 150000,
-        remainingBudget: 150000,
-        userPayout: 150,
-        platformMargin: 45,
-        tag: "education",
-        link: "https://www.w3schools.com/html/mov_bbb.mp4",
-        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-        imageUrl: null,
-        shareText: null,
-        enableSocialShare: false,
-        type: "video",
-        status: "active",
-        durationDays: 90,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        requiresProof: true,
-        targetCount: 1000,
-        completedCount: 0,
-        clicksCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        title: "Download OPay App & Register",
-        description: "Download the OPay app from the Play Store or App Store, register a free account, and submit a screenshot of your home dashboard showing your verified status.",
-        advertiserId: "internal_platform",
-        totalBudget: 500000,
-        remainingBudget: 500000,
-        userPayout: 500,
-        platformMargin: 150,
-        tag: "finance",
-        link: "https://opayweb.com",
-        videoUrl: null,
-        imageUrl: null,
-        shareText: null,
-        enableSocialShare: false,
-        type: "app_download",
-        status: "active",
-        durationDays: 90,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        requiresProof: true,
-        targetCount: 1000,
-        completedCount: 0,
-        clicksCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        title: "Post Earnwise on WhatsApp Status",
-        description: "Post your Earnwise referral link on your WhatsApp status to invite friends. The status must remain active for at least 1 hour. Upload a screenshot of your status view count as proof.",
-        advertiserId: "internal_platform",
-        totalBudget: 200000,
-        remainingBudget: 200000,
-        userPayout: 200,
-        platformMargin: 60,
-        tag: "social",
-        link: "https://earnwise.ng",
-        videoUrl: null,
-        imageUrl: null,
-        shareText: "Earn daily with Earnwise! Sign up now with my link and get instant welcome bonuses: ",
-        enableSocialShare: true,
-        type: "referral",
-        status: "active",
-        durationDays: 90,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        requiresProof: true,
-        targetCount: 1000,
-        completedCount: 0,
-        clicksCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        title: "Write an Earnwise Review on Facebook",
-        description: "Write a short, honest review or post about your experience with Earnwise on Facebook or TikTok. Include your referral link in the post and upload a screenshot of your post as proof.",
-        advertiserId: "internal_platform",
-        totalBudget: 350000,
-        remainingBudget: 350000,
-        userPayout: 350,
-        platformMargin: 105,
-        tag: "social",
-        link: "https://facebook.com",
-        videoUrl: null,
-        imageUrl: null,
-        shareText: null,
-        enableSocialShare: false,
-        type: "content_creation",
-        status: "active",
-        durationDays: 90,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        requiresProof: true,
-        targetCount: 1000,
-        completedCount: 0,
-        clicksCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        title: "Join Earnwise Telegram Channel",
-        description: "Join our official Telegram community to connect with over 50,000 elite earners and receive daily signals, withdrawal receipts, and admin updates.",
-        advertiserId: "internal_platform",
-        totalBudget: 100000,
-        remainingBudget: 100000,
-        userPayout: 100,
-        platformMargin: 30,
-        tag: "social",
-        link: "https://t.me/EarnwiseElite",
-        videoUrl: null,
-        imageUrl: null,
-        shareText: null,
-        enableSocialShare: false,
-        type: "ad",
-        status: "active",
-        durationDays: 90,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        requiresProof: true,
-        targetCount: 1000,
-        completedCount: 0,
-        clicksCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      }
-    ];
+// Initialize Mailer
+const requiredSmtpVars = [
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_SECURE',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'SMTP_FROM'
+];
 
-    for (const t of defaultTasks) {
-      await dbAdmin.collection('tasks').add(t);
+function checkSmtpConfigMissing() {
+  const missing: string[] = [];
+  for (const v of requiredSmtpVars) {
+    if (!process.env[v]) {
+      missing.push(v);
     }
-    console.log(`[SEED] Successfully seeded ${defaultTasks.length} active premium tasks.`);
-  } catch (err: any) {
-    console.error("[SEED] Error seeding tasks:", err.message);
   }
+  return missing;
 }
 
-// Initialize Mailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+const missingSmtpOnStartup = checkSmtpConfigMissing();
+let transporter: any;
 
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  transporter.verify((error, success) => {
+if (missingSmtpOnStartup.length === 0) {
+  console.log("[SMTP] Startup Check: All required SMTP environment variables are present. Initializing modern SMTP Transporter...");
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+
+  transporter.verify((error: any, success: any) => {
     if (error) {
-      console.error("[NODEMAILER] SMTP connection configuration verification failed:", error.message || error);
+      console.error("[SMTP] Startup Check: Connection verification failed with the configured SMTP_* variables:", error.message || error);
     } else {
-      console.log("[NODEMAILER] SMTP connection successfully verified and ready to send emails.");
+      console.log("[SMTP] Startup Check: Connection successfully verified and ready to send emails!");
     }
   });
 } else {
-  console.log("[NODEMAILER] SMTP credentials (EMAIL_USER/EMAIL_PASS) are not configured.");
+  console.log(`[SMTP] Startup Check: The following required SMTP variables are missing: ${missingSmtpOnStartup.join(', ')}. Falling back to traditional EMAIL_USER/EMAIL_PASS Gmail configuration...`);
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter.verify((error: any, success: any) => {
+      if (error) {
+        console.error("[NODEMAILER] Traditional Gmail connection configuration verification failed:", error.message || error);
+      } else {
+        console.log("[NODEMAILER] Traditional Gmail connection successfully verified and ready to send emails.");
+      }
+    });
+  } else {
+    console.log("[NODEMAILER] SMTP is NOT fully configured. Both modern SMTP_* variables and traditional EMAIL_USER/EMAIL_PASS are missing.");
+  }
 }
 
 const PORT = 3000;
@@ -409,6 +280,198 @@ function getAi() {
     });
   }
   return aiInstance;
+}
+
+// Reusable function to dispatch welcome email to new users
+async function dispatchWelcomeEmail(uid: string, email: string, name: string) {
+  if (!email) return { success: false, error: "Email is missing" };
+
+  try {
+    console.log(`[AUTH] Dispatching welcome sequence for ${email} (UID: ${uid || 'unknown'})...`);
+    
+    // Fetch dynamic system settings
+    let websiteName = 'Earnwise';
+    let supportEmail = 'support@earnwise.com';
+    let customWelcomeEnabled = true;
+    let customWelcomeSubject = '';
+    let customWelcomeBody = '';
+
+    if (isDbAdminCapable) {
+      try {
+        const settingsSnap = await dbAdmin.collection('settings').doc('system').get();
+        if (settingsSnap.exists) {
+          const data = settingsSnap.data();
+          websiteName = data?.websiteName || websiteName;
+          supportEmail = data?.supportEmail || supportEmail;
+        }
+
+        const templateSnap = await dbAdmin.collection('settings').doc('email_templates').get();
+        if (templateSnap.exists) {
+          const templates = templateSnap.data();
+          if (templates?.welcome) {
+            customWelcomeEnabled = templates.welcome.enabled !== false;
+            customWelcomeSubject = templates.welcome.subject || '';
+            customWelcomeBody = templates.welcome.body || '';
+          }
+        }
+
+        // Final safety check: if uid is provided, check if email was already sent
+        if (uid) {
+          const userDoc = await dbAdmin.collection('users').doc(uid).get();
+          if (userDoc.exists && userDoc.data()?.welcomeEmailSent) {
+            console.log(`[AUTH] Welcome email already marked as sent for ${email}. Skipping.`);
+            return { success: true, message: "Already sent" };
+          }
+        }
+      } catch (e) {
+        console.warn("[AUTH] Failed to fetch settings or check status for email, using defaults.");
+      }
+    }
+
+    if (!customWelcomeEnabled) {
+      console.log(`[AUTH] Welcome email is disabled by admin setting for ${email}.`);
+      return { success: true, message: "Disabled" };
+    }
+
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS && transporter) {
+      try {
+        const rawSubject = customWelcomeSubject || `Welcome to ${websiteName}, {name}!`;
+        const finalSubject = rawSubject.replace(/{name}/g, name || 'Earner');
+        
+        let emailHtml = '';
+        if (customWelcomeBody) {
+          emailHtml = customWelcomeBody.replace(/{name}/g, name || 'Earner');
+          if (!emailHtml.includes('<div') && !emailHtml.includes('<p') && !emailHtml.includes('<html')) {
+            emailHtml = `
+              <div style="font-family: 'Inter', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f1f5f9; border-radius: 24px; background-color: #ffffff; color: #1e293b; line-height: 1.7;">
+                <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">${websiteName} Broadcast</h2>
+                <p style="font-size: 15px; color: #475569;">
+                  ${emailHtml.replace(/\n/g, '<br/>')}
+                </p>
+              </div>
+            `;
+          }
+        } else {
+          emailHtml = `
+            <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
+              <div style="background-color: #2563eb; padding: 40px 20px; text-align: center;">
+                <img src="cid:earnwise_logo" alt="${websiteName} Logo" style="max-width: 80px; margin-bottom: 20px; filter: brightness(0) invert(1);" />
+                <h1 style="color: #ffffff; font-size: 28px; font-weight: 900; margin: 0; letter-spacing: -0.02em;">Welcome to ${websiteName}</h1>
+                <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 8px; font-weight: 600; text-transform: uppercase; tracking-widest;">Your Gateway to Digital Wealth</p>
+              </div>
+              <div style="padding: 40px 30px;">
+                <h2 style="color: #0f172a; font-size: 22px; font-weight: 800; margin-bottom: 16px;">Hello ${name || 'Earner'},</h2>
+                <p style="font-size: 16px; color: #475569; line-height: 1.7; margin-bottom: 24px;">
+                  We're thrilled to have you! You've officially joined Nigeria's premier community for digital earners. 
+                  With <strong>${websiteName}</strong>, you can turn your daily screen time into real, withdrawable cash.
+                </p>
+                <div style="background-color: #f8fafc; padding: 30px; border-radius: 20px; margin: 32px 0; border: 1px solid #e2e8f0;">
+                  <h3 style="margin-top: 0; color: #0f172a; font-size: 18px; font-weight: 800; margin-bottom: 16px;">How to start earning:</h3>
+                  <div style="margin-bottom: 20px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">1. Complete Tasks</p>
+                    <p style="margin: 0; color: #64748b; font-size: 15px;">Like, follow, and share to earn WiseCoins instantly.</p>
+                  </div>
+                  <div style="margin-bottom: 20px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">2. Grow Your Team</p>
+                    <p style="margin: 0; color: #64748b; font-size: 15px;">Invite friends and earn 30% commission on their upgrades.</p>
+                  </div>
+                  <div style="margin: 0;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">3. Withdraw Cash</p>
+                    <p style="margin: 0; color: #64748b; font-size: 15px;">Cash out your earnings directly to your bank account via Paystack.</p>
+                  </div>
+                </div>
+                <div style="text-align: center; margin: 40px 0;">
+                  <a href="${process.env.PUBLIC_APP_URL || 'https://earnwise.ng'}" style="background-color: #2563eb; color: #ffffff; padding: 18px 40px; text-decoration: none; border-radius: 16px; font-weight: 800; font-size: 16px; display: inline-block;">Launch Your Dashboard</a>
+                </div>
+                <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-top: 40px;">
+                  Need assistance? Reply to this email or contact us at <strong>${supportEmail}</strong>.<br>
+                  &copy; ${new Date().getFullYear()} ${websiteName} Team.
+                </p>
+              </div>
+            </div>
+          `;
+        }
+
+        await transporter.sendMail({
+          from: `"${websiteName} Support" <${process.env.EMAIL_USER}>`,
+          to: email,
+          replyTo: supportEmail,
+          subject: finalSubject,
+          text: `Welcome to ${websiteName}! Launch your dashboard here: ${process.env.PUBLIC_APP_URL || 'https://earnwise.ng'}`,
+          html: emailHtml,
+          attachments: (() => {
+            const logoPath = path.join(process.cwd(), 'public/logo.png');
+            const iconPath = path.join(process.cwd(), 'public/icon.png');
+            if (fs.existsSync(logoPath)) return [{ filename: 'logo.png', path: logoPath, cid: 'earnwise_logo' }];
+            if (fs.existsSync(iconPath)) return [{ filename: 'logo.png', path: iconPath, cid: 'earnwise_logo' }];
+            return [];
+          })()
+        });
+
+        // Mark as sent in Firestore
+        if (uid && isDbAdminCapable) {
+          await dbAdmin.collection('users').doc(uid).update({ welcomeEmailSent: true });
+
+          // Also inject in-door welcome notification and coaching
+          try {
+            const notifCheck = await dbAdmin.collection('notifications')
+              .where('userId', '==', uid)
+              .where('title', '==', 'Welcome to Earnwise!')
+              .get();
+
+            if (notifCheck.empty) {
+              await dbAdmin.collection('notifications').add({
+                userId: uid,
+                title: "Welcome to Earnwise!",
+                message: `Welcome aboard, ${name || 'Earner'}! We're thrilled to have you. Complete high-paying tasks, withdraw real cash in Naira, and earn referral commissions!`,
+                type: 'success',
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                readBy: []
+              });
+
+              // Automatically trigger their first daily coaching topic (Chapter 1)
+              const firstCoachingTopic = {
+                subject: "💸 Secrets to 10X Your Daily Earnings on Earnwise",
+                headline: "The Compound Earning Framework",
+                quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
+                tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 10% cash bonus on all their task approval reserves!"
+              };
+
+              await dbAdmin.collection('notifications').add({
+                userId: uid,
+                title: `🌅 Wise AI Daily: ${firstCoachingTopic.headline}`,
+                message: `${firstCoachingTopic.quote} 👉 Tip: ${firstCoachingTopic.tip}`,
+                type: 'reward',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                readBy: [],
+                read: false
+              });
+
+              await dbAdmin.collection('users').doc(uid).update({
+                coachingStep: 1,
+                lastCoachingAt: admin.firestore.FieldValue.serverTimestamp()
+              }).catch(() => {});
+            }
+          } catch (notifErr) {
+            console.error("[AUTH] Failed to dispatch welcome notifications:", notifErr);
+          }
+        }
+        
+        console.log(`[AUTH] SUCCESS! Welcome email sent to ${email}`);
+        return { success: true };
+      } catch (mailErr: any) {
+        console.error(`[AUTH] Welcome email dispatch failed for ${email}:`, mailErr.message);
+        return { success: false, error: mailErr.message };
+      }
+    } else {
+      console.warn(`[AUTH] SMTP not configured. Skipping welcome email for ${email}.`);
+      return { success: false, error: "SMTP not configured" };
+    }
+  } catch (globalErr: any) {
+    console.error(`[AUTH] Global error in dispatchWelcomeEmail for ${email}:`, globalErr.message);
+    return { success: false, error: globalErr.message };
+  }
 }
 // --- CONFIGURATION: Membership Tiers & Multipliers ---
 // Defines the exact payout boost for each membership level
@@ -978,16 +1041,27 @@ async function startServer() {
     if (!isDbAdminCapable) return;
     try {
       const now = new Date();
+      // Use a simpler query that doesn't require a composite index
+      // We fetch all 'scheduled' notifications and filter by time in-memory
       const scheduledSnap = await dbAdmin.collection('notifications')
         .where('status', '==', 'scheduled')
-        .where('scheduledAt', '<=', admin.firestore.Timestamp.fromDate(now))
         .get();
 
       if (scheduledSnap.empty) return;
 
-      console.log(`[Scheduler] Found ${scheduledSnap.size} scheduled notifications to process.`);
+      const toProcess = scheduledSnap.docs.filter(doc => {
+        const data = doc.data();
+        if (!data.scheduledAt) return false;
+        // Robust time comparison
+        const schedDate = data.scheduledAt.toDate ? data.scheduledAt.toDate() : new Date(data.scheduledAt);
+        return schedDate <= now;
+      });
 
-      for (const doc of scheduledSnap.docs) {
+      if (toProcess.length === 0) return;
+
+      console.log(`[Scheduler] Found ${toProcess.length} scheduled notifications to process.`);
+
+      for (const doc of toProcess) {
         const data = doc.data();
         const docId = doc.id;
 
@@ -3864,6 +3938,25 @@ GENERAL RULES:
     }
   });
 
+  app.post("/api/admin/tasks/delete", async (req, res) => {
+    const { adminId, taskId } = req.body;
+    if (!isDbAdminCapable) return res.status(503).json({ error: "Service Unavailable" });
+
+    try {
+      const adminDoc = await dbAdmin.collection('users').doc(adminId).get();
+      if (!adminDoc.exists || (adminDoc.data()?.role !== 'admin' && adminDoc.data()?.email?.toLowerCase() !== 'wiseking7890@gmail.com')) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await dbAdmin.collection('tasks').doc(taskId).delete();
+      console.log(`[ADMIN] Task ${taskId} deleted by ${adminId}`);
+      res.json({ status: "success", message: "Task deleted successfully" });
+    } catch (err: any) {
+      console.error("Task delete error:", err);
+      res.status(500).json({ error: err.message || "Failed to delete task" });
+    }
+  });
+
   app.post("/api/notifications/send", async (req, res) => {
     const { 
       adminId, 
@@ -4849,11 +4942,20 @@ GENERAL RULES:
         const userSnap = await dbAdmin.collection('users').where('email', '==', email).limit(1).get();
         if (!userSnap.empty) {
           const userDoc = userSnap.docs[0];
+          const userData = userDoc.data();
           await userDoc.ref.update({
             deviceFingerprint,
-            telegramId: telegramId || userDoc.data().telegramId || null,
+            telegramId: telegramId || userData.telegramId || null,
             lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
           });
+
+          // AUTOMATIC WELCOME EMAIL CHECK
+          // If the welcome email hasn't been sent yet, trigger it now during login
+          if (!userData.welcomeEmailSent) {
+            // Run in background to not block login
+            dispatchWelcomeEmail(userDoc.id, userData.email, userData.displayName || userData.username || 'Earner')
+              .catch(e => console.error("[AUTH] Background welcome email trigger failed:", e.message));
+          }
         }
       }
       return res.status(200).json({ 
@@ -4867,250 +4969,12 @@ GENERAL RULES:
 
   // Send Welcome Email
   app.post("/api/auth/send-welcome-email", async (req, res) => {
-    const { email, name } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required" });
-
-    try {
-      console.log(`[AUTH] Processing welcome sequence for ${email}...`);
-      
-      // Fetch dynamic system settings
-      let websiteName = 'Earnwise';
-      let supportEmail = 'support@earnwise.com';
-      
-      let customWelcomeEnabled = true;
-      let customWelcomeSubject = '';
-      let customWelcomeBody = '';
-
-      if (isDbAdminCapable) {
-        try {
-          const settingsSnap = await dbAdmin.collection('settings').doc('system').get();
-          if (settingsSnap.exists) {
-            const data = settingsSnap.data();
-            websiteName = data?.websiteName || websiteName;
-            supportEmail = data?.supportEmail || supportEmail;
-          }
-
-          // Fetch automated templates settings
-          const templateSnap = await dbAdmin.collection('settings').doc('email_templates').get();
-          if (templateSnap.exists) {
-            const templates = templateSnap.data();
-            if (templates?.welcome) {
-              customWelcomeEnabled = templates.welcome.enabled !== false;
-              customWelcomeSubject = templates.welcome.subject || '';
-              customWelcomeBody = templates.welcome.body || '';
-            }
-          }
-        } catch (e) {
-          console.warn("[AUTH] Failed to fetch settings for email, using defaults.");
-        }
-      }
-
-      let emailSent = false;
-      
-      if (!customWelcomeEnabled) {
-        console.log(`[AUTH] Welcome email is disabled by admin setting. Skipping welcome email dispatch for ${email}.`);
-      } else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        try {
-          const rawSubject = customWelcomeSubject || `Welcome to ${websiteName}, {name}!`;
-          const finalSubject = rawSubject.replace(/{name}/g, name || 'Earner');
-          
-          let emailHtml = '';
-          if (customWelcomeBody) {
-            emailHtml = customWelcomeBody.replace(/{name}/g, name || 'Earner');
-            // If it doesn't look like HTML, auto-wrap it in simple layout with newlines converted
-            if (!emailHtml.includes('<div') && !emailHtml.includes('<p') && !emailHtml.includes('<html')) {
-              emailHtml = `
-                <div style="font-family: 'Inter', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f1f5f9; border-radius: 24px; background-color: #ffffff; color: #1e293b; line-height: 1.7;">
-                  <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">${websiteName} Broadcast</h2>
-                  <p style="font-size: 15px; color: #475569;">
-                    ${emailHtml.replace(/\n/g, '<br/>')}
-                  </p>
-                </div>
-              `;
-            }
-          } else {
-            emailHtml = `
-              <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
-                <div style="background-color: #2563eb; padding: 40px 20px; text-align: center;">
-                  <img src="cid:earnwise_logo" alt="${websiteName} Logo" style="max-width: 80px; margin-bottom: 20px; filter: brightness(0) invert(1);" />
-                  <h1 style="color: #ffffff; font-size: 28px; font-weight: 900; margin: 0; letter-spacing: -0.02em;">Welcome to ${websiteName}</h1>
-                  <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 8px; font-weight: 600; text-transform: uppercase; tracking-widest;">Your Gateway to Digital Wealth</p>
-                </div>
-                
-                <div style="padding: 40px 30px;">
-                  <h2 style="color: #0f172a; font-size: 22px; font-weight: 800; margin-bottom: 16px;">Hello ${name || 'Earner'},</h2>
-                  <p style="font-size: 16px; color: #475569; line-height: 1.7; margin-bottom: 24px;">
-                    We're thrilled to have you! You've officially joined Nigeria's premier community for digital earners. 
-                    With <strong>${websiteName}</strong>, you can turn your daily screen time into real, withdrawable cash.
-                  </p>
-                  
-                  <div style="background-color: #f8fafc; padding: 30px; border-radius: 20px; margin: 32px 0; border: 1px solid #e2e8f0;">
-                    <h3 style="margin-top: 0; color: #0f172a; font-size: 18px; font-weight: 800; margin-bottom: 16px;">How to start earning:</h3>
-                    <div style="margin-bottom: 20px;">
-                      <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">1. Complete Tasks</p>
-                      <p style="margin: 0; color: #64748b; font-size: 15px;">Like, follow, and share to earn WiseCoins instantly.</p>
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                      <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">2. Grow Your Team</p>
-                      <p style="margin: 0; color: #64748b; font-size: 15px;">Invite friends and earn 30% commission on their upgrades.</p>
-                    </div>
-                    <div style="margin: 0;">
-                      <p style="margin: 0 0 4px 0; font-weight: 700; color: #2563eb; font-size: 14px; text-transform: uppercase;">3. Withdraw Cash</p>
-                      <p style="margin: 0; color: #64748b; font-size: 15px;">Cash out your earnings directly to your bank account via Paystack.</p>
-                    </div>
-                  </div>
-                  
-                  <div style="text-align: center; margin: 40px 0;">
-                    <a href="${currentAppUrl || 'https://earnwise1.vercel.app'}" style="background-color: #2563eb; color: #ffffff; padding: 18px 40px; text-decoration: none; border-radius: 16px; font-weight: 800; font-size: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);">Launch Your Dashboard</a>
-                  </div>
-                  
-                  <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #f1f5f9;">
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Join our community</p>
-                    <a href="https://t.me/Earnwise01" style="margin: 0 8px; color: #2563eb; text-decoration: none; font-weight: 700; background: #eff6ff; padding: 10px 16px; border-radius: 10px; display: inline-block;">Telegram Group</a>
-                    <a href="https://t.me/EarnwiseElite" style="margin: 0 8px; color: #2563eb; text-decoration: none; font-weight: 700; background: #eff6ff; padding: 10px 16px; border-radius: 10px; display: inline-block;">Official Channel</a>
-                  </div>
-                  
-                  <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-top: 40px; line-height: 1.6;">
-                    Need assistance? Reply to this email or contact us at <strong>${supportEmail}</strong>.<br>
-                    &copy; ${new Date().getFullYear()} ${websiteName} Team. All rights reserved.
-                  </p>
-                </div>
-              </div>
-            `;
-          }
-
-          await transporter.sendMail({
-            from: `"${websiteName} Support" <${process.env.EMAIL_USER}>`,
-            to: email,
-            replyTo: supportEmail,
-            subject: finalSubject,
-            text: `Welcome to ${websiteName}! You're now part of Nigeria's #1 digital wealth platform. Complete high-paying tasks, withdraw real cash, and earn referral commissions.\n\nGet started now by logging into your dashboard: ${currentAppUrl || 'https://earnwise1.vercel.app'}`,
-            html: emailHtml,
-            attachments: (() => {
-              const logoPath = path.join(process.cwd(), 'public/logo.png');
-              const iconPath = path.join(process.cwd(), 'public/icon.png');
-              if (fs.existsSync(logoPath)) {
-                return [{ filename: 'logo.png', path: logoPath, cid: 'earnwise_logo' }];
-              } else if (fs.existsSync(iconPath)) {
-                return [{ filename: 'logo.png', path: iconPath, cid: 'earnwise_logo' }];
-              }
-              return [];
-            })()
-          });
-          emailSent = true;
-          console.log(`[AUTH] SUCCESS! Welcome email sent to ${email}`);
-        } catch (mailErr: any) {
-          console.error(`[AUTH] Welcome transporter failed for ${email}:`, mailErr.message);
-        }
-      } else {
-        console.warn(`[AUTH] EMAIL_USER or EMAIL_PASS not configured. Skipping transporter dispatch for ${email}.`);
-      }
-
-      // Always fallback to injecting in-door welcome notification to ensure continuous operation
-      if (isDbAdminCapable) {
-        try {
-          const userSnap = await dbAdmin.collection('users').where('email', '==', email).limit(1).get();
-          if (!userSnap.empty) {
-            const uid = userSnap.docs[0].id;
-            const notifCheck = await dbAdmin.collection('notifications')
-              .where('userId', '==', uid)
-              .where('title', '==', 'Welcome to Earnwise!')
-              .get();
-
-            if (notifCheck.empty) {
-              await dbAdmin.collection('notifications').add({
-                userId: uid,
-                title: "Welcome to Earnwise!",
-                message: `Welcome aboard, ${name || 'Earner'}! We're thrilled to have you. Complete high-paying tasks, withdraw real cash in Naira, and earn referral commissions!`,
-                type: 'success',
-                read: false,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                readBy: []
-              });
-              console.log(`[AUTH] In-door notification appended for ${email} (${uid})`);
-
-              // Automatically trigger their first daily coaching topic (Chapter 1) so coaching is completely automatic
-              const firstCoachingTopic = {
-                subject: "💸 Secrets to 10X Your Daily Earnings on Earnwise",
-                headline: "The Compound Earning Framework",
-                quote: "Average members work for individual micro-tasks. Elite earners build network engines.",
-                tip: "Maintain a consecutive 7-day streak to unlock a 2.5x multiplier on all personal task reward submissions. Pair this by recruiting 5 active friends to tap into a lifelong 10% cash bonus on all their task approval reserves!"
-              };
-
-              // Send in-app notification for Chapter 1
-              await dbAdmin.collection('notifications').add({
-                userId: uid,
-                title: `🌅 Wise AI Daily: ${firstCoachingTopic.headline}`,
-                message: `${firstCoachingTopic.quote} 👉 Tip: ${firstCoachingTopic.tip}`,
-                type: 'reward',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                readBy: [],
-                read: false
-              });
-
-              // If SMTP configured, dispatch email coaching immediately
-              if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-                await transporter.sendMail({
-                  from: `"Earnwise Coaching" <${process.env.EMAIL_USER}>`,
-                  to: email,
-                  replyTo: 'earnwise29@gmail.com',
-                  subject: firstCoachingTopic.subject,
-                  html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px; background-color: #ffffff;">
-                      <div style="text-align: center; margin-bottom: 25px;">
-                        <h1 style="color: #2563eb; font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase;">Earnwise Daily Coach</h1>
-                        <p style="color: #64748b; font-size: 13px; margin: 5px 0 0 0;">Automated Success Coach • Active Multipliers</p>
-                      </div>
-                      
-                      <p style="font-size: 15px; color: #475569; line-height: 1.6;">Hello ${name || 'Earner'},</p>
-                      <p style="font-size: 15px; color: #475569; line-height: 1.6;">We've automatically dispatched your first masterclass lesson to kickstart your journey:</p>
-
-                      <div style="background-color: #eff6ff; border-left: 5px solid #2563eb; padding: 20px; border-radius: 12px; margin: 25px 0;">
-                        <h3 style="margin-top: 0; color: #1e3a8a; font-size: 16px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">${firstCoachingTopic.headline}</h3>
-                        <p style="color: #1e40af; font-size: 15px; font-style: italic; margin-bottom: 0;">"${firstCoachingTopic.quote}"</p>
-                      </div>
-
-                      <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; background-color: #fafafa; margin-bottom: 25px;">
-                        <h4 style="margin-top: 0; color: #1e293b; font-size: 14px; text-transform: uppercase; font-weight: 800;">Strategic Action Tip:</h4>
-                        <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 0;">${firstCoachingTopic.tip}</p>
-                      </div>
-
-                      <div style="text-align: center; margin: 30px 0;">
-                        <a href="${currentAppUrl || 'https://ais-pre-ucu3byd4dxfepn7umejqhx-558253480073.europe-west2.run.app'}" style="background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); text-transform: uppercase;">Access Dashboard</a>
-                      </div>
-
-                      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-                        <p style="color: #94a3b8; font-size: 11px; margin-bottom: 5px; text-transform: uppercase;">Active Streak Protection Alert</p>
-                        <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">You are receiving this because you registered on Earnwise. Daily email coaching is active.</p>
-                      </div>
-                    </div>
-                  `
-                }).catch(e => console.error("[AUTH] Automatic first coaching email dispatch failed:", e.message));
-              }
-
-              // Update coaching step to 1 so the next scheduled drops follow sequentially
-              await userSnap.docs[0].ref.update({
-                coachingStep: 1,
-                lastCoachingAt: admin.firestore.FieldValue.serverTimestamp()
-              }).catch(e => console.error("[AUTH] Failed updating coaching step metadata:", e.message));
-            }
-          }
-        } catch (dbErr: any) {
-          console.error("[AUTH] Welcome notification/coaching automatic dispatch failed:", dbErr.message);
-        }
-      }
-
-      res.json({ 
-        status: "success", 
-        message: "Welcome processed", 
-        emailDelivered: emailSent 
-      });
-    } catch (error: any) {
-      console.error("[AUTH] Error in send-welcome-email:", error);
-      res.status(500).json({ error: "Failed to process welcome request" });
-    }
+    const { uid, email, name } = req.body;
+    const result = await dispatchWelcomeEmail(uid, email, name);
+    return res.status(200).json({ success: result.success, message: result.message || (result.success ? "Welcome processed" : "Failed to process") });
   });
 
+  // Send Daily Reminders
   // Send Daily Reminders & Encouragement email + notification on demand (for tests or automatic setups)
   app.post("/api/auth/send-daily-encouragement", async (req, res) => {
     const { email, name, userId, topicId } = req.body;
@@ -5315,16 +5179,141 @@ GENERAL RULES:
     }
   });
 
+  // Test SMTP connection and optionally send a test email
+  app.post("/api/admin/test-smtp", async (req, res) => {
+    const { testEmail } = req.body;
+
+    const missing = checkSmtpConfigMissing();
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: "SMTP credentials are not configured in environment variables.",
+        message: `The following required SMTP environment variable(s) are missing: ${missing.join(', ')}`,
+        missingVariables: missing,
+        success: false
+      });
+    }
+
+    try {
+      console.log("[SMTP TEST] Verifying connection...");
+      const testTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '465', 10),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      // Verify connection
+      await new Promise<void>((resolve, reject) => {
+        testTransporter.verify((error: any, success: any) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+
+      console.log("[SMTP TEST] Connection verified successfully.");
+
+      let emailSent = false;
+
+      if (testEmail) {
+        console.log(`[SMTP TEST] Sending test email to ${testEmail}...`);
+        await testTransporter.sendMail({
+          from: `"Earnwise SMTP Test" <${process.env.SMTP_FROM}>`,
+          to: testEmail,
+          subject: "⚡ Earnwise SMTP Connection Test Successful!",
+          html: `
+            <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
+              <div style="background-color: #10b981; padding: 30px 20px; text-align: center; color: white;">
+                <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.01em;">SMTP Test Successful! 🎉</h1>
+              </div>
+              <div style="padding: 40px 30px; font-size: 15px; color: #334155; line-height: 1.7;">
+                <p>Hello,</p>
+                <p>This is a test email from your <strong>Earnwise</strong> backend on Render. If you are receiving this, it means your SMTP configuration is fully functional and successfully connected to the mail server!</p>
+                
+                <h3 style="border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px; font-weight: 800; text-transform: uppercase; font-size: 12px; color: #64748b; letter-spacing: 0.05em;">Connection Details</h3>
+                <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                  <tr>
+                    <td style="font-weight: bold; width: 140px; padding: 8px 0; border-bottom: 1px solid #f8fafc; color: #64748b;">SMTP Host:</td>
+                    <td style="padding: 8px 0; font-family: monospace; color: #0f172a;">${process.env.SMTP_HOST}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: bold; padding: 8px 0; border-bottom: 1px solid #f8fafc; color: #64748b;">SMTP Port:</td>
+                    <td style="padding: 8px 0; font-family: monospace; color: #0f172a;">${process.env.SMTP_PORT}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: bold; padding: 8px 0; border-bottom: 1px solid #f8fafc; color: #64748b;">SSL/TLS Secure:</td>
+                    <td style="padding: 8px 0; font-family: monospace; color: #0f172a;">${process.env.SMTP_SECURE}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: bold; padding: 8px 0; border-bottom: 1px solid #f8fafc; color: #64748b;">SMTP User:</td>
+                    <td style="padding: 8px 0; font-family: monospace; color: #0f172a;">${process.env.SMTP_USER}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: bold; padding: 8px 0; border-bottom: 1px solid #f8fafc; color: #64748b;">SMTP From:</td>
+                    <td style="padding: 8px 0; font-family: monospace; color: #0f172a;">${process.env.SMTP_FROM}</td>
+                  </tr>
+                </table>
+                
+                <p style="margin-top: 30px; color: #94a3b8; font-size: 12px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                  This SMTP test was triggered on ${new Date().toLocaleString()}.
+                </p>
+              </div>
+            </div>
+          `
+        });
+        emailSent = true;
+        console.log(`[SMTP TEST] Test email sent successfully to ${testEmail}.`);
+      }
+
+      return res.json({
+        success: true,
+        message: "SMTP Connection tested successfully! Host is reachable and credentials are valid.",
+        details: {
+          host: process.env.SMTP_HOST,
+          port: process.env.SMTP_PORT,
+          secure: process.env.SMTP_SECURE,
+          user: process.env.SMTP_USER,
+          from: process.env.SMTP_FROM,
+          testEmailSent: emailSent,
+          recipient: testEmail || null
+        }
+      });
+
+    } catch (err: any) {
+      console.error("[SMTP TEST] Connection/Send failed:", err);
+      return res.status(500).json({
+        success: false,
+        error: "SMTP Test Failed.",
+        message: err.message || String(err),
+        details: err.stack || null,
+        configChecked: {
+          host: process.env.SMTP_HOST,
+          port: process.env.SMTP_PORT,
+          secure: process.env.SMTP_SECURE,
+          user: process.env.SMTP_USER,
+          from: process.env.SMTP_FROM
+        }
+      });
+    }
+  });
+
   // Send custom manual email based on targeting criteria
   app.post("/api/admin/send-custom-email", async (req, res) => {
-    const { subject, body, targeting, specificEmail } = req.body;
+    const { subject, body, targeting, specificEmail, includeActionButton, actionButtonText, actionButtonLink, supportEmailOverride } = req.body;
     if (!subject || !body) {
       return res.status(400).json({ error: "Subject and body are required." });
     }
 
     try {
-      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        return res.status(500).json({ error: "SMTP credentials are not configured in environment variables." });
+      const missingVars = checkSmtpConfigMissing();
+      if (missingVars.length > 0) {
+        return res.status(400).json({ 
+          error: "SMTP credentials are not configured in environment variables.",
+          message: `The following required SMTP environment variable(s) are missing on Render: ${missingVars.join(', ')}`,
+          missingVariables: missingVars
+        });
       }
 
       if (!isDbAdminCapable) {
@@ -5378,13 +5367,17 @@ GENERAL RULES:
         console.warn("[EMAIL] Failed to fetch settings, using default branding.");
       }
 
+      if (supportEmailOverride) {
+        supportEmail = supportEmailOverride;
+      }
+
       let successCount = 0;
       let failureCount = 0;
 
       for (const email of recipients) {
         try {
           await transporter.sendMail({
-            from: `"${websiteName} Info" <${process.env.EMAIL_USER}>`,
+            from: `"${websiteName} Info" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
             to: email,
             replyTo: supportEmail,
             subject: subject,
@@ -5395,6 +5388,12 @@ GENERAL RULES:
                 </div>
                 <div style="padding: 40px 30px; font-size: 15px; color: #334155; line-height: 1.7;">
                   ${body.replace(/\n/g, '<br/>')}
+                  
+                  ${includeActionButton && actionButtonLink ? `
+                  <div style="text-align: center; margin: 35px 0;">
+                    <a href="${actionButtonLink}" style="background-color: #10b981; color: #ffffff; padding: 14px 30px; text-decoration: none; font-weight: bold; font-size: 14px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">${actionButtonText || 'Click Here'}</a>
+                  </div>
+                  ` : ''}
                   
                   <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #f1f5f9;">
                     <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
@@ -5421,6 +5420,10 @@ GENERAL RULES:
         recipients,
         successCount,
         failureCount,
+        includeActionButton: !!includeActionButton,
+        actionButtonText: includeActionButton ? actionButtonText : null,
+        actionButtonLink: includeActionButton ? actionButtonLink : null,
+        supportEmailOverride: supportEmailOverride || null,
         sentAt: admin.firestore.FieldValue.serverTimestamp()
       });
 

@@ -203,6 +203,8 @@ export default function AdminAds() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -227,6 +229,55 @@ export default function AdminAds() {
       configUnsub();
     };
   }, []);
+
+  const handleDeleteAllAds = async () => {
+    if (!showConfirmDeleteAll) {
+      setShowConfirmDeleteAll(true);
+      setTimeout(() => setShowConfirmDeleteAll(false), 5000);
+      return;
+    }
+
+    setIsDeletingAll(true);
+    try {
+      const batchSize = 100; // Firestore batch limit is 500, but let's be safe
+      let deletedCount = 0;
+      
+      // Delete in batches
+      const adsSnapshot = await query(collection(db, 'ads'));
+      // We need a non-snapshot get here for bulk deletion
+      const { getDocs, writeBatch } = await import('firebase/firestore');
+      const snap = await getDocs(collection(db, 'ads'));
+      
+      if (snap.empty) {
+        showStatus("No ads to delete.", 'success');
+        setIsDeletingAll(false);
+        setShowConfirmDeleteAll(false);
+        return;
+      }
+
+      const chunks = [];
+      for (let i = 0; i < snap.docs.length; i += batchSize) {
+        chunks.push(snap.docs.slice(i, i + batchSize));
+      }
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach(d => {
+          batch.delete(d.ref);
+          deletedCount++;
+        });
+        await batch.commit();
+      }
+
+      showStatus(`Successfully deleted ${deletedCount} ads.`, 'success');
+      setShowConfirmDeleteAll(false);
+    } catch (err: any) {
+      console.error("Bulk delete failed:", err);
+      showStatus("Bulk delete failed: " + err.message, 'error');
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   const handleSaveConfig = async () => {
     setSavingConfig(true);
@@ -388,7 +439,24 @@ export default function AdminAds() {
   return (
     <Layout>
       <div className="p-6 space-y-8 max-w-7xl mx-auto">
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Ad Management</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Ad Management</h1>
+          
+          {ads.length > 0 && (
+            <button
+              onClick={handleDeleteAllAds}
+              disabled={isDeletingAll}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase italic tracking-tighter transition-all active:scale-95 disabled:opacity-50 ${
+                showConfirmDeleteAll 
+                  ? 'bg-rose-600 text-white animate-pulse' 
+                  : 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+              }`}
+            >
+              <Trash2 size={18} />
+              {isDeletingAll ? 'Deleting...' : showConfirmDeleteAll ? 'Confirm Delete ALL?' : 'Delete All Ads'}
+            </button>
+          )}
+        </div>
         
         {/* Ads Center Maintenance Controls */}
         <div className="bg-slate-900 rounded-[2.5rem] p-8 sm:p-10 border border-white/10 shadow-2xl overflow-hidden relative group">

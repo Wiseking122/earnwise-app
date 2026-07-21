@@ -194,6 +194,7 @@ export default function Welcome() {
 
         // Send Welcome Email for new user
         await axios.post(getApiUrl('/api/auth/send-welcome-email'), { 
+          uid: user.uid,
           email: user.email, 
           name: userData.displayName
         }).catch(err => console.error("Failed to send welcome email", err));

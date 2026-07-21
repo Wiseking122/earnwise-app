@@ -72,8 +72,7 @@ export default function TaskList() {
   const [isRenewalRequired, setIsRenewalRequired] = useState(true);
 
   useEffect(() => {
-    // Listen for Ads Configuration
-    const adsConfigUnsub = onSnapshot(doc(db, 'system_settings', 'ads_config'), (snap) => {
+    const unsub = onSnapshot(doc(db, 'system_settings', 'ads_config'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setAdsMaintenanceMode(data.adsMaintenanceMode ?? false);
@@ -81,7 +80,7 @@ export default function TaskList() {
       }
     });
 
-    return () => adsConfigUnsub();
+    return () => unsub();
   }, []);
 
   useEffect(() => {

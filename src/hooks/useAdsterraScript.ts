@@ -20,7 +20,7 @@ export function useAdsterraScript() {
 
     // 2. Inject Script
     const script = document.createElement('script');
-    script.src = 'https://sturgeonvelocity.com/82/1e/dc/821edc4ecc9d8933eb617e91c4ea9249.js';
+    script.src = 'https://sturgeonvelocity.com/6c/69/bf/6c69bfc6dac990e7f98735f23ad91fbf.js';
     script.async = true;
     script.defer = true;
     script.crossOrigin = 'anonymous';

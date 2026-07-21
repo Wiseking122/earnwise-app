@@ -83,6 +83,7 @@ export interface UserProfile {
     refreshToken?: string;
     expiryDate?: number;
   };
+  welcomeEmailSent?: boolean;
   subscriptionTier: 'free' | 'premium';
   referralCode: string;
   totalReferrals?: number;

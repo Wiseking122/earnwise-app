@@ -121,6 +121,13 @@ export const AnnouncementEngine: React.FC<{ placement: AnnouncementPlacement }> 
       if (stored.includes(a.id!)) return false;
     }
     
+    // Hard-coded filter to remove the requested banner
+    const bannerText = "🚀 New sponsored tasks are coming soon! Thank you for your patience while we upgrade the Task Marketplace.";
+    if (a.title?.includes("sponsored tasks") || a.shortMessage?.includes("sponsored tasks") || 
+        a.title?.includes("New sponsored tasks") || a.shortMessage?.includes("New sponsored tasks")) {
+      return false;
+    }
+    
     return true;
   });
 

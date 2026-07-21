@@ -522,20 +522,7 @@ export default function Home() {
 
         {/* Ads Center Maintenance Announcement */}
         <AnnouncementEngine placement="home_floating" />
-        {adsMaintenanceMode && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 bg-linear-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3 backdrop-blur-md"
-          >
-            <div className="bg-blue-500 rounded-full p-1.5 mt-0.5 shadow-lg shadow-blue-500/20">
-              <Sparkles size={14} className="text-white" />
-            </div>
-            <p className="text-[11px] sm:text-xs font-bold text-blue-100 leading-relaxed">
-              🚀 New sponsored tasks are coming soon! Thank you for your patience while we upgrade the Task Marketplace.
-            </p>
-          </motion.div>
-        )}
+
 
         {/* Daily Check-in Dashboard */}
         <DailyCheckIn />

@@ -1,6 +1,6 @@
 {
-  "name": "Remix: Earnwise",
-  "description": "Earnwise is a premier task-based platform featuring the Elite Academy with AI-powered coaching. Earn real money completing quick surveys, watching ads, and exploring digital tasks with fast, secure payouts.",
+  "name": "Earnwise",
+  "description": "Earnwise is a premier task-based platform featuring the Elite Academy and AI-powered rewards. Earn Wise Coins (WC) by completing high-yield ad streams and digital tasks with secure payouts.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "Real-time Payouts",

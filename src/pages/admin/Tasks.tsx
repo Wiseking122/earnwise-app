@@ -22,6 +22,7 @@ import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Task, TaskType, TaskCompletion } from '../../types';
 import { sendNotification, NotificationType } from '../../lib/notifications';
 import { getApiUrl } from '../../lib/config';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
   X, 
@@ -49,6 +50,13 @@ export default function AdminTasks() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedScreenshotForModal, setSelectedScreenshotForModal] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
   
   // New Task Form
   const [newTitle, setNewTitle] = useState('');
@@ -254,11 +262,36 @@ export default function AdminTasks() {
 
   const handleDeleteTask = async (id: string) => {
     if (deletingId === id) {
-      await deleteDoc(doc(db, 'tasks', id));
-      setDeletingId(null);
+      try {
+        setIsDeleting(true);
+        // Use the server-side API for authoritative deletion
+        // We use fetch directly to avoid dependency issues if axios isn't configured for this specific flow
+        const response = await fetch(getApiUrl('/api/admin/tasks/delete'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: user?.uid,
+            taskId: id
+          })
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to delete task");
+        }
+
+        showToast("Task deleted permanently", 'success');
+        setDeletingId(null);
+      } catch (err: any) {
+        console.error("Failed to delete task:", err);
+        showToast(err.message || "Failed to delete task", 'error');
+      } finally {
+        setIsDeleting(false);
+      }
     } else {
       setDeletingId(id);
-      setTimeout(() => setDeletingId(prev => prev === id ? null : prev), 3000);
+      setTimeout(() => setDeletingId(prev => prev === id ? null : prev), 5000);
     }
   };
 
@@ -421,6 +454,25 @@ export default function AdminTasks() {
   return (
     <Layout title="Task Admin" showBack>
       <div className="p-4 space-y-6">
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className={`fixed top-6 right-6 z-[999] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
+                toast.type === 'success' 
+                  ? 'bg-emerald-500/90 text-white border-emerald-400/50' 
+                  : 'bg-rose-500/90 text-white border-rose-400/50'
+              }`}
+            >
+              {toast.type === 'success' ? <Check size={20} /> : <AlertCircle size={20} />}
+              <span className="font-bold text-sm">{toast.message}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {dbError && (
           <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-red-900 shadow-sm">
             <div className="flex items-start gap-4">
@@ -697,11 +749,16 @@ export default function AdminTasks() {
                       </button>
                       <button 
                         onClick={() => handleDeleteTask(task.id)} 
+                        disabled={isDeleting && deletingId === task.id}
                         className={`p-2 rounded-lg transition-all flex items-center justify-center ${
                           deletingId === task.id ? 'bg-red-600 text-white animate-pulse font-black text-[10px] px-3' : 'bg-red-50 text-red-550 group hover:bg-red-100 transition-colors'
-                        }`}
+                        } disabled:opacity-50`}
                       >
-                        {deletingId === task.id ? 'Confirm?' : <Trash2 size={18} />}
+                        {isDeleting && deletingId === task.id ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          deletingId === task.id ? 'Confirm?' : <Trash2 size={18} />
+                        )}
                       </button>
                     </div>
                   </div>

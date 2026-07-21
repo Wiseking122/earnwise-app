@@ -18,7 +18,6 @@ import { useAuth } from './context/AuthContext';
 import { playRewardSound } from './pages/sounds';
 import VideoAd from './components/VideoAd';
 import VastVideoPlayer from './components/VastVideoPlayer';
-import { MONETAG_LINKS, getMonetagLink } from './lib/adManager';
 import { getApiUrl } from './lib/config';
 
 export const VAST_ADS = [
@@ -351,23 +350,35 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   }, [activeTimerTask, timerSecondsLeft]);
 
   const isAdCompletedToday = (adId: string) => {
-    if (profile?.role === 'admin') return false;
-    if (!profile?.completedAds) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return profile.completedAds.some((ad: any) => 
-      ad.id === adId && ad.timestamp.startsWith(today)
-    );
+    if (!profile?.completedAds || !Array.isArray(profile.completedAds)) return false;
+    // Use Africa/Lagos timezone for daily limit consistency
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
+    
+    return profile.completedAds.some((ad: any) => {
+      if (typeof ad === 'string') return ad === adId;
+      return ad.id === adId && ad.timestamp === today;
+    });
   };
   const handleReward = async (adId: string, amount: number) => {
     if (!user) return;
+    if (isAdCompletedToday(adId)) {
+      setRewardMsg('Daily limit reached for this ad.');
+      setTimeout(() => setRewardMsg(null), 3000);
+      return;
+    }
+
     setLoading(true);
     try {
        const userRef = doc(db, 'users', user.uid);
+       const nowLagos = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
+       const nowIso = new Date().toISOString();
+       
        await updateDoc(userRef, {
          wiseCoins: increment(amount),
          completedAds: arrayUnion({
            id: adId,
-           timestamp: new Date().toISOString(),
+           timestamp: nowLagos, 
+           isoTimestamp: nowIso,
            reward: amount
          })
        });
@@ -379,10 +390,12 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
        }, { merge: true });
        
        playRewardSound();
-       setRewardMsg(`Success! +${amount.toFixed(2)} WC added to your wallet.`);
+       setRewardMsg(`Success! +${amount.toFixed(2)} WC credited.`);
        setTimeout(() => setRewardMsg(null), 3500);
     } catch (error) {
        console.error('Reward error:', error);
+       setRewardMsg('Failed to credit reward. Please try again.');
+       setTimeout(() => setRewardMsg(null), 3500);
     } finally {
        setLoading(false);
     }
@@ -392,7 +405,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     id: ad.id,
     name: ad.title || 'Premium Sponsor Offer',
     provider: 'Featured Sponsor',
-    reward: Math.min(Number(ad.reward) || 20.00, 20.00),
+    reward: Math.min(Number(ad.reward) || 10.00, 10.00),
     type: ad.type === 'video' ? 'video' : 'click',
     color: ad.type === 'video' ? 'bg-amber-600' : 'bg-pink-600',
     icon: ad.type === 'video' ? Video : ImageIcon,
@@ -413,77 +426,86 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
 
   const sturgeonTasks: AdTask[] = [
     {
-      id: 'sturgeon-1',
+      id: 'sturgeon-premium-1',
       name: '⚡ Premium Ad Stream - Channel 1',
       provider: 'Sturgeon High-Yield',
-      reward: 20.00,
+      reward: 10.00,
       type: 'click',
       color: 'bg-indigo-600',
       icon: ExternalLink,
       link: 'https://sturgeonvelocity.com/g5zbtjxs6?key=b81682a90b1562b13c9a6b8876242bae',
-      instructions: 'Click to launch the stream. Stay active on the destination page to verify your reward.'
+      instructions: 'Click to launch the stream. Stay active on the destination page for 30s to verify your reward.'
     },
     {
-      id: 'sturgeon-2',
+      id: 'sturgeon-vip-2',
       name: '💎 VIP Ad Stream - Channel 2',
       provider: 'Sturgeon High-Yield',
-      reward: 20.00,
+      reward: 10.00,
       type: 'click',
       color: 'bg-violet-600',
       icon: ExternalLink,
       link: 'https://sturgeonvelocity.com/a7gbcdbyy?key=80bf12cfa4ca2c7c22e598ee09d258ef',
-      instructions: 'Open the VIP channel and follow instructions on screen to credit your balance.'
+      instructions: 'Open the VIP channel and follow instructions on screen to credit your WC balance.'
     },
     {
-      id: 'sturgeon-3',
+      id: 'sturgeon-exclusive-3',
       name: '🔥 Exclusive Ad Stream - Channel 3',
       provider: 'Sturgeon High-Yield',
-      reward: 20.00,
+      reward: 8.00,
       type: 'click',
       color: 'bg-fuchsia-600',
       icon: ExternalLink,
       link: 'https://sturgeonvelocity.com/q46trwhb54?key=6ca2957902753234c562c9b2e2a0fe75',
-      instructions: 'Access the exclusive partner stream. Complete verification to unlock your ₦20.00 reward.'
+      instructions: 'Access the exclusive partner stream. Complete verification to unlock your WC reward.'
     },
     {
-      id: 'sturgeon-4',
+      id: 'sturgeon-velocity-4',
       name: '🚀 Velocity Ad Stream - Channel 4',
       provider: 'Sturgeon High-Yield',
-      reward: 20.00,
+      reward: 8.00,
       type: 'click',
       color: 'bg-rose-600',
       icon: ExternalLink,
       link: 'https://sturgeonvelocity.com/nz179ju7h7?key=2aca4e3ac4bc450e62b1f2a48187f63b',
-      instructions: 'Fast-track your earnings by completing this quick web verification offer.'
+      instructions: 'Fast-track your WC earnings by completing this quick web verification offer.'
     },
     {
-      id: 'sturgeon-5',
+      id: 'sturgeon-secure-5',
       name: '🛡️ Secure Ad Stream - Channel 5',
       provider: 'Sturgeon High-Yield',
-      reward: 20.00,
+      reward: 6.00,
       type: 'click',
       color: 'bg-blue-600',
       icon: ExternalLink,
       link: 'https://sturgeonvelocity.com/r6jntjqds?key=c7121e9cf3f96b845f5b4a48335dd597',
-      instructions: 'Securely verify your session via this high-yield ad channel to claim your instant credit.'
+      instructions: 'Securely verify your session via this high-yield ad channel to claim your instant WC credit.'
+    },
+    {
+      id: 'sturgeon-turbo-6',
+      name: '⚡ Turbo Ad Stream - Channel 6',
+      provider: 'Sturgeon High-Yield',
+      reward: 6.00,
+      type: 'click',
+      color: 'bg-emerald-600',
+      icon: ExternalLink,
+      link: 'https://sturgeonvelocity.com/gmwga3b9?key=2031dcef33edfdd4a6b69f69af6183ab',
+      instructions: 'Boost your performance with the Turbo Stream. 30s activity required.'
+    },
+    {
+      id: 'sturgeon-ultra-7',
+      name: '💎 Ultra Ad Stream - Channel 7',
+      provider: 'Sturgeon High-Yield',
+      reward: 5.00,
+      type: 'click',
+      color: 'bg-cyan-600',
+      icon: ExternalLink,
+      link: 'https://sturgeonvelocity.com/zjumjgafze?key=c8dfead0d37ec817bad231d47b2ef669',
+      instructions: 'Access the Ultra high-performance stream for instant WC rewards.'
     }
   ];
 
-  const monetagTasks: AdTask[] = MONETAG_LINKS.map((link, idx) => ({
-    id: link.id,
-    name: `Premium Sponsor Ad Stream - Channel ${idx + 1}`,
-    provider: 'Monetag Smart',
-    reward: 20.00,
-    type: 'click',
-    color: 'bg-indigo-600',
-    icon: ExternalLink,
-    link: link.url
-  }));
-
   const adTasks: AdTask[] = [
-    ...mappedDbTasks,
-    ...sturgeonTasks,
-    ...monetagTasks
+    ...sturgeonTasks
   ];
 
   const handleAdClickMetric = (adId: string) => {
@@ -668,7 +690,9 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
               <div className="space-y-4">
                 <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">Incoming Reward</span>
-                  <span className="text-sm font-display font-black text-white">₦{activeTimerTask.reward.toFixed(2)}</span>
+                  <span className="text-sm font-display font-black text-white">
+                    {activeTimerTask.reward.toFixed(2)} WC
+                  </span>
                 </div>
 
                 <div className="flex gap-3">
@@ -688,67 +712,6 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Featured Banner Ads */}
-      {mappedDbTasks.filter(t => t.type === 'click').length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-3 bg-linear-to-b from-pink-500 to-rose-500 rounded-full" />
-            <h4 className="font-display font-black text-slate-900 uppercase tracking-tighter text-sm italic">Featured Sponsor Banners</h4>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {mappedDbTasks.filter(t => t.type === 'click').map((task) => {
-              const completedToday = isAdCompletedToday(task.id);
-              return (
-                <div 
-                  key={task.id}
-                  className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all flex flex-col relative group ${
-                    completedToday ? 'opacity-60 grayscale border-slate-100' : 'border-indigo-100'
-                  }`}
-                >
-                  {task.mediaUrl && (
-                    <div className="w-full h-36 bg-slate-950 flex items-center justify-center overflow-hidden relative">
-                      <img 
-                        src={getApiUrl(task.mediaUrl)} 
-                        alt={task.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent" />
-                      <div className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-white font-display font-black text-[10px] shadow-lg">
-                        ₦{task.reward.toFixed(2)}
-                      </div>
-                      <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
-                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-                        <span className="text-white font-black text-[8px] uppercase tracking-widest drop-shadow-md">Premium Sponsor</span>
-                      </div>
-                    </div>
-                  )}
-                  <div className="p-5 flex flex-col justify-between flex-1 relative">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl -mr-8 -mt-8" />
-                    <div className="relative z-10">
-                      <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">{task.provider}</span>
-                      <h5 className="font-display font-black text-slate-900 text-base uppercase italic leading-tight mt-2 group-hover:text-blue-600 transition-colors">{task.name}</h5>
-                    </div>
-                    <button
-                      onClick={() => handleTaskClick(task)}
-                      disabled={loading || completedToday}
-                      className={`mt-4 w-full py-3.5 rounded-2xl font-display font-black text-xs uppercase tracking-widest transition-all text-center relative overflow-hidden group/btn ${
-                        completedToday 
-                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                          : 'bg-slate-950 text-white shadow-lg shadow-slate-900/20 active:scale-95'
-                      }`}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
-                      {completedToday ? 'Completed Today' : 'Visit & Unlock Reward'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="flex items-center gap-2 mt-4">
         <span className="w-1.5 h-3 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full" />
@@ -796,7 +759,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
               
               <div className="text-right relative z-10">
                 <p className={`text-xl font-display font-black tracking-tighter ${isInternal ? 'text-white' : 'text-slate-900'}`}>
-                  {completedToday ? 'DONE' : `₦${task.reward.toFixed(2)}`}
+                  {completedToday ? 'DONE' : `${task.reward.toFixed(2)} WC`}
                 </p>
                 <div className="flex items-center gap-1 justify-end mt-1">
                    <Timer size={10} className={isInternal ? 'text-blue-100' : 'text-slate-400'} />

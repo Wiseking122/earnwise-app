@@ -17,7 +17,11 @@ import {
   ArrowRight,
   Info,
   ShieldCheck,
-  Upload
+  Upload,
+  Copy,
+  Check,
+  ExternalLink,
+  Share2
 } from 'lucide-react';
 import { playRewardSound } from './sounds';
 import { PlanRestrictionModal } from '../components/PlanRestrictionModal';
@@ -501,6 +505,43 @@ export default function TaskDetail() {
   const multiplier = planDetails?.multiplier || 1.0;
   const calculatedReward = task ? (task.reward ?? task.userPayout ?? 0) * multiplier : 0;
 
+  const userReferralLink = useMemo(() => {
+    const code = profile?.referralCode || user?.uid || '';
+    if (!code) return window.location.origin;
+    return `${window.location.origin}/invite/${code.toLowerCase().trim()}`;
+  }, [profile?.referralCode, user?.uid]);
+
+  const dynamicShareText = useMemo(() => {
+    if (!task) return '';
+    const taskTitle = task.title || 'Check this out!';
+    const baseShare = task.shareText || task.description || 'Complete simple tasks and earn daily with me on Earnwise!';
+    
+    let text = `🌟 *EARN WITH ME ON EARNWISE* 🌟\n\n📢 *Task:* ${taskTitle}\n📝 *Description:* ${baseShare}\n\n🔗 *Register & Earn Instantly:* ${userReferralLink}`;
+    
+    if (task.imageUrl) {
+      text += `\n\n📸 *Proof Image / Banner:* ${task.imageUrl}`;
+    }
+    
+    return text;
+  }, [task, userReferralLink]);
+
+  const [shareCopied, setShareCopied] = useState(false);
+  const [imageCopied, setImageCopied] = useState(false);
+
+  const handleCopyShareText = () => {
+    navigator.clipboard.writeText(dynamicShareText);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2500);
+  };
+
+  const handleCopyImageLink = () => {
+    if (task?.imageUrl) {
+      navigator.clipboard.writeText(task.imageUrl);
+      setImageCopied(true);
+      setTimeout(() => setImageCopied(false), 2500);
+    }
+  };
+
   const [wiseAiMessage, setWiseAiMessage] = useState<string>('');
 
   const handleProofSubmit = async () => {
@@ -778,20 +819,29 @@ export default function TaskDetail() {
 
         {/* Share Section */}
         {task.enableSocialShare && (
-          <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-               <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
-                  <ArrowRight className="rotate-[-45deg]" size={16} />
-               </div>
-               <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">Share to Socials</h4>
+          <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+              <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600">
+                    <Share2 size={16} />
+                 </div>
+                 <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-slate-900">Referral Social Share</h4>
+                    <p className="text-[10px] text-slate-400 font-bold leading-tight">Post this to earn extra commissions from signups!</p>
+                 </div>
+              </div>
+              <span className="text-[10px] bg-indigo-50 text-indigo-600 font-black px-2.5 py-1 rounded-full border border-indigo-100 uppercase tracking-wider">
+                Ref Boost On
+              </span>
             </div>
             
+            {/* Social Share Buttons */}
             <div className="grid grid-cols-4 gap-3">
               {[
-                { name: 'WhatsApp', icon: '📱', color: 'bg-emerald-500', url: `https://wa.me/?text=${encodeURIComponent(task.shareText || '')}` },
-                { name: 'Facebook', icon: '🔵', color: 'bg-blue-600', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(task.shareText || '')}` },
-                { name: 'YouTube', icon: '🔴', color: 'bg-red-600', url: `https://www.youtube.com/` },
-                { name: 'TikTok', icon: '🎵', color: 'bg-black', url: `https://www.tiktok.com/` }
+                { name: 'WhatsApp', icon: '📱', color: 'bg-emerald-500 hover:bg-emerald-600', url: `https://wa.me/?text=${encodeURIComponent(dynamicShareText)}` },
+                { name: 'Facebook', icon: '🔵', color: 'bg-blue-600 hover:bg-blue-700', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(userReferralLink)}&quote=${encodeURIComponent(dynamicShareText)}` },
+                { name: 'Twitter / X', icon: '🐦', color: 'bg-slate-900 hover:bg-slate-950', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(dynamicShareText)}` },
+                { name: 'Telegram', icon: '✈️', color: 'bg-sky-500 hover:bg-sky-600', url: `https://t.me/share/url?url=${encodeURIComponent(userReferralLink)}&text=${encodeURIComponent(dynamicShareText)}` }
               ].map(social => (
                 <button
                   key={social.name}
@@ -799,13 +849,73 @@ export default function TaskDetail() {
                     window.open(social.url, '_blank');
                     if (countdown === null) startTask();
                   }}
-                  className={`${social.color} h-12 rounded-2xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-all`}
+                  className={`${social.color} h-14 rounded-2xl flex flex-col items-center justify-center text-white shadow-md active:scale-95 transition-all duration-200 group`}
                 >
-                  <span className="text-base">{social.icon}</span>
-                  <span className="text-[7px] font-black uppercase tracking-tighter mt-0.5">{social.name}</span>
+                  <span className="text-lg group-hover:scale-115 transition-transform">{social.icon}</span>
+                  <span className="text-[8px] font-black uppercase tracking-tighter mt-1">{social.name}</span>
                 </button>
               ))}
             </div>
+
+            {/* Link & Image Copy Center */}
+            <div className="space-y-4 pt-2">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Your Share Package Preview</span>
+                  <span className="text-[9px] font-bold text-slate-400">Tap copy to share anywhere</span>
+                </div>
+
+                {/* Pre-formatted Share Preview Container */}
+                <div className="bg-white border border-slate-100 rounded-xl p-3 text-[11px] text-slate-600 font-medium leading-relaxed max-h-36 overflow-y-auto whitespace-pre-wrap select-all">
+                  {dynamicShareText}
+                </div>
+
+                {/* Copy Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    onClick={handleCopyShareText}
+                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs py-3 px-4 rounded-xl shadow-lg shadow-indigo-100 transition-all duration-200 active:scale-95"
+                  >
+                    {shareCopied ? (
+                      <>
+                        <Check size={14} className="text-emerald-300 animate-bounce" />
+                        <span>Copied Text & Link!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        <span>Copy Caption & Referral Link</span>
+                      </>
+                    )}
+                  </button>
+
+                  {task.imageUrl && (
+                    <button
+                      onClick={handleCopyImageLink}
+                      className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs py-3 px-4 rounded-xl transition-all duration-200 active:scale-95"
+                    >
+                      {imageCopied ? (
+                        <>
+                          <Check size={14} className="text-emerald-300 animate-bounce" />
+                          <span>Copied Image Link!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          <span>Copy Task Image Link</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Instructions Callout */}
+              <div className="bg-amber-50/60 border border-amber-100/80 rounded-2xl p-4 text-[11px] text-amber-800 leading-relaxed font-semibold">
+                💡 <strong className="text-amber-900">How to Share & Double Earnings:</strong> Save or copy the task image, copy your customized caption text above, and post them as your status/story. Anyone who registers via your embedded link becomes your lifetime referral team member!
+              </div>
+            </div>
+
             <p className="text-[9px] text-slate-400 font-bold text-center italic">Share using any platform to trigger your reward timer</p>
           </section>
         )}

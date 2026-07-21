@@ -156,10 +156,10 @@ service cloud.firestore {
     }
 
     match /device_tokens/{tokenId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidDeviceToken(incoming());
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && isValidDeviceToken(incoming());
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidDeviceToken(incoming());
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /wise_coin_wallets/{userId} {

@@ -7,16 +7,7 @@ export interface MonetagLink {
   name: string;
 }
 
-export const MONETAG_LINKS: MonetagLink[] = [
-  { id: 'monetag-1', url: 'https://omg10.com/4/10926323', trackingId: 'OMG10_01', type: 'smartlink', active: true, name: 'Sponsor Stream 1' },
-  { id: 'monetag-2', url: 'https://omg10.com/4/10946432', trackingId: 'OMG10_02', type: 'smartlink', active: true, name: 'Sponsor Stream 2' },
-  { id: 'monetag-3', url: 'https://omg10.com/4/10926325', trackingId: 'OMG10_03', type: 'smartlink', active: true, name: 'Sponsor Stream 3' },
-  { id: 'monetag-4', url: 'https://omg10.com/4/10926382', trackingId: 'OMG10_04', type: 'smartlink', active: true, name: 'Sponsor Stream 4' },
-  { id: 'monetag-5', url: 'https://omg10.com/4/10926389', trackingId: 'OMG10_05', type: 'smartlink', active: true, name: 'Sponsor Stream 5' },
-  { id: 'monetag-6', url: 'https://omg10.com/4/11098951', trackingId: 'OMG10_06', type: 'smartlink', active: true, name: 'Sponsor Stream 6' },
-  { id: 'monetag-7', url: 'https://omg10.com/4/10928530', trackingId: 'OMG10_07', type: 'smartlink', active: true, name: 'Sponsor Stream 7' },
-  { id: 'monetag-8', url: 'https://omg10.com/4/10926400', trackingId: 'OMG10_08', type: 'smartlink', active: true, name: 'Sponsor Stream 8' }
-];
+export const MONETAG_LINKS: MonetagLink[] = [];
 
 export function getActiveMonetagLinks(): MonetagLink[] {
   return MONETAG_LINKS.filter(link => link.active);

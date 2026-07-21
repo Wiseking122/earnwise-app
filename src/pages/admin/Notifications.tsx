@@ -48,6 +48,15 @@ export default function AdminNotifications() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
   const [loadingEmailLogs, setLoadingEmailLogs] = useState(false);
+  const [includeActionButton, setIncludeActionButton] = useState(false);
+  const [actionButtonText, setActionButtonText] = useState('Get Started');
+  const [actionButtonLink, setActionButtonLink] = useState('');
+  const [supportEmailOverride, setSupportEmailOverride] = useState('');
+
+  // SMTP Testing States
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [smtpTestEmail, setSmtpTestEmail] = useState('');
+  const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
   // Automated Email Template States
   const [welcomeEnabled, setWelcomeEnabled] = useState(true);
@@ -126,6 +135,10 @@ export default function AdminNotifications() {
       alert("Please enter a specific target Gmail address.");
       return;
     }
+    if (includeActionButton && !actionButtonLink) {
+      alert("Please enter a link for the Action Button.");
+      return;
+    }
 
     setSendingEmail(true);
     try {
@@ -136,7 +149,11 @@ export default function AdminNotifications() {
           subject: emailSubject,
           body: emailBody,
           targeting: emailTarget,
-          specificEmail: emailTarget === 'specific' ? emailSpecificAddress.trim() : undefined
+          specificEmail: emailTarget === 'specific' ? emailSpecificAddress.trim() : undefined,
+          includeActionButton,
+          actionButtonText: includeActionButton ? actionButtonText : undefined,
+          actionButtonLink: includeActionButton ? actionButtonLink.trim() : undefined,
+          supportEmailOverride: supportEmailOverride ? supportEmailOverride.trim() : undefined
         })
       });
 
@@ -145,6 +162,9 @@ export default function AdminNotifications() {
         alert(data.message || "Emails sent successfully!");
         setEmailSubject('');
         setEmailBody('');
+        setActionButtonLink('');
+        setIncludeActionButton(false);
+        setSupportEmailOverride('');
         fetchEmailLogs();
       } else {
         throw new Error(data.error || "Failed to send email");
@@ -153,6 +173,46 @@ export default function AdminNotifications() {
       alert(err.message);
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  const testSmtpConnection = async () => {
+    if (!smtpTestEmail) {
+      alert("Please enter a test email address to receive the test message.");
+      return;
+    }
+
+    setTestingSmtp(true);
+    setSmtpTestResult(null);
+    try {
+      const response = await fetch(getApiUrl('/api/admin/test-smtp'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testEmail: smtpTestEmail.trim() })
+      });
+
+      const data = await response.json();
+      setSmtpTestResult({
+        success: data.success !== false && response.ok,
+        message: data.message || (data.success ? "SMTP Connection verified successfully!" : "SMTP Test failed."),
+        details: data.details || data.error || null
+      });
+
+      if (response.ok && data.success !== false) {
+        alert(data.message || "SMTP test connection succeeded and test email was sent!");
+      } else {
+        alert(data.message || data.error || "SMTP connection test failed. Please verify your Render environment variables.");
+      }
+    } catch (err: any) {
+      console.error("Error testing SMTP:", err);
+      setSmtpTestResult({
+        success: false,
+        message: "An error occurred while communicating with the server.",
+        details: err.message
+      });
+      alert(`SMTP Test Error: ${err.message}`);
+    } finally {
+      setTestingSmtp(false);
     }
   };
 
@@ -231,7 +291,7 @@ export default function AdminNotifications() {
     }
     setSending(true);
     try {
-      const response = await fetch('/api/notifications/send', {
+      const response = await fetch(getApiUrl('/api/notifications/send'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -294,7 +354,7 @@ export default function AdminNotifications() {
       const endpoint = editingId ? '/api/notifications/update' : '/api/notifications/send';
       const bodyPayload = editingId ? { ...payload, notificationId: editingId } : payload;
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(getApiUrl(endpoint), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyPayload)
@@ -320,7 +380,7 @@ export default function AdminNotifications() {
   const handleDeleteNotification = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this notification? This cannot be undone.')) return;
     try {
-      const response = await fetch('/api/notifications/delete', {
+      const response = await fetch(getApiUrl('/api/notifications/delete'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -922,6 +982,67 @@ export default function AdminNotifications() {
 
         {activeTab === 'gmail' && (
           <div className="lg:col-span-12 space-y-8">
+            {/* SMTP Diagnostic & Test Connection Card */}
+            <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-6 sm:p-8 rounded-[2.5rem] shadow-premium">
+              <h2 className="text-xl font-black text-white tracking-tight uppercase mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+                SMTP Configuration & Test Diagnostics
+              </h2>
+              <p className="text-sm text-slate-300 font-medium mb-6">
+                Ensure your Render backend service is configured with the required SMTP credentials. Earnwise uses secure custom SMTP to send bulk newsletters and system notices.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Recipient Email Address to Test</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. wiseking7890@gmail.com"
+                    value={smtpTestEmail}
+                    onChange={(e) => setSmtpTestEmail(e.target.value)}
+                    className="w-full bg-slate-950/80 border border-white/5 rounded-2xl px-4 py-3 text-sm text-slate-300 font-bold placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={testSmtpConnection}
+                    disabled={testingSmtp}
+                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/50 text-slate-950 font-black uppercase tracking-wider text-xs py-4 rounded-2xl inline-flex items-center justify-center gap-2 transition disabled:opacity-50"
+                  >
+                    {testingSmtp ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" /> Testing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" /> Run Connection Diagnostic
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {smtpTestResult && (
+                <div className={`mt-6 p-5 rounded-2xl border ${smtpTestResult.success ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-300' : 'bg-rose-950/30 border-rose-500/20 text-rose-300'}`}>
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl mt-0.5">{smtpTestResult.success ? "✅" : "❌"}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black uppercase tracking-wider mb-2">
+                        {smtpTestResult.success ? "SMTP Setup Valid & Connected" : "SMTP Verification Failed"}
+                      </p>
+                      <p className="text-xs text-slate-300 font-bold">{smtpTestResult.message}</p>
+                      {smtpTestResult.details && (
+                        <pre className="mt-3 text-xs font-mono bg-slate-950/70 p-3 rounded-xl overflow-x-auto text-slate-400 max-h-40 whitespace-pre-wrap select-all">
+                          {typeof smtpTestResult.details === 'object' ? JSON.stringify(smtpTestResult.details, null, 2) : String(smtpTestResult.details)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-6 sm:p-8 rounded-[2.5rem] shadow-premium">
               <h2 className="text-xl font-black text-white tracking-tight uppercase mb-6 flex items-center gap-2">
                 <Mail className="w-5 h-5 text-emerald-400" />
@@ -978,6 +1099,75 @@ export default function AdminNotifications() {
                     onChange={(e) => setEmailBody(e.target.value)}
                     className="w-full bg-slate-950/80 border border-white/5 rounded-2xl p-4 text-sm text-slate-300 font-bold placeholder-slate-600 focus:border-emerald-500 focus:outline-none font-mono"
                   />
+                </div>
+
+                {/* Custom Action Button & Support Email Config */}
+                <div className="p-6 bg-slate-950/40 border border-white/5 rounded-3xl space-y-6">
+                  <h3 className="text-xs font-black text-white tracking-wider uppercase flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-emerald-400" />
+                    Interactive Actions & Support Integrations
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Action Button Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-slate-300 uppercase tracking-wider">Include Call-to-Action Button</span>
+                          <span className="text-[10px] text-slate-500 font-bold">Adds a prominent action button to the email template</span>
+                        </div>
+                        <input 
+                          type="checkbox"
+                          checked={includeActionButton}
+                          onChange={(e) => setIncludeActionButton(e.target.checked)}
+                          className="w-4 h-4 text-emerald-500 bg-slate-950 border-white/10 rounded focus:ring-emerald-500 focus:ring-offset-slate-900"
+                        />
+                      </div>
+
+                      {includeActionButton && (
+                        <div className="space-y-4 p-4 bg-slate-950/60 border border-white/5 rounded-2xl animate-fadeIn">
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Button Label</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Claim Earnings Now"
+                              value={actionButtonText}
+                              onChange={(e) => setActionButtonText(e.target.value)}
+                              className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-300 font-bold focus:border-emerald-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Button Link (URL)</label>
+                            <input
+                              type="url"
+                              placeholder="e.g. https://earnwise.com/upgrade"
+                              value={actionButtonLink}
+                              onChange={(e) => setActionButtonLink(e.target.value)}
+                              className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-300 font-bold focus:border-emerald-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Support Desk Integration */}
+                    <div className="space-y-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-slate-300 uppercase tracking-wider">Support Contact Email</span>
+                        <span className="text-[10px] text-slate-500 font-bold">Override reply-to and support contact links (defaults to earnwise29@gmail.com)</span>
+                      </div>
+                      
+                      <div>
+                        <input
+                          type="email"
+                          placeholder="e.g. earnwise29@gmail.com"
+                          value={supportEmailOverride}
+                          onChange={(e) => setSupportEmailOverride(e.target.value)}
+                          className="w-full bg-slate-950/80 border border-white/5 rounded-2xl px-4 py-3 text-sm text-slate-300 font-bold placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex justify-end">

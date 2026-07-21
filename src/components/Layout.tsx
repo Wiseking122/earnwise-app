@@ -28,6 +28,7 @@ import { AnnouncementEngine } from './AnnouncementEngine';
 import { playNotificationSound } from '../pages/sounds';
 import TransactionReceipt from './TransactionReceipt';
 import { CpxSurveyNotification } from './CpxSurveyNotification';
+import { AdsterraSocialBar } from './AdsterraSocialBar';
 
 interface LayoutProps {
   children: ReactNode;
@@ -291,6 +292,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
       <InstallModal />
       <CpxSurveyNotification />
+      <AdsterraSocialBar />
       
       {activeReceipt && (
         <TransactionReceipt 
