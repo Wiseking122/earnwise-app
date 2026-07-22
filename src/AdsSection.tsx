@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './lib/firebase';
-import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, increment, arrayUnion, collection, query, onSnapshot, setDoc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from './context/AuthContext';
 import { playRewardSound } from './pages/sounds';
 import VideoAd from './components/VideoAd';
@@ -406,27 +406,42 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
 
     setLoading(true);
     try {
-       const userRef = doc(db, 'users', user.uid);
-       const nowLagos = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
-       const nowIso = new Date().toISOString();
-       
-       await updateDoc(userRef, {
-         wiseCoins: increment(amount),
-         completedAds: arrayUnion({
-           id: adId,
-           timestamp: nowLagos, 
-           isoTimestamp: nowIso,
-           reward: amount
-         })
-       });
+        const batch = writeBatch(db);
+        const userRef = doc(db, 'users', user.uid);
+        const walletRef = doc(db, 'wise_coin_wallets', user.uid);
+        const transRef = doc(collection(db, 'wise_coin_transactions'));
+        
+        const nowLagos = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
+        const nowIso = new Date().toISOString();
+        
+        batch.update(userRef, {
+          wiseCoins: increment(amount),
+          completedAds: arrayUnion({
+            id: adId,
+            timestamp: nowLagos, 
+            isoTimestamp: nowIso,
+            reward: amount
+          })
+        });
 
-       await setDoc(doc(db, 'wise_coin_wallets', user.uid), {
-         userId: user.uid,
-         balance: increment(amount),
-         updatedAt: new Date().toISOString()
-       }, { merge: true });
-       
-       playRewardSound();
+        batch.set(walletRef, {
+          userId: user.uid,
+          balance: increment(amount),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        batch.set(transRef, {
+          userId: user.uid,
+          amount: amount,
+          action: 'credit',
+          reason: `Ad Reward: ${adId}`,
+          status: 'completed',
+          createdAt: serverTimestamp()
+        });
+        
+        await batch.commit();
+        
+        playRewardSound();
        setRewardMsg(`Success! +${amount.toFixed(2)} WC added to your WiseCoin wallet. Convert to ₦ in Withdrawal section.`);
        setTimeout(() => setRewardMsg(null), 3500);
     } catch (error) {
