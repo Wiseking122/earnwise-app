@@ -453,7 +453,9 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
     }
   };
 
-  const mappedDbTasks: AdTask[] = dbAds.map(ad => ({
+  const mappedDbTasks: AdTask[] = dbAds
+    .filter(ad => ad.status !== 'inactive')
+    .map(ad => ({
     id: ad.id,
     name: ad.title || 'Premium Sponsor Offer',
     provider: 'Featured Sponsor',
@@ -558,6 +560,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   ];
 
   const adTasks: AdTask[] = [
+    ...mappedDbTasks,
     ...sturgeonTasks
   ];
 
