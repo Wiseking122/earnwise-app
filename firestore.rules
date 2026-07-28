@@ -279,7 +279,11 @@ service cloud.firestore {
 
     match /ads/{adId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (incoming().diff(existing()).affectedKeys().hasOnly(['views', 'clicks', 'watchTime']))
+      );
+      allow create, delete: if isAdmin();
     }
 
     match /appeals/{appealId} {

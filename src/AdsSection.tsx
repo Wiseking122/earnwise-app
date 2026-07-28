@@ -393,17 +393,31 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
   }, [profile?.plan, profile?.role, user?.email, isRenewalRequired, isPlanExpired]);
 
   const handleReward = async (adId: string, amount: number) => {
-    if (!user) return;
+    if (!user) {
+      console.warn('[AdsSection] No user found for reward');
+      return;
+    }
+    
+    const rewardAmount = Number(amount);
+    if (isNaN(rewardAmount) || rewardAmount <= 0) {
+      console.error('[AdsSection] Invalid reward amount:', amount);
+      return;
+    }
+
     if (isUserFree) {
+      console.warn('[AdsSection] Free user attempted to claim reward. Plan:', profile?.plan);
       setShowRestriction(true);
       return;
     }
+
     if (isAdCompletedToday(adId)) {
+      console.log('[AdsSection] Ad already completed today:', adId);
       setRewardMsg('Daily limit reached for this ad.');
       setTimeout(() => setRewardMsg(null), 3000);
       return;
     }
 
+    console.log(`[AdsSection] Attempting to credit reward: ${rewardAmount} WC for Ad: ${adId}`);
     setLoading(true);
     try {
         const batch = writeBatch(db);
@@ -414,42 +428,46 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
         const nowLagos = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
         const nowIso = new Date().toISOString();
         
-        batch.update(userRef, {
-          wiseCoins: increment(amount),
+        // Use set with merge true for user document to ensure wiseCoins field is created if missing
+        batch.set(userRef, {
+          wiseCoins: increment(rewardAmount),
           completedAds: arrayUnion({
             id: adId,
             timestamp: nowLagos, 
             isoTimestamp: nowIso,
-            reward: amount
-          })
-        });
+            reward: rewardAmount
+          }),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
 
         batch.set(walletRef, {
           userId: user.uid,
-          balance: increment(amount),
+          balance: increment(rewardAmount),
           updatedAt: serverTimestamp()
         }, { merge: true });
 
         batch.set(transRef, {
           userId: user.uid,
-          amount: amount,
+          amount: rewardAmount,
           action: 'credit',
           reason: `Ad Reward: ${adId}`,
           status: 'completed',
           createdAt: serverTimestamp()
         });
         
+        console.log('[AdsSection] Committing batch reward transaction...');
         await batch.commit();
+        console.log('[AdsSection] Reward batch committed successfully!');
         
         playRewardSound();
-       setRewardMsg(`Success! +${amount.toFixed(2)} WC added to your WiseCoin wallet. Convert to ₦ in Withdrawal section.`);
-       setTimeout(() => setRewardMsg(null), 3500);
+        setRewardMsg(`Success! +${rewardAmount.toFixed(2)} WC added to your WiseCoin wallet.`);
+        setTimeout(() => setRewardMsg(null), 3500);
     } catch (error) {
-       console.error('Reward error:', error);
-       setRewardMsg('Failed to credit reward. Please try again.');
-       setTimeout(() => setRewardMsg(null), 3500);
+        console.error('[AdsSection] Reward transaction failed:', error);
+        setRewardMsg('Failed to credit reward. System synchronization error.');
+        setTimeout(() => setRewardMsg(null), 3500);
     } finally {
-       setLoading(false);
+        setLoading(false);
     }
   };
 
