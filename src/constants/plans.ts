@@ -103,10 +103,11 @@ export const PLANS: PlanDetails[] = [
     name: 'Platinum',
     cost: 15000,
     multiplier: 7.5,
-    minWithdrawal: 45000,
+    minWithdrawal: 1,
     perks: [
       'Earn up to ₦3,000 Daily',
       'Unlimited Lifetime Earnings',
+      'Unlimited Task Withdrawal',
       '7.5x Earnings Multiplier',
       '2 Free Premium Courses'
     ],
@@ -120,10 +121,11 @@ export const PLANS: PlanDetails[] = [
     name: 'Golden',
     cost: 25000,
     multiplier: 10.0,
-    minWithdrawal: 75000,
+    minWithdrawal: 1,
     perks: [
       'Earn up to ₦4,000 Daily',
       'Unlimited Lifetime Earnings',
+      'Unlimited Task Withdrawal',
       '10.0x Earnings Multiplier',
       '4 Free Premium Courses'
     ],

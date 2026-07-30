@@ -182,9 +182,10 @@ export default function Withdrawal() {
       
       if (withdrawalType === 'task') {
         const is30th = now.getDate() === 30;
-        if (isTaskOverride) {
+        const isUnlimitedPlan = profile?.plan === 'platinum' || profile?.plan === 'golden';
+        if (isTaskOverride || isUnlimitedPlan) {
           setIsWindowOpen(true);
-          setTimeRemainingStr('🔓 Special Admin Task Withdrawal Window Active!');
+          setTimeRemainingStr(isUnlimitedPlan ? '🔓 Unlimited Premium Task Portal Active!' : '🔓 Special Admin Task Withdrawal Window Active!');
         } else if (isCustomScheduleActive) {
           setIsWindowOpen(true);
           setTimeRemainingStr('📅 ' + customScheduleStr);
@@ -230,8 +231,8 @@ export default function Withdrawal() {
       case 'bronze': return 15000;
       case 'diamond': return 21000;
       case 'silver': return 30000;
-      case 'platinum': return 45000;
-      case 'golden': return 75000;
+      case 'platinum': return 99999999;
+      case 'golden': return 99999999;
       default: return 0; // Free cannot execute withdrawals unless they are an admin
     }
   }

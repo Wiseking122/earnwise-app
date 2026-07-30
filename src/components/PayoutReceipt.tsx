@@ -115,6 +115,25 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [downloadedImage, setDownloadedImage] = useState<string | null>(null);
+  const [renderedImage, setRenderedImage] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen && data && receiptRef.current) {
+      const timer = setTimeout(() => {
+        generateCanvas().then(canvas => {
+          if (canvas) {
+            const dataUrl = canvas.toDataURL('image/png');
+            setRenderedImage(dataUrl);
+          }
+        }).catch(err => {
+          console.error("Background receipt render failed:", err);
+        });
+      }, 600);
+      return () => clearTimeout(timer);
+    } else {
+      setRenderedImage(null);
+    }
+  }, [isOpen, data]);
 
   if (!isOpen || !data) return null;
 
@@ -145,7 +164,15 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
 
   const generateCanvas = async (): Promise<HTMLCanvasElement | null> => {
     if (!receiptRef.current) return null;
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    
+    // Ensure all fonts are loaded
+    if (typeof document !== 'undefined' && (document as any).fonts && (document as any).fonts.ready) {
+      await (document as any).fonts.ready;
+    }
+
+    // Wait for a few frames to ensure layout is settled
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const element = receiptRef.current;
     const originalGCS = window.getComputedStyle;
@@ -174,6 +201,8 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
           scrollX: 0,
           scrollY: 0,
           windowWidth: 340,
+          removeContainer: true,
+          imageTimeout: 0,
           onclone: (clonedDoc) => {
             const clonedWin = clonedDoc.defaultView;
             if (clonedWin) {
@@ -192,17 +221,64 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
               };
             }
 
+            // 1. Sanitize all style tag innerHTMLs to replace 'oklch' which causes html2canvas to fail
             try {
               const styleTags = clonedDoc.getElementsByTagName('style');
               for (let i = 0; i < styleTags.length; i++) {
-                let css = styleTags[i].innerHTML;
-                if (css && css.includes('oklch')) {
-                  css = css.replace(/oklch\([^)]+\)/g, '#1e293b');
-                  styleTags[i].innerHTML = css;
+                try {
+                  let css = styleTags[i].innerHTML;
+                  if (css && css.includes('oklch')) {
+                    css = css.replace(/oklch\([^)]+\)/g, '#1e293b');
+                    styleTags[i].innerHTML = css;
+                  }
+                } catch (styleErr) {
+                  console.warn("Could not clean style tag innerHTML:", styleErr);
                 }
               }
             } catch (err) {
-              console.warn("Could not clean style tag oklch:", err);
+              console.warn("Error finding style tags:", err);
+            }
+
+            // 2. Sanitize all styleSheets rules to delete rules containing 'oklch'
+            try {
+              const sheets = clonedDoc.styleSheets;
+              for (let i = 0; i < sheets.length; i++) {
+                try {
+                  const sheet = sheets[i];
+                  const rules = sheet.cssRules || sheet.rules;
+                  if (!rules) continue;
+                  for (let j = rules.length - 1; j >= 0; j--) {
+                    try {
+                      const rule = rules[j];
+                      if (rule && rule.cssText && rule.cssText.includes('oklch')) {
+                        sheet.deleteRule(j);
+                      }
+                    } catch (ruleErr) {
+                      // Ignore individual rule access errors
+                    }
+                  }
+                } catch (sheetErr) {
+                  console.warn("Could not access sheet rules:", sheetErr);
+                }
+              }
+            } catch (err) {
+              console.warn("Error sanitizing document stylesheets:", err);
+            }
+
+            // 3. Sanitize inline style attributes for any element containing 'oklch'
+            try {
+              const allEls = clonedDoc.getElementsByTagName('*');
+              for (let i = 0; i < allEls.length; i++) {
+                const el = allEls[i] as HTMLElement;
+                if (el && el.style) {
+                  const inlineStyle = el.getAttribute('style') || '';
+                  if (inlineStyle.includes('oklch')) {
+                    el.setAttribute('style', inlineStyle.replace(/oklch\([^)]+\)/g, '#1e293b'));
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn("Error sanitizing inline styles:", err);
             }
 
             const clonedCard = clonedDoc.getElementById('earnwise-payout-card');
@@ -225,10 +301,8 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const canvas = await generateCanvas();
-      if (!canvas) throw new Error("Could not construct canvas element");
-      
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (!dataUrl) throw new Error("Could not construct canvas element");
       
       try {
         const link = document.createElement('a');
@@ -255,10 +329,9 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
   const copyBothToClipboard = async () => {
     setSharing(true);
     try {
-      const canvas = await generateCanvas();
-      if (!canvas) throw new Error("Could not construct canvas");
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (!dataUrl) throw new Error("Could not construct canvas");
       
-      const dataUrl = canvas.toDataURL('image/png');
       const blob = dataURLtoBlob(dataUrl);
       const textBlob = new Blob([shareText], { type: 'text/plain' });
 
@@ -290,9 +363,8 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
   const shareToPlatform = async (platform: 'whatsapp' | 'telegram' | 'copy') => {
     if (platform === 'whatsapp') {
       try {
-        const canvas = await generateCanvas();
-        if (canvas) {
-          const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+        if (dataUrl) {
           const blob = dataURLtoBlob(dataUrl);
           const textBlob = new Blob([shareText], { type: 'text/plain' });
           if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
@@ -327,9 +399,8 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
       }, 800);
     } else if (platform === 'telegram') {
       try {
-        const canvas = await generateCanvas();
-        if (canvas) {
-          const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+        if (dataUrl) {
           const blob = dataURLtoBlob(dataUrl);
           const textBlob = new Blob([shareText], { type: 'text/plain' });
           if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
@@ -368,10 +439,9 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
   const handleNativeShare = async () => {
     setSharing(true);
     try {
-      const canvas = await generateCanvas();
-      if (!canvas) throw new Error("Could not construct canvas");
+      const dataUrl = renderedImage || (await generateCanvas())?.toDataURL('image/png');
+      if (!dataUrl) throw new Error("Could not construct canvas");
 
-      const dataUrl = canvas.toDataURL('image/png');
       const blob = dataURLtoBlob(dataUrl);
       const file = new File([blob], `earnwise_withdrawal_${receiptId.slice(-8)}.png`, { type: 'image/png' });
 

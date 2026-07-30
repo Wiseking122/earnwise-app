@@ -520,8 +520,8 @@ const PLAN_MIN_WITHDRAWAL: Record<string, number> = {
   bronze: 15000,
   diamond: 21000,
   silver: 30000,
-  platinum: 45000,
-  golden: 75000
+  platinum: 1,
+  golden: 1
 };
 
 // --- CONFIGURATION: Advertiser CPA Chart ---
@@ -5592,7 +5592,8 @@ GENERAL RULES:
 
         if (withdrawalType === 'task') {
           const lagosDay = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Lagos', day: 'numeric' }).format(now));
-          if (isTaskOverride || isCustomScheduleActive) {
+          const isUnlimitedPlan = userData.plan === 'platinum' || userData.plan === 'golden';
+          if (isTaskOverride || isCustomScheduleActive || isUnlimitedPlan) {
             isWindowOpen = true;
           } else if (lagosDay === 30) {
             isWindowOpen = true;

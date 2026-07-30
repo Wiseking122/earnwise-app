@@ -168,8 +168,14 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const generateCanvas = async (): Promise<HTMLCanvasElement | null> => {
     if (!receiptRef.current) return null;
     
-    // Minor delay to ensure component render states are aligned
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Ensure all fonts are loaded before capture to prevent layout shifts
+    if (typeof document !== 'undefined' && (document as any).fonts && (document as any).fonts.ready) {
+      await (document as any).fonts.ready;
+    }
+
+    // Wait for a few frames to ensure layout is settled and non-animating
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const element = receiptRef.current;
     
@@ -199,6 +205,8 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
           scrollX: 0,
           scrollY: 0,
           windowWidth: 340,
+          removeContainer: true,
+          imageTimeout: 0,
           onclone: (clonedDoc) => {
             // Intercept cloned iframe window getComputedStyle
             const clonedWin = clonedDoc.defaultView;

@@ -66,10 +66,10 @@ export const DailyCheckIn: React.FC = () => {
 
   // Derived Values
   const rawStreak = profile?.streak || 0;
-  // Map streak to current 7-day cycle index (0 to 6)
-  const cycleIndex = rawStreak > 0 ? (rawStreak - 1) % 7 : 0;
   // Current Day in our 7-day UI cycle (1 to 7)
-  const cycleDayNumber = cycleIndex + 1;
+  const cycleDayNumber = (rawStreak % 7) + 1;
+  // Map streak to current 7-day cycle index (0 to 6)
+  const cycleIndex = cycleDayNumber - 1;
 
   // The active claim reward for today's check-in
   const currentReward = DAILY_REWARDS[cycleIndex] || DAILY_REWARDS[0];
@@ -97,6 +97,7 @@ export const DailyCheckIn: React.FC = () => {
       await updateDoc(userRef, {
         wiseCoins: increment(rewardAmount), // Credited directly to wise coin balance
         xp: increment(xpAmount),
+        streak: increment(1),
         lastCheckIn: serverTimestamp(),
       });
 

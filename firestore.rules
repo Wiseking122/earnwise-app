@@ -162,7 +162,7 @@ service cloud.firestore {
         (request.auth.uid == userId && (
           !incoming().diff(existing()).affectedKeys().hasAny(['role'])
         )) ||
-        (set(['balance', 'referralBalance', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt', 'fcmTokens', 'pushEnabled', 'lastCoachingAt', 'coachingStep', 'wiseCoins', 'completedAds']).hasAll(incoming().diff(existing()).affectedKeys()))
+        (set(['balance', 'referralBalance', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt', 'fcmTokens', 'pushEnabled', 'lastCoachingAt', 'coachingStep', 'wiseCoins', 'completedAds', 'xp', 'lastCheckIn', 'streak']).hasAll(incoming().diff(existing()).affectedKeys()))
       );
     }
 
