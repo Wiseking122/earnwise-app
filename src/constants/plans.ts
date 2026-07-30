@@ -5,6 +5,7 @@ export interface PlanDetails {
   name: string;
   cost: number;
   multiplier: number;
+  minWithdrawal: number;
   perks: string[];
   color: string;
   description: string;
@@ -18,6 +19,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Free',
     cost: 0,
     multiplier: 1.0,
+    minWithdrawal: 1000,
     perks: ['Standard Base Rewards', 'Basic Tasks Only', 'No AI Support'],
     color: 'bg-gray-500',
     description: 'Our entry-level basic package. Earn standard base rewards on basic social tasks. AI Assistant and specialized premium tasks are locked.',
@@ -29,6 +31,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Elite',
     cost: 1000,
     multiplier: 1.2,
+    minWithdrawal: 3000,
     perks: ['Earn up to ₦235 Daily', 'Max Earnings: ₦7,000', '1.2x Multiplier', 'AI Task Breakdown'],
     color: 'bg-indigo-500',
     description: 'Earn up to ₦235 daily with a maximum total lifetime earnings cap of ₦7,000! Multiply all your social and ad earnings by 1.2x. Includes core AI assistance, limited to 3 daily queries (Unlimited for Course Buyers), and faster payout verification.',
@@ -40,6 +43,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Starter',
     cost: 2000,
     multiplier: 1.5,
+    minWithdrawal: 6000,
     perks: ['Earn up to ₦470 Daily', 'Max Earnings: ₦14,000', '1.5x Multiplier', 'Premium Sync'],
     color: 'bg-blue-500',
     description: 'Earn up to ₦470 daily with a maximum total lifetime earnings cap of ₦14,000! A great value package featuring a strong 1.5x earnings multiplier. Includes access to our Wise AI assistant with a limit of 3 daily queries (Unlimited for Course Buyers).',
@@ -51,6 +55,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Pro',
     cost: 3000,
     multiplier: 1.8,
+    minWithdrawal: 9000,
     perks: ['Earn up to ₦735 Daily', 'Max Earnings: ₦22,000', '1.8x Earnings Multiplier', 'Weekly Bonus Tasks'],
     color: 'bg-emerald-500',
     description: 'Earn up to ₦735 daily with a maximum total lifetime earnings cap of ₦22,000! Accelerate your digital wealth. Earn 1.8x more on every task and enjoy 3 daily Wise AI Assistant queries (Unlimited for Course Buyers) plus dedicated support.',
@@ -62,6 +67,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Bronze',
     cost: 5000,
     multiplier: 2.5,
+    minWithdrawal: 15000,
     perks: ['Earn up to ₦1,170 Daily', 'Max Earnings: ₦35,000', '2.5x Earnings Multiplier', 'Bronze Exclusive Tasks'],
     color: 'bg-orange-700',
     description: 'Earn up to ₦1,170 daily with a maximum total lifetime earnings cap of ₦35,000! Power up to a huge 2.5x multiplier on all personal task submissions. Includes access to our Wise AI Assistant, limited to 3 queries daily (Unlimited for Course Buyers).',
@@ -73,6 +79,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Diamond',
     cost: 7000,
     multiplier: 3.5,
+    minWithdrawal: 21000,
     perks: ['Earn up to ₦1,500 Daily', 'Max Earnings: ₦45,000', '3.5x Earnings Multiplier', 'Diamond Exclusive Tasks'],
     color: 'bg-cyan-500',
     description: 'Earn up to ₦1,500 daily with a maximum total lifetime earnings cap of ₦45,000! Prestige VIP tier. Boost your earnings by 3.5x, unlock Diamond-exclusive tasks, and VIP priority support. Includes access to our Wise AI Assistant, limited to 3 queries daily (Unlimited for Course Buyers).',
@@ -84,6 +91,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Silver',
     cost: 10000,
     multiplier: 5.0,
+    minWithdrawal: 30000,
     perks: ['Earn up to ₦2,500 Daily', 'Max Earnings: ₦55,000', '5.0x Earnings Multiplier', 'Silver VIP Support'],
     color: 'bg-slate-400',
     description: 'Earn up to ₦2,500 daily with a maximum total lifetime earnings cap of ₦55,000! Our elite institutional package. Receive a massive 5.0x payout multiplier on all approved tasks, with UNLIMITED Wise AI and instant withdrawal priority.',
@@ -95,6 +103,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Platinum',
     cost: 15000,
     multiplier: 7.5,
+    minWithdrawal: 45000,
     perks: [
       'Earn up to ₦3,000 Daily',
       'Unlimited Lifetime Earnings',
@@ -111,6 +120,7 @@ export const PLANS: PlanDetails[] = [
     name: 'Golden',
     cost: 25000,
     multiplier: 10.0,
+    minWithdrawal: 75000,
     perks: [
       'Earn up to ₦4,000 Daily',
       'Unlimited Lifetime Earnings',

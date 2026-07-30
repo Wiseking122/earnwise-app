@@ -512,6 +512,18 @@ const PLAN_LIMITS: Record<string, { cap: number; daily: number }> = {
   golden: { cap: 99999999, daily: 40000 }
 };
 
+const PLAN_MIN_WITHDRAWAL: Record<string, number> = {
+  free: 1000,
+  elite: 3000,
+  starter: 6000,
+  pro: 9000,
+  bronze: 15000,
+  diamond: 21000,
+  silver: 30000,
+  platinum: 45000,
+  golden: 75000
+};
+
 // --- CONFIGURATION: Advertiser CPA Chart ---
 const CPA_CHART: Record<string, number> = {
   'follow': 20,
@@ -5544,6 +5556,12 @@ GENERAL RULES:
       }
       if (!isAdmin && (!userData.plan || userData.plan === 'free')) {
         return res.status(400).json({ error: "Upgrade your plan to start withdrawing." });
+      }
+
+      const planId = userData.plan || 'free';
+      const minWithdrawal = PLAN_MIN_WITHDRAWAL[planId] || 1000;
+      if (!isAdmin && amount < minWithdrawal) {
+        return res.status(400).json({ error: "You have not yet reached the minimum withdrawal amount for your activated plan. Continue completing tasks and offers until you reach the required amount before requesting a withdrawal." });
       }
 
       // --- ADVANCED DUAL-WALLET CALENDAR & WITHDRAWAL LOGIC ---

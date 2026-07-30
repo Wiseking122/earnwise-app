@@ -38,6 +38,8 @@ import WithdrawalTimeline from '../components/WithdrawalTimeline';
 import { PayoutReceipt } from '../components/PayoutReceipt';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
+import { PLANS } from '../constants/plans';
+
 export default function Withdrawal() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -526,8 +528,12 @@ export default function Withdrawal() {
     }
 
     const withdrawAmount = parseFloat(amount);
-    if (isNaN(withdrawAmount) || withdrawAmount < 1000) {
-      setError('Minimum withdrawal is ₦1,000.00');
+    const planId = profile.plan || 'free';
+    const planDetails = PLANS.find(p => p.id === planId);
+    const minWithdrawal = planDetails?.minWithdrawal || 1000;
+
+    if (isNaN(withdrawAmount) || withdrawAmount < minWithdrawal) {
+      setError(`You have not yet reached the minimum withdrawal amount for your activated plan. Continue completing tasks and offers until you reach the required amount before requesting a withdrawal.`);
       return;
     }
 

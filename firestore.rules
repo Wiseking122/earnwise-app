@@ -69,9 +69,20 @@ service cloud.firestore {
              (data.submittedAt == request.time || data.submittedAt is timestamp);
     }
 
+    function getMinWithdrawal(plan) {
+      return plan == 'elite' ? 3000 :
+             plan == 'starter' ? 6000 :
+             plan == 'pro' ? 9000 :
+             plan == 'bronze' ? 15000 :
+             plan == 'diamond' ? 21000 :
+             plan == 'silver' ? 30000 :
+             plan == 'platinum' ? 45000 :
+             plan == 'golden' ? 75000 : 1000;
+    }
+
     function isValidWithdrawal(data) {
       return data.userId == request.auth.uid &&
-             data.amount is number && data.amount > 0 &&
+             data.amount is number && data.amount >= getMinWithdrawal(getUserData(request.auth.uid).plan) &&
              data.status == 'pending' &&
              data.bankDetails.accountNumber is string;
     }
