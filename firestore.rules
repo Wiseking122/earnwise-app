@@ -41,6 +41,10 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function set(list) {
+      return list.toSet();
+    }
+
     // --- Validators ---
     function isValidUser(data) {
       return data.uid == request.auth.uid &&
@@ -76,8 +80,7 @@ service cloud.firestore {
              plan == 'bronze' ? 15000 :
              plan == 'diamond' ? 21000 :
              plan == 'silver' ? 30000 :
-             plan == 'platinum' ? 45000 :
-             plan == 'golden' ? 75000 : 1000;
+             (plan == 'platinum' || plan == 'golden') ? 1 : 1000;
     }
 
     function isValidWithdrawal(data) {

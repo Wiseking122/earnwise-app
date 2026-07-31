@@ -66,8 +66,33 @@ export const DailyCheckIn: React.FC = () => {
 
   // Derived Values
   const rawStreak = profile?.streak || 0;
+  
+  // Logic to determine if streak should be reset (missed more than 1 day)
+  const isStreakBroken = React.useMemo(() => {
+    if (!profile?.lastCheckIn) return false;
+    const lastCheckIn = profile.lastCheckIn?.toDate?.() || profile.lastCheckIn;
+    const lastDate = new Date(lastCheckIn);
+    const now = new Date();
+    
+    // Reset time to midnight for calendar day comparison
+    const lastMidnight = new Date(lastDate);
+    lastMidnight.setHours(0, 0, 0, 0);
+    
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
+    
+    const diffDays = Math.floor((todayMidnight.getTime() - lastMidnight.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // If diffDays is 1, they check in on the consecutive day.
+    // If diffDays > 1, they missed a day.
+    // If diffDays 0, they already checked in today.
+    return diffDays > 1;
+  }, [profile?.lastCheckIn]);
+
+  const effectiveStreak = isStreakBroken ? 0 : rawStreak;
+
   // Current Day in our 7-day UI cycle (1 to 7)
-  const cycleDayNumber = (rawStreak % 7) + 1;
+  const cycleDayNumber = (effectiveStreak % 7) + 1;
   // Map streak to current 7-day cycle index (0 to 6)
   const cycleIndex = cycleDayNumber - 1;
 
@@ -94,12 +119,22 @@ export const DailyCheckIn: React.FC = () => {
     try {
       // 1. Transactionally update user profile document
       const userRef = doc(db, 'users', profile.uid);
-      await updateDoc(userRef, {
-        wiseCoins: increment(rewardAmount), // Credited directly to wise coin balance
+      
+      // If streak is broken, we set it to 1. If not, we increment it.
+      const updateData: any = {
+        wiseCoins: increment(rewardAmount),
         xp: increment(xpAmount),
-        streak: increment(1),
         lastCheckIn: serverTimestamp(),
-      });
+        updatedAt: serverTimestamp()
+      };
+
+      if (isStreakBroken) {
+        updateData.streak = 1;
+      } else {
+        updateData.streak = increment(1);
+      }
+
+      await setDoc(userRef, updateData, { merge: true });
 
       // 2. Transactionally update wise_coin_wallets document
       const walletRef = doc(db, 'wise_coin_wallets', profile.uid);
@@ -115,7 +150,9 @@ export const DailyCheckIn: React.FC = () => {
         userId: profile.uid,
         amount: rewardAmount,
         action: 'credit',
-        reason: `Consecutive Day ${cycleDayNumber} Check-In Bonus`,
+        reason: isStreakBroken 
+          ? `Consecutive Day 1 Check-In Bonus (Streak Reset)` 
+          : `Consecutive Day ${cycleDayNumber} Check-In Bonus`,
         status: 'completed',
         createdAt: serverTimestamp()
       });
