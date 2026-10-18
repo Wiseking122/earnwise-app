@@ -199,7 +199,7 @@ service cloud.firestore {
     match /wise_coin_transactions/{transactionId} {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
       allow update, delete: if isAdmin();
     }
 

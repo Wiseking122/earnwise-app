@@ -227,9 +227,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
     { path: '/tasks', label: 'Tasks', icon: List, locked: isFree },
     { path: '/academy', label: 'Academy', icon: BookOpen, locked: isFree },
     { path: '/advertiser', label: 'Ads', icon: Megaphone, locked: false },
-    { path: '/upgrade', label: 'Upgrade', icon: Crown, locked: false },
     { path: '/earnings', label: 'Wallet', icon: Wallet, locked: isFree },
-    { path: '/profile', label: 'Profile', icon: UserIcon, locked: false },
   ];
 
   return (
@@ -274,14 +272,57 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
                 setHasNewNotifs(false);
               }}
               className="p-1.5 hover:bg-white/10 rounded-xl transition-colors relative group"
+              title="Notifications"
             >
               <Bell size={18} className="text-slate-300 active:rotate-12 transition-transform" />
               {hasNewNotifs && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
               )}
             </button>
+            {/* Profile Tab moved to up right near notification bell */}
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={() => navigate('/profile')}
+              className={`p-1 px-2.5 rounded-xl transition-all relative flex items-center gap-1.5 group cursor-pointer border ${
+                location.pathname.startsWith('/profile')
+                  ? 'bg-blue-600/25 text-white border-blue-500/50 shadow-[0_0_12px_rgba(59,130,246,0.35)]'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+              }`}
+              title="Profile"
+              aria-label="Profile"
+            >
+              <div className="relative flex items-center justify-center">
+                {profile.photoURL ? (
+                  <img
+                    src={profile.photoURL}
+                    alt={profile.displayName || 'Profile'}
+                    className={`w-6 h-6 rounded-lg object-cover ${
+                      location.pathname.startsWith('/profile') ? 'ring-1 ring-blue-400' : 'ring-1 ring-white/20'
+                    }`}
+                  />
+                ) : (
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-display font-black text-xs ${
+                    location.pathname.startsWith('/profile') ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'
+                  }`}>
+                    {profile.displayName?.[0]?.toUpperCase() || <UserIcon size={13} />}
+                  </div>
+                )}
+                {profile.plan !== 'free' && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full flex items-center justify-center shadow-[0_0_6px_rgba(251,191,36,0.8)] ring-1 ring-slate-900">
+                    <Crown size={7} className="text-slate-950 fill-slate-950" />
+                  </span>
+                )}
+              </div>
+              <span className="text-xs font-bold tracking-tight">
+                Profile
+              </span>
+            </motion.button>
             {profile.plan !== 'free' && (
-              <div className="w-8 h-8 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-xl flex items-center justify-center text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.3)] border border-amber-200/50">
+              <div 
+                onClick={() => navigate('/profile?tab=upgrade')}
+                className="w-8 h-8 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-xl flex items-center justify-center text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.3)] border border-amber-200/50 cursor-pointer active:scale-95 transition-transform"
+                title={`${profile.plan.toUpperCase()} Member - Click to manage`}
+              >
                 <Crown size={16} className="text-amber-900 fill-amber-900" />
               </div>
             )}

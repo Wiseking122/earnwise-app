@@ -15,10 +15,11 @@ import {
   ArrowRight,
   Info
 } from 'lucide-react';
-import { doc, updateDoc, increment, serverTimestamp, setDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, increment, serverTimestamp, setDoc, collection, writeBatch } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import Confetti from './Confetti';
+import confetti from 'canvas-confetti';
 import { PlanRestrictionModal } from './PlanRestrictionModal';
 
 // Daily Rewards configuration mapping to 7-day cycle
@@ -107,20 +108,15 @@ export const DailyCheckIn: React.FC = () => {
     }
     if (!canCheckIn || loading) return;
     
-    // Open current day's link in a new tab
-    if (currentReward.link) {
-      window.open(currentReward.link, '_blank', 'noopener,noreferrer');
-    }
-
     setLoading(true);
     const rewardAmount = currentReward.amount;
     const xpAmount = currentReward.xp;
 
     try {
-      // 1. Transactionally update user profile document
-      const userRef = doc(db, 'users', profile.uid);
+      // 1. Transactionally update both documents using a batch
+      const batch = writeBatch(db);
       
-      // If streak is broken, we set it to 1. If not, we increment it.
+      const userRef = doc(db, 'users', profile.uid);
       const updateData: any = {
         wiseCoins: increment(rewardAmount),
         xp: increment(xpAmount),
@@ -134,31 +130,51 @@ export const DailyCheckIn: React.FC = () => {
         updateData.streak = increment(1);
       }
 
-      await setDoc(userRef, updateData, { merge: true });
+      batch.set(userRef, updateData, { merge: true });
 
-      // 2. Transactionally update wise_coin_wallets document
+      // 2. Update wise_coin_wallets document
       const walletRef = doc(db, 'wise_coin_wallets', profile.uid);
-      await setDoc(walletRef, {
+      batch.set(walletRef, {
         userId: profile.uid,
         balance: increment(rewardAmount),
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      // 3. Add an audit log entry in the user's wise_coin_transactions collection
-      const wcTransRef = doc(collection(db, 'wise_coin_transactions'));
-      await setDoc(wcTransRef, {
+      // 3. Create a transaction record for history (fixed: added 'type' field for rules compliance)
+      const transRef = doc(collection(db, 'wise_coin_transactions'));
+      batch.set(transRef, {
         userId: profile.uid,
         amount: rewardAmount,
+        type: 'check_in',
         action: 'credit',
         reason: isStreakBroken 
-          ? `Consecutive Day 1 Check-In Bonus (Streak Reset)` 
-          : `Consecutive Day ${cycleDayNumber} Check-In Bonus`,
+          ? `Day 1 Check-In (Streak Reset)` 
+          : `Day ${cycleDayNumber} Check-In Bonus`,
         status: 'completed',
         createdAt: serverTimestamp()
       });
-      
-      setShowReward(true);
+
+      await batch.commit();
+
+      setLastCheckInTime(new Date());
       setCanCheckIn(false);
+      
+      // Open reward link AFTER successful credit to ensure user is credited even if they leave
+      if (currentReward.link) {
+        try {
+          window.open(currentReward.link, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+          console.warn("Popup blocked or failed to open reward link:", e);
+        }
+      }
+
+      setShowReward(true);
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#10b981', '#3b82f6', '#f59e0b']
+      });
     } catch (err) {
       console.error("Check-in failed:", err);
       handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/dailyCheckIn`);

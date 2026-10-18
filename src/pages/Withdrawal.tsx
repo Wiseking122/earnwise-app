@@ -549,8 +549,11 @@ export default function Withdrawal() {
     }
 
     const currentWindowRequests = getCumulativeWithdrawalsInWindow();
+    const isUnlimited = cap >= 90000000;
+    
     if (!isAdmin && (currentWindowRequests + withdrawAmount > cap)) {
-      setError(`Payout request exceeds your plan's window limit. Your maximum window capacity is ₦${cap.toLocaleString()}, and you have already requested ₦${currentWindowRequests.toLocaleString()} in this session.`);
+      const capDisplay = isUnlimited ? "Unlimited" : `₦${cap.toLocaleString()}`;
+      setError(`Payout request exceeds your plan's window limit. Your maximum window capacity is ${capDisplay}, and you have already requested ₦${currentWindowRequests.toLocaleString()} in this session.`);
       return;
     }
 

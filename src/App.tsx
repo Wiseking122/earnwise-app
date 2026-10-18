@@ -69,7 +69,7 @@ function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: 
   const isFreeUser = profile?.plan === 'free' && !isAdmin && !isWiseKing;
 
   if (!bypassPlanCheck && isFreeUser) {
-    return <Navigate to="/upgrade?reason=plan_required" />;
+    return <Navigate to="/profile?tab=upgrade&reason=plan_required" replace />;
   }
   
   return <>{children}</>;
@@ -78,7 +78,7 @@ function PrivateRoute({ children, adminOnly = false, bypassPlanCheck = false }: 
 function AppRoutes() {
   const { loading } = useAuth();
   const location = useLocation();
-  
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -145,24 +145,6 @@ export default function App() {
 
 function AppContent() {
   useAdsterraScript();
-  
-  React.useEffect(() => {
-    try {
-      const tg = (window as any).Telegram?.WebApp;
-      if (tg) {
-        if (typeof tg.ready === 'function') tg.ready();
-        if (typeof tg.expand === 'function') tg.expand();
-        if (typeof tg.enableClosingConfirmation === 'function') {
-           tg.enableClosingConfirmation();
-         }
-        if (typeof tg.setHeaderColor === 'function') {
-           tg.setHeaderColor('#0f172a'); // slate-900
-        }
-      }
-    } catch (err) {
-      console.log('Telegram App Init Error:', err);
-    }
-  }, []);
   
   return (
     <>

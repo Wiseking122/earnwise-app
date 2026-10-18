@@ -374,7 +374,7 @@ export default function Deposit() {
             ) : (
               <>
                 <Zap size={14} className="group-hover/btn:fill-white transition-all" />
-                <span>Execute Protocol</span>
+                <span>Make Payment</span>
                 <ChevronRight size={12} className="group-hover/btn:translate-x-1 transition-transform opacity-50" />
               </>
             )}

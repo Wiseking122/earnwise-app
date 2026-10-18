@@ -498,13 +498,13 @@ export default function Home() {
                   </div>
                 </div>
                 {!isAdmin && (
-                  <Link to="/upgrade" className="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
+                  <Link to="/profile?tab=upgrade" className="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase tracking-widest shadow-md active:scale-95 transition-transform hover:bg-orange-50">
                     Upgrade
                   </Link>
                 )}
               </div>
             ) : (
-              <Link to="/upgrade" className="bg-blue-600 p-3 sm:p-3.5 rounded-xl text-white flex items-center justify-between shadow-md border border-blue-500 group">
+              <Link to="/profile?tab=upgrade" className="bg-blue-600 p-3 sm:p-3.5 rounded-xl text-white flex items-center justify-between shadow-md border border-blue-500 group">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
                     <Zap size={16} className="fill-white animate-pulse" />
@@ -1134,7 +1134,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   setShowRenewModal(false);
-                  navigate('/upgrade');
+                  navigate('/profile?tab=upgrade');
                 }}
                 className="w-full bg-linear-to-r from-red-600 to-orange-500 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest shadow-lg hover:from-red-500 hover:to-orange-400 transition-all active:scale-95"
               >

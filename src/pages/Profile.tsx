@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../lib/config';
 import Layout from '../components/Layout';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import UpgradeTabContent from '../components/UpgradeTabContent';
 import { 
   User, 
   Shield, 
@@ -41,6 +42,31 @@ import { sendNotification, NotificationType, requestNotificationPermission } fro
 export default function Profile() {
   const { profile, logout, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'profile' | 'upgrade'>(
+    searchParams.get('tab') === 'upgrade' ? 'upgrade' : 'profile'
+  );
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'upgrade') {
+      setActiveTab('upgrade');
+    } else if (tabParam === 'profile') {
+      setActiveTab('profile');
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'profile' | 'upgrade') => {
+    setActiveTab(tab);
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'upgrade') {
+      newParams.set('tab', 'upgrade');
+    } else {
+      newParams.delete('tab');
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
   const [isEditing, setIsEditing] = useState(false);
   const [newFirstName, setNewFirstName] = useState(profile?.firstName || '');
   const [newLastName, setNewLastName] = useState(profile?.lastName || '');
@@ -258,7 +284,7 @@ export default function Profile() {
     { label: 'Hall of Fame (Leaderboard)', icon: Award, path: '/leaderboard' },
     { label: 'Post Ads (Advertiser)', icon: Megaphone, path: '/advertiser' },
     { label: 'Transaction History', icon: History, path: '/transactions' },
-    { label: 'Upgrade Membership', icon: Crown, path: '/upgrade' },
+    { label: 'Upgrade Membership', icon: Crown, action: () => handleTabChange('upgrade') },
     { label: 'Payment Details', icon: CreditCard, path: '/withdrawal' },
     { label: 'Refer & Earn', icon: Share2, path: '/referral' },
     ...(canInstall ? [{ label: 'Install App (PWA)', icon: Smartphone, action: handleInstallClick }] : []),
@@ -310,59 +336,96 @@ export default function Profile() {
   ];
 
   return (
-    <Layout title="Executive Profile">
+    <Layout title={activeTab === 'upgrade' ? "Membership Upgrade" : "Executive Profile"}>
       <div className="p-3.5 sm:p-5 pb-24 space-y-5 max-w-2xl mx-auto relative">
         <div className="premium-blur" />
 
-        {/* Cinematic Profile Header */}
-        <div className="bg-slate-950 rounded-2xl p-4 sm:p-6 text-white relative overflow-hidden shadow-xl group border border-white/5">
-          <div className="absolute inset-0 bg-linear-to-br from-blue-600/20 via-transparent to-slate-950 opacity-100" />
-          <div className="absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none -mr-24 -mt-24" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)' }} />
-          
-          <div className="relative z-10 flex flex-col items-center">
-            <div className="relative group mb-3">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-2xl flex items-center justify-center text-blue-500 border-2 border-white/10 shadow-xl relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-700">
-                {newPhotoUrl ? (
-                  <img src={newPhotoUrl} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl font-display font-black italic">{profile?.displayName?.[0] || 'U'}</span>
-                )}
-                {isEditing && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <Camera size={24} className="text-white" />
-                  </div>
-                )}
-              </div>
-              <div className="absolute -inset-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%)' }} />
-            </div>
+        {/* Profile Section Tabs */}
+        <div className="flex bg-slate-900/90 backdrop-blur-xl p-1 rounded-2xl border border-white/10 shadow-lg relative z-20">
+          <button
+            onClick={() => handleTabChange('profile')}
+            className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer ${
+              activeTab === 'profile'
+                ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <User size={15} />
+            Profile Details
+          </button>
+          <button
+            onClick={() => handleTabChange('upgrade')}
+            className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 relative cursor-pointer ${
+              activeTab === 'upgrade'
+                ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow-[0_0_20px_rgba(245,158,11,0.4)]'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Crown size={15} className={activeTab === 'upgrade' ? 'fill-slate-950 text-slate-950' : 'text-amber-400 fill-amber-400'} />
+            Upgrade Tier
+            {profile?.plan === 'free' && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2.5 right-3" />
+            )}
+          </button>
+        </div>
 
-            {!isEditing ? (
-              <div className="text-center space-y-2">
-                <div className="space-y-0.5">
-                  <h2 className="text-lg sm:text-xl font-display font-black tracking-tighter uppercase italic">{profile?.displayName}</h2>
-                  <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em] font-sans">{profile?.email}</p>
-                </div>
-                
-                <div className="flex justify-center gap-2">
-                  <div className="flex items-center gap-1 bg-blue-600 text-white text-[7px] sm:text-[8px] font-black uppercase px-2.5 py-1 rounded-lg tracking-[0.1em] shadow-[0_0_15px_rgba(37,99,235,0.4)]">
-                    <Star size={8} className="fill-white" />
-                    Tier {profile?.level || 1}
+        {activeTab === 'upgrade' ? (
+          <UpgradeTabContent />
+        ) : (
+          <>
+            {/* Cinematic Profile Header */}
+            <div className="bg-slate-950 rounded-2xl p-4 sm:p-6 text-white relative overflow-hidden shadow-xl group border border-white/5">
+              <div className="absolute inset-0 bg-linear-to-br from-blue-600/20 via-transparent to-slate-950 opacity-100" />
+              <div className="absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none -mr-24 -mt-24" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)' }} />
+              
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="relative group mb-3">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-2xl flex items-center justify-center text-blue-500 border-2 border-white/10 shadow-xl relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-700">
+                    {newPhotoUrl ? (
+                      <img src={newPhotoUrl} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-3xl font-display font-black italic">{profile?.displayName?.[0] || 'U'}</span>
+                    )}
+                    {isEditing && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                        <Camera size={24} className="text-white" />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 bg-white/10 text-white text-[7px] sm:text-[8px] font-black uppercase px-2.5 py-1 rounded-lg tracking-[0.1em] border border-white/10 backdrop-blur-md">
-                    <Crown size={8} className="text-amber-400 fill-amber-400" />
-                    {profile?.plan || 'Free'}
-                  </div>
+                  <div className="absolute -inset-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%)' }} />
                 </div>
 
-                <div className="pt-1.5">
-                  <button 
-                    onClick={() => setIsEditing(true)}
-                    className="px-4 py-1.5 bg-white/5 border border-white/10 rounded-lg text-slate-300 text-[7.5px] sm:text-[8px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-1 hover:bg-white/10 hover:text-white transition-all backdrop-blur-md"
-                  >
-                    <Edit2 size={8} /> Customize Identity
-                  </button>
-                </div>
-              </div>
+                {!isEditing ? (
+                  <div className="text-center space-y-2">
+                    <div className="space-y-0.5">
+                      <h2 className="text-lg sm:text-xl font-display font-black tracking-tighter uppercase italic">{profile?.displayName}</h2>
+                      <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em] font-sans">{profile?.email}</p>
+                    </div>
+                    
+                    <div className="flex justify-center gap-2">
+                      <div className="flex items-center gap-1 bg-blue-600 text-white text-[7px] sm:text-[8px] font-black uppercase px-2.5 py-1 rounded-lg tracking-[0.1em] shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                        <Star size={8} className="fill-white" />
+                        Tier {profile?.level || 1}
+                      </div>
+                      <button
+                        onClick={() => handleTabChange('upgrade')}
+                        className="flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[7px] sm:text-[8px] font-black uppercase px-2.5 py-1 rounded-lg tracking-[0.1em] border border-amber-500/30 backdrop-blur-md transition-all active:scale-95 group cursor-pointer"
+                        title="Click to view upgrade plans"
+                      >
+                        <Crown size={8} className="text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
+                        {profile?.plan || 'Free'} • Upgrade
+                      </button>
+                    </div>
+
+                    <div className="pt-1.5">
+                      <button 
+                        onClick={() => setIsEditing(true)}
+                        className="px-4 py-1.5 bg-white/5 border border-white/10 rounded-lg text-slate-300 text-[7.5px] sm:text-[8px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-1 hover:bg-white/10 hover:text-white transition-all backdrop-blur-md"
+                      >
+                        <Edit2 size={8} /> Customize Identity
+                      </button>
+                    </div>
+                  </div>
             ) : (
               <div className="w-full max-w-sm space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -411,6 +474,32 @@ export default function Profile() {
             accept="image/*" 
             onChange={handleFileChange}
           />
+        </div>
+
+        {/* Tier Status & Upgrade Membership Banner */}
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-4 shadow-xl relative overflow-hidden flex items-center justify-between gap-3 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/20 transition-all duration-700" />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.4)] shrink-0">
+              <Crown size={20} className="fill-slate-950 text-slate-950" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-amber-400">Membership Tier</span>
+                <span className="text-[9px] font-bold text-slate-400">({profile?.plan ? `${profile.plan.toUpperCase()} Plan` : 'Free Plan'})</span>
+              </div>
+              <p className="text-xs font-black text-white capitalize mt-0.5">
+                {profile?.plan === 'free' ? 'Unlock Instant Earnings & 5x Multipliers' : 'View High-Yield Tiers & Multipliers'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleTabChange('upgrade')}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all shrink-0 flex items-center gap-1 cursor-pointer"
+          >
+            <span>Upgrade</span>
+            <ChevronRight size={13} />
+          </button>
         </div>
 
         {/* Elite Stats Hub */}
@@ -942,6 +1031,8 @@ export default function Profile() {
         </button>
 
         <p className="text-center text-[10px] text-slate-300 font-black uppercase tracking-[0.4em] pb-8 italic opacity-50">Earnwise Elite Protocol • v2.5 Cinematic</p>
+          </>
+        )}
       </div>
     </Layout>
   );

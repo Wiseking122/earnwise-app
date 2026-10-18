@@ -94,7 +94,7 @@ export const PlanRestrictionModal: React.FC<PlanRestrictionModalProps> = ({
               <button
                 onClick={() => {
                   onClose();
-                  navigate('/upgrade');
+                  navigate('/profile?tab=upgrade');
                 }}
                 className="w-full bg-linear-to-r from-blue-600 to-indigo-600 hover:brightness-110 text-white py-4 rounded-2xl font-display font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 cursor-pointer"
               >

@@ -123,6 +123,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
 
   useEffect(() => {
     // Generate the canvas in the background shortly after mount so it's ready when clicked
+    // Increased delay to 1200ms to ensure all animations and Vercel-side dynamic imports settle
     const timer = setTimeout(() => {
       generateCanvas().then(canvas => {
         if (canvas) {
@@ -132,7 +133,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
       }).catch(err => {
         console.error("Background receipt render failed:", err);
       });
-    }, 450); // 450ms is perfect: allows the modal animate entrance to complete fully, ensuring html2canvas grabs a clean, non-scaled/non-animated snapshot of the receipt card!
+    }, 1200); 
     return () => clearTimeout(timer);
   }, [receipt]);
 
@@ -168,14 +169,27 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
   const generateCanvas = async (): Promise<HTMLCanvasElement | null> => {
     if (!receiptRef.current) return null;
     
-    // Ensure all fonts are loaded before capture to prevent layout shifts
+    // 1. Ensure all fonts are fully loaded before capture
     if (typeof document !== 'undefined' && (document as any).fonts && (document as any).fonts.ready) {
       await (document as any).fonts.ready;
+      // Wait an extra bit for the browser to actually apply the fonts to the layout
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    // Wait for a few frames to ensure layout is settled and non-animating
+    // 2. Ensure all images/icons inside the receipt are loaded
+    const images = receiptRef.current.querySelectorAll('img');
+    const imagePromises = Array.from(images).map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue anyway if one fails
+      });
+    });
+    await Promise.all(imagePromises);
+
+    // 3. Wait for a few frames to ensure layout is settled and non-animating
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     const element = receiptRef.current;
     
@@ -653,49 +667,50 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
             {/* Dash Divider */}
             <div style={{ borderTop: '1px dashed #cbd5e1', height: '1px' }} />
 
-            {/* Transaction Data Table */}
-            <div className="space-y-2 text-[10.5px] sm:text-[11px] relative z-10">
-              <div className="flex justify-between items-start gap-2">
+            {/* Transaction Data Table - Standardized layout to prevent overlapping on Vercel */}
+            <div className="space-y-2.5 text-[10.5px] sm:text-[11px] relative z-10">
+              <div className="flex justify-between items-start gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap pt-[2px]" style={{ color: '#64748b' }}>Reference ID</span>
                 <span 
-                  className="font-black font-mono px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] uppercase break-all text-right max-w-[150px] sm:max-w-[170px]"
+                  className="font-black font-mono px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] uppercase text-right"
                   style={{
                     color: '#0f172a',
                     backgroundColor: '#f8fafc',
                     borderColor: '#e2e8f0',
                     borderWidth: '1px',
-                    borderStyle: 'solid'
+                    borderStyle: 'solid',
+                    wordBreak: 'break-all'
                   }}
                 >
                   EW-{receipt.id.toUpperCase().slice(0, 10)}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-2">
+              <div className="flex justify-between items-center gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Date & Time</span>
-                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right whitespace-nowrap" style={{ color: '#0f172a' }}>
                   {displayDate} • {displayTime}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-2">
+              <div className="flex justify-between items-center gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payout Type</span>
-                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase ${receipt.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase whitespace-nowrap ${receipt.withdrawalType === 'referral' ? 'text-[#059669]' : 'text-[#2563eb]'}`}>
                   {receipt.withdrawalType === 'referral' ? 'Referral Payout' : 'Video Task Payout'}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-2">
+              <div className="flex justify-between items-center gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Recipient Bank</span>
-                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right" style={{ color: '#0f172a' }}>{receipt.bankName || 'N/A'}</span>
+                <span className="font-extrabold text-[10.5px] sm:text-[11px] text-right truncate max-w-[180px]" style={{ color: '#0f172a' }}>{receipt.bankName || 'N/A'}</span>
               </div>
-              <div className="flex justify-between items-start gap-2">
+              <div className="flex justify-between items-start gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap pt-[1px]" style={{ color: '#64748b' }}>Account Name</span>
-                <span className="font-extrabold text-right break-words text-[10.5px] sm:text-[11px] leading-tight max-w-[150px] sm:max-w-[170px]" style={{ color: '#0f172a' }}>
+                <span className="font-extrabold text-right text-[10.5px] sm:text-[11px] leading-tight max-w-[180px]" style={{ color: '#0f172a' }}>
                   {receipt.accountName || 'N/A'}
                 </span>
               </div>
-              <div className="flex justify-between items-center gap-2">
+              <div className="flex justify-between items-center gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payment Engine</span>
-                <span className="font-extrabold text-emerald-600 flex items-center gap-1 text-[10px] sm:text-[11.5px]">
-                  <ShieldCheck size={11} className="text-emerald-500" />
+                <span className="font-extrabold text-[#059669] flex items-center gap-1 text-[10px] sm:text-[11.5px]">
+                  <ShieldCheck size={11} className="text-[#10b981]" />
                   Paystack Secure
                 </span>
               </div>
@@ -706,11 +721,11 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
 
             {/* Financial Calculations breakdown */}
             <div className="p-2.5 rounded-lg space-y-1.5 text-[10.5px] sm:text-[11px] relative z-10" style={{ backgroundColor: '#f8fafc' }}>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-4">
                 <span style={{ color: '#64748b' }} className="font-bold">Gross Amount</span>
                 <span className="font-black" style={{ color: '#334155' }}>₦{receipt.amount.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-4">
                 <span style={{ color: '#64748b' }} className="font-bold">
                   {receipt.withdrawalType === 'referral' ? 'Processing Fee (Free)' : 'Processing Fee (10%)'}
                 </span>
@@ -719,7 +734,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
                 </span>
               </div>
               <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '3px', marginBottom: '3px' }} />
-              <div className="flex justify-between items-center pt-0.5">
+              <div className="flex justify-between items-center gap-4 pt-0.5">
                 <span style={{ color: '#0f172a' }} className="font-black uppercase tracking-wider text-[9.5px] sm:text-[10px]">Total Disbursed</span>
                 <span className="font-black text-[12px] sm:text-[13px]" style={{ color: '#10b981' }}>₦{receipt.netPayout.toLocaleString()}</span>
               </div>

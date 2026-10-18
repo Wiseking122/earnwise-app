@@ -449,6 +449,7 @@ export default function AdsSection({ onBack }: AdsSectionProps) {
         batch.set(transRef, {
           userId: user.uid,
           amount: rewardAmount,
+          type: 'ad_reward',
           action: 'credit',
           reason: `Ad Reward: ${adId}`,
           status: 'completed',
