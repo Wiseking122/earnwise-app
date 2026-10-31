@@ -122,7 +122,7 @@ service cloud.firestore {
     function isValidCoursePurchase(data) {
       return data.userId == request.auth.uid &&
              data.courseId is string &&
-             (data.amount == 7000 || data.amount == 0) &&
+             ((data.amount >= 5000 && data.amount <= 7000) || data.amount == 0) &&
              (data.purchasedAt == request.time || data.purchasedAt is timestamp);
     }
 
@@ -165,7 +165,7 @@ service cloud.firestore {
         (request.auth.uid == userId && (
           !incoming().diff(existing()).affectedKeys().hasAny(['role'])
         )) ||
-        (set(['balance', 'referralBalance', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt', 'fcmTokens', 'pushEnabled', 'lastCoachingAt', 'coachingStep', 'wiseCoins', 'completedAds', 'xp', 'lastCheckIn', 'streak']).hasAll(incoming().diff(existing()).affectedKeys()))
+        (set(['balance', 'referralBalance', 'affiliateBalance', 'affiliateEarnings', 'totalAffiliateSales', 'withdrawableBalance', 'referralEarnings', 'hasReceivedReferralBonus', 'totalReferrals', 'updatedAt', 'fcmTokens', 'pushEnabled', 'lastCoachingAt', 'coachingStep', 'wiseCoins', 'completedAds', 'xp', 'lastCheckIn', 'streak']).hasAll(incoming().diff(existing()).affectedKeys()))
       );
     }
 
@@ -265,6 +265,12 @@ service cloud.firestore {
     match /coursePurchases/{purchaseId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidCoursePurchase(incoming()) && isValidId(purchaseId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /affiliateSales/{saleId} {
+      allow read: if isSignedIn() && (resource.data.referrerId == request.auth.uid || resource.data.buyerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 

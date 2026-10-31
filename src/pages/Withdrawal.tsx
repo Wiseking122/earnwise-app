@@ -61,7 +61,7 @@ export default function Withdrawal() {
   const [accountNumber, setAccountNumber] = useState(profile?.bankDetails?.accountNumber || '');
   const [accountName, setAccountName] = useState(profile?.bankDetails?.accountName || '');
   const [loading, setLoading] = useState(false);
-  const [withdrawalType, setWithdrawalType] = useState<'task' | 'referral'>('task');
+  const [withdrawalType, setWithdrawalType] = useState<'task' | 'referral' | 'affiliate'>('task');
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -79,6 +79,25 @@ export default function Withdrawal() {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
 
   const [isSavingBank, setIsSavingBank] = useState(false);
+
+  // Automatically check URL query parameters for direct affiliate withdrawal link
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      const typeParam = params.get('type');
+      if (tabParam === 'withdraw' || typeParam) {
+        setExchangeSubTab('withdraw');
+      }
+      if (typeParam === 'affiliate') {
+        setWithdrawalType('affiliate');
+      } else if (typeParam === 'referral') {
+        setWithdrawalType('referral');
+      } else if (typeParam === 'task') {
+        setWithdrawalType('task');
+      }
+    } catch (_) {}
+  }, []);
 
   // Exchange and Rate Settings (Real-time Firestore updates)
   const [exchangeSettings, setExchangeSettings] = useState<any>({
@@ -214,6 +233,25 @@ export default function Withdrawal() {
           setIsWindowOpen(false);
           setTimeRemainingStr('🗓️ Referral portal opens Saturdays 8:00 AM – 6:00 PM');
         }
+      } else if (withdrawalType === 'affiliate') {
+        // Dedicated Affiliate Course Payout Window: Saturdays 8:00 AM – 6:00 PM (Separate from task and other payouts)
+        const isSaturday = now.getDay() === 6;
+        const currentHour = now.getHours();
+        const isOpenHours = currentHour >= 8 && currentHour < 18; // 8:00 AM to 6:00 PM
+        
+        if (payoutSettings?.affiliateOverrideOpen || isReferralOverride) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('🔓 Special Admin Affiliate Payout Window Active!');
+        } else if (isCustomScheduleActive) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('📅 ' + customScheduleStr);
+        } else if (isSaturday && isOpenHours) {
+          setIsWindowOpen(true);
+          setTimeRemainingStr('Academic Affiliate Window Active (Ends 6:00 PM)');
+        } else {
+          setIsWindowOpen(false);
+          setTimeRemainingStr('🎓 Academic Affiliate payouts open Saturdays 8:00 AM – 6:00 PM');
+        }
       }
     };
 
@@ -251,7 +289,7 @@ export default function Withdrawal() {
       .reduce((sum, w) => sum + w.amount, 0);
   };
 
-  const getPendingWithdrawalTotal = (type: 'task' | 'referral') => {
+  const getPendingWithdrawalTotal = (type: 'task' | 'referral' | 'affiliate') => {
     return withdrawals
       .filter(w => w.status === 'pending' && w.withdrawalType === type && !(w as any).deductedAtRequest)
       .reduce((sum, w) => sum + w.amount, 0);
@@ -557,16 +595,19 @@ export default function Withdrawal() {
       return;
     }
 
-    // Direct Wallet selection checks (taskBalance vs referralBalance)
+    // Direct Wallet selection checks (taskBalance vs referralBalance vs affiliateBalance)
     const walletBalance = withdrawalType === 'task' 
       ? (profile.taskBalance || 0) 
-      : (profile.referralBalance || 0);
+      : withdrawalType === 'referral'
+      ? (profile.referralBalance || 0)
+      : (profile.affiliateBalance || 0);
 
     const pendingRequestsTotal = getPendingWithdrawalTotal(withdrawalType);
     const availableFunds = Math.max(0, walletBalance - pendingRequestsTotal);
 
     if (withdrawAmount > availableFunds) {
-      setError(`Insufficient balance. Selected ${withdrawalType === 'task' ? 'Task' : 'Referral'} balance is ₦${walletBalance.toLocaleString()}. After accounting for ₦${pendingRequestsTotal.toLocaleString()} in other pending requests, you can only withdraw up to ₦${availableFunds.toLocaleString()}.`);
+      const typeLabel = withdrawalType === 'task' ? 'Task' : withdrawalType === 'referral' ? 'Referral' : 'Academic Affiliate';
+      setError(`Insufficient balance. Selected ${typeLabel} balance is ₦${walletBalance.toLocaleString()}. After accounting for ₦${pendingRequestsTotal.toLocaleString()} in other pending requests, you can only withdraw up to ₦${availableFunds.toLocaleString()}.`);
       return;
     }
 
@@ -590,7 +631,9 @@ export default function Withdrawal() {
         const userData = userSnap.data();
         const freshWalletBalance = withdrawalType === 'task' 
           ? (userData.taskBalance || 0) 
-          : (userData.referralBalance || 0);
+          : withdrawalType === 'referral'
+          ? (userData.referralBalance || 0)
+          : (userData.affiliateBalance || 0);
 
         // Calculate available funds taking legacy (undeducted) pending ones into account
         const freshPendingTotal = withdrawals
@@ -603,8 +646,8 @@ export default function Withdrawal() {
           throw new Error(`Insufficient funds. Your fresh available balance is ₦${freshAvailable.toLocaleString()}.`);
         }
 
-        // Deduct balances immediately
-        const walletField = withdrawalType === 'task' ? 'taskBalance' : 'referralBalance';
+        // Deduct balances immediately from designated separate wallet
+        const walletField = withdrawalType === 'task' ? 'taskBalance' : withdrawalType === 'referral' ? 'referralBalance' : 'affiliateBalance';
         const updatedWalletBalance = freshWalletBalance - withdrawAmount;
         const updatedWithdrawableBalance = Math.max(0, (userData.withdrawableBalance || 0) - withdrawAmount);
         const updatedTotalBalance = Math.max(0, (userData.balance || 0) - withdrawAmount);
@@ -632,10 +675,11 @@ export default function Withdrawal() {
 
       setSuccess(true);
       setAmount('');
+      const isFeeFree = withdrawalType === 'referral' || withdrawalType === 'affiliate';
       setLastWithdrawal({
         amount: withdrawAmount,
-        netAmount: withdrawAmount * (withdrawalType === 'referral' ? 1 : 0.90),
-        fee: withdrawAmount * (withdrawalType === 'referral' ? 0 : 0.10),
+        netAmount: withdrawAmount * (isFeeFree ? 1 : 0.90),
+        fee: withdrawAmount * (isFeeFree ? 0 : 0.10),
         bankName,
         accountNumber,
         accountName,
@@ -1025,24 +1069,28 @@ export default function Withdrawal() {
                   </div>
                 </div>
 
-                {/* Wallet Balance Summary for Bank Withdrawal */}
-                <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex justify-between items-center text-xs font-black">
-                  <div className="space-y-1">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Task Wallet Balance</span>
-                    <h3 className="text-lg text-emerald-400">₦{(profile?.taskBalance || 0).toLocaleString()}</h3>
+                {/* 3-Wallet Balance Summary for Bank Withdrawal */}
+                <div className="bg-black/40 border border-white/5 rounded-2xl p-4 grid grid-cols-3 gap-2 text-center text-xs font-black">
+                  <div className="space-y-0.5">
+                    <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest text-slate-500 block truncate">Task Wallet</span>
+                    <h3 className="text-base sm:text-lg text-emerald-400 font-mono">₦{(profile?.taskBalance || 0).toLocaleString()}</h3>
                   </div>
-                  <div className="space-y-1 text-right">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-slate-500">Referral Wallet Balance</span>
-                    <h3 className="text-lg text-emerald-400">₦{(profile?.referralBalance || 0).toLocaleString()}</h3>
+                  <div className="space-y-0.5 border-x border-white/5">
+                    <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest text-slate-500 block truncate">Referral Wallet</span>
+                    <h3 className="text-base sm:text-lg text-emerald-400 font-mono">₦{(profile?.referralBalance || 0).toLocaleString()}</h3>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest text-slate-500 block truncate">Affiliate Wallet</span>
+                    <h3 className="text-base sm:text-lg text-cyan-400 font-mono">₦{(profile?.affiliateBalance || 0).toLocaleString()}</h3>
                   </div>
                 </div>
 
-                {/* Dual Wallet Payout Selection */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* 3-Way Wallet Payout Selection */}
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => setWithdrawalType('task')}
-                    className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden text-left ${
+                    className={`p-2 sm:p-2.5 rounded-xl border transition-all flex flex-col gap-1.5 relative overflow-hidden text-left cursor-pointer ${
                       withdrawalType === 'task' 
                         ? 'bg-blue-600 border-blue-500 text-white shadow-lg scale-[1.01]' 
                         : 'bg-[#0D1527] border-white/5 text-slate-300 hover:border-blue-500/50'
@@ -1050,18 +1098,18 @@ export default function Withdrawal() {
                   >
                     <div className="flex items-center justify-between">
                       <Zap size={12} className={withdrawalType === 'task' ? 'text-blue-200' : 'text-blue-500'} />
-                      <span className="text-[7px] font-black uppercase tracking-widest bg-white/10 px-1.5 py-0.5 rounded">Task</span>
+                      <span className="text-[6.5px] font-black uppercase tracking-widest bg-white/10 px-1 py-0.5 rounded">Task</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-black uppercase block">Task Payout</span>
-                      <span className="text-[7.5px] font-bold uppercase text-slate-300 block">10% Platform Fee</span>
+                      <span className="text-[9.5px] font-black uppercase block truncate">Task Payout</span>
+                      <span className="text-[7px] font-bold uppercase text-slate-300 block truncate">10% Fee • 30th</span>
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setWithdrawalType('referral')}
-                    className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden text-left ${
+                    className={`p-2 sm:p-2.5 rounded-xl border transition-all flex flex-col gap-1.5 relative overflow-hidden text-left cursor-pointer ${
                       withdrawalType === 'referral' 
                         ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg scale-[1.01]' 
                         : 'bg-[#0D1527] border-white/5 text-slate-300 hover:border-emerald-500/50'
@@ -1069,11 +1117,30 @@ export default function Withdrawal() {
                   >
                     <div className="flex items-center justify-between">
                       <User size={12} className={withdrawalType === 'referral' ? 'text-emerald-200' : 'text-emerald-500'} />
-                      <span className="text-[7px] font-black uppercase tracking-widest bg-white/10 px-1.5 py-0.5 rounded">Ref</span>
+                      <span className="text-[6.5px] font-black uppercase tracking-widest bg-white/10 px-1 py-0.5 rounded">Ref</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-black uppercase block">Referral Payout</span>
-                      <span className="text-[7.5px] font-bold uppercase text-slate-300 block">0% Processing Fee</span>
+                      <span className="text-[9.5px] font-black uppercase block truncate">Referral Payout</span>
+                      <span className="text-[7px] font-bold uppercase text-slate-300 block truncate">0% Fee • Saturday</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalType('affiliate')}
+                    className={`p-2 sm:p-2.5 rounded-xl border transition-all flex flex-col gap-1.5 relative overflow-hidden text-left cursor-pointer ${
+                      withdrawalType === 'affiliate' 
+                        ? 'bg-gradient-to-r from-teal-600 to-cyan-600 border-cyan-400 text-white shadow-lg scale-[1.01]' 
+                        : 'bg-[#0D1527] border-white/5 text-slate-300 hover:border-cyan-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <TrendingUp size={12} className={withdrawalType === 'affiliate' ? 'text-cyan-200' : 'text-cyan-400'} />
+                      <span className="text-[6.5px] font-black uppercase tracking-widest bg-white/10 px-1 py-0.5 rounded">Affiliate</span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-black uppercase block truncate">Affiliate Payout</span>
+                      <span className="text-[7px] font-bold uppercase text-slate-300 block truncate">0% Fee • Saturday</span>
                     </div>
                   </button>
                 </div>
@@ -1081,9 +1148,9 @@ export default function Withdrawal() {
                 {/* NGN Withdrawal Form */}
                 <form onSubmit={handleBankWithdrawal} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-500 uppercase ml-1 tracking-widest">Withdrawal Amount in Wisecoin</label>
+                    <label className="text-[9px] font-black text-slate-500 uppercase ml-1 tracking-widest">Withdrawal Amount in Naira</label>
                     <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-[10px] text-slate-400">WC</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display font-black text-[11px] text-slate-400">₦</span>
                       <input 
                         type="number" 
                         placeholder="0.00"
@@ -1098,9 +1165,11 @@ export default function Withdrawal() {
                     {parseFloat(amount) >= 1000 && (
                       <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mt-1 pl-1">
                         {withdrawalType === 'task' ? (
-                          `A 10% processing fee applies. You receive: ${(parseFloat(amount) * 0.90).toLocaleString(undefined, { minimumFractionDigits: 0 })} WC`
+                          `A 10% processing fee applies. You receive: ₦${(parseFloat(amount) * 0.90).toLocaleString(undefined, { minimumFractionDigits: 0 })}`
+                        ) : withdrawalType === 'affiliate' ? (
+                          `Academic Affiliate withdrawals are 100% free of charge! You receive: ₦${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 0 })}`
                         ) : (
-                          `Referral withdrawals are 100% free of charge! You receive: ${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 0 })} WC`
+                          `Referral withdrawals are 100% free of charge! You receive: ₦${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 0 })}`
                         )}
                       </p>
                     )}

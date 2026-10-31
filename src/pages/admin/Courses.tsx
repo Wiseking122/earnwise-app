@@ -429,6 +429,20 @@ export default function AdminCourses() {
                           <span className="text-[11px] font-medium text-slate-500">{formattedDate}</span>
                         </div>
                       </div>
+
+                      {purchase.referrerId && (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-emerald-900">
+                          <span className="font-bold flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Affiliate Sale (70/30 Share):
+                          </span>
+                          <div className="flex gap-3 text-[10px] font-mono">
+                            <span>Promoter: <strong>{purchase.referrerId.slice(0, 10)}...</strong></span>
+                            <span>70% Paid: <strong className="text-emerald-700">₦{(purchase.affiliateCommission || Math.round((purchase.amount || 6000) * 0.70)).toLocaleString()}</strong></span>
+                            <span>Platform 30%: <strong>₦{((purchase.amount || 6000) - (purchase.affiliateCommission || Math.round((purchase.amount || 6000) * 0.70))).toLocaleString()}</strong></span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

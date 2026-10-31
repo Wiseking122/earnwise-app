@@ -1,19 +1,48 @@
+import { getTikTokShopModule, TikTokModuleData } from './tiktokShopCourseData';
+
 export interface EnrichedSubSection {
   subtitle: string;
   content: string;
+  workedScenario?: string;
+  proTip?: string;
+  commonPitfall?: string;
 }
 
 export interface EnrichedStep {
   moduleTitle: string;
+  headline?: string;
+  learningObjectives?: string[];
   subsections: EnrichedSubSection[];
+  knowledgeCheck?: {
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  }[];
   assignment: {
     title: string;
+    purpose?: string;
+    instructions?: string[];
+    expectedOutput?: string;
+    rubric?: {
+      criteria: string;
+      points: string;
+      standard: string;
+    }[];
+    alternativeSimulation?: string;
     tasks: string[];
   };
   resources: {
     name: string;
+    filename?: string;
     type: 'PDF' | 'spreadsheet' | 'toolkit' | 'checklist' | 'notion';
     description: string;
+    downloadUrl?: string;
+    previewContent?: {
+      summary: string;
+      keyPoints: string[];
+      sampleSnippet: string;
+    };
   }[];
 }
 
@@ -22,7 +51,70 @@ export function getEnrichedStep(
   stepText: string,
   stepIndex: number
 ): EnrichedStep {
-  // Use stepText first colon to determine a clean step title
+  const titleLower = courseTitle.toLowerCase();
+
+  // If this is the upgraded TikTok Shop course, return the deep 8-module curriculum
+  if (titleLower.includes("tiktok")) {
+    const tModule = getTikTokShopModule(stepIndex);
+    return {
+      moduleTitle: tModule.moduleTitle,
+      headline: tModule.headline,
+      learningObjectives: tModule.learningObjectives,
+      subsections: tModule.lessons.map(l => ({
+        subtitle: l.subtitle,
+        content: l.content,
+        workedScenario: l.workedScenario,
+        proTip: l.proTip,
+        commonPitfall: l.commonPitfall
+      })),
+      knowledgeCheck: tModule.knowledgeCheck,
+      assignment: {
+        title: tModule.assignment.title,
+        purpose: tModule.assignment.purpose,
+        instructions: tModule.assignment.instructions,
+        expectedOutput: tModule.assignment.expectedOutput,
+        rubric: tModule.assignment.rubric,
+        alternativeSimulation: tModule.assignment.alternativeSimulation,
+        tasks: tModule.assignment.tasks
+      },
+      resources: [
+        {
+          name: tModule.resource.name,
+          filename: tModule.resource.filename,
+          type: tModule.resource.type,
+          description: tModule.resource.description,
+          downloadUrl: tModule.resource.downloadUrl,
+          previewContent: tModule.resource.previewContent
+        },
+        {
+          name: "TikTok_Shop_Master_Study_Guide.pdf",
+          filename: "TikTok-Shop-Complete-Study-Guide.pdf",
+          type: "PDF",
+          description: "Official 8-Module Companion Field Guide & Cross-Border Framework.",
+          downloadUrl: "/downloads/tiktok-shop/TikTok-Shop-Complete-Study-Guide.pdf",
+          previewContent: {
+            summary: "Comprehensive 8-module curriculum guide with economic formulas, policy guidelines, and cross-border blueprints.",
+            keyPoints: ["Unit economics", "SLA dispatch rules", "Remote agency arbitrage"],
+            sampleSnippet: "Target Retail Price = (COGS + Shipping) × 3.5"
+          }
+        },
+        {
+          name: "TikTok_Shop_Final_Project_Workbook.pdf",
+          filename: "TikTok-Shop-Final-Project-Workbook.pdf",
+          type: "PDF",
+          description: "Official Capstone Project & Portfolio Dossier Template.",
+          downloadUrl: "/downloads/tiktok-shop/TikTok-Shop-Final-Project-Workbook.pdf",
+          previewContent: {
+            summary: "Culminating Capstone Workbook for portfolio presentation and remote agency client pitch.",
+            keyPoints: ["Product validation", "Script blueprints", "Agency proposal"],
+            sampleSnippet: "CAPSTONE MANDATE: Document your full 14-day execution sprint or client-facing agency proposal."
+          }
+        }
+      ]
+    };
+  }
+
+  // Standard legacy enrichment for all other courses
   let parsedTitle = `Strategy Block 0${stepIndex + 1}`;
   let cleanBody = stepText;
   
@@ -32,18 +124,14 @@ export function getEnrichedStep(
     cleanBody = parts.slice(1).join(':').trim();
   }
 
-  // Create tailored assets, hacks, blueprints, and quick-win items based on course context
   const has48HourWin = stepIndex === 0;
 
-  // Derive specialized localized advice based on the vertical
   let localizedSecret = "";
   let screenBlueprint = "";
   let dfyAsset = "";
   let dfyFilename = "";
   let dfyType: 'PDF' | 'spreadsheet' | 'toolkit' | 'checklist' | 'notion' = 'toolkit';
   let quickWinAction = "";
-
-  const titleLower = courseTitle.toLowerCase();
 
   if (titleLower.includes("whatsapp") || titleLower.includes("lead")) {
     localizedSecret = "Integrate standard VCF generator web hooks directly. Instead of asking leads to manually save your number—which kills conversions by 65%—redirect them through a standard custom-text link that triggers an automated VCF card download of their contacts instantly.";
@@ -66,15 +154,7 @@ export function getEnrichedStep(
     dfyFilename = "Midjourney_Elite_Prompts_Dictionary.xlsx";
     dfyType = "spreadsheet";
     quickWinAction = "Generate 1 design mockup using the exact prompts in the toolkit, overlay your logo using the alignment rules, and pitch layout improvements directly to 5 local restaurant or gym owners on Instagram.";
-  } else if (titleLower.includes("tiktok") || titleLower.includes("e-commerce")) {
-    localizedSecret = "Avoid generic dropshipping models that require expensive advertising systems. Instead, leverage secondary organic affiliate pipelines: search TikTok's internal creator search bar using specific keywords, isolate accounts showing high engagement but low monetization, and offer them pre-vetted custom sales sheets in exchange for 30% revenue sharing.";
-    screenBlueprint = "Go to your TikTok Shop seller account dashboard, open 'Product Marketplace', search for verified high-ticket products with active commissions > 15%, and click the 'Add to Showcase' action button. Under 'Creator Collaboration Templates', select the pre-saved contract, set the automated message parameters, and hit publish.";
-    dfyAsset = "The TikTok Creator Collaboration Script & Commission Settlement Sheet.";
-    dfyFilename = "TikTok_Shop_Affiliate_Outreach_Mastery.pdf";
-    dfyType = "PDF";
-    quickWinAction = "Isolate 3 trending high-commission products, copy-paste the outreach script directly to 5 micro-influencers, and secure your first affiliate promoter relationship within 48 hours.";
   } else {
-    // Default high-ticket digital arbitrage / general freelancing/writing/marketing models
     localizedSecret = "To secure stable dollar payments from international businesses from Nigeria, completely avoid outdated payment platforms that trigger geolocation reviews. Set up a multi-currency business account through Wise or Payoneer, register it with a custom invoice generator, and structure payments into two discrete 50% milestone payments to protect your design and execution capital from day one.";
     screenBlueprint = "Open your global platform dashboard (e.g. contracting board, Notion, or custom workspace), click the 'Account Settings' tab, navigate to 'Billing Methods', select 'Direct Bank Transfer', and input your multi-currency routing coordinates directly. Build your premium digital catalog, customize the price blocks to USD values only, and set client message automations to on.";
     dfyAsset = "High-Ticket Client Acquisition Outreach swipe-files, legal agreements, and contract templates.";
@@ -83,7 +163,6 @@ export function getEnrichedStep(
     quickWinAction = "Download the client-outreach script, identify exactly 5 premium candidates on professional platforms, send customized outbound briefs, and register your first high-integrity digital strategy conversation within 48 hours.";
   }
 
-  // Create highly customized subsections based on the 4 pillars
   const subsections: EnrichedSubSection[] = [
     {
       subtitle: "1. OVER-THE-SHOULDER SCREENBLUEPRINT & DASHBOARD WALK-THROUGH",
@@ -99,7 +178,6 @@ export function getEnrichedStep(
     }
   ];
 
-  // Specific assignment tasks centering the 48-Hour Quick-Win or Tactical Drills
   const tasks = has48HourWin
     ? [
         `🔥 [48-HOUR QUICK-WIN CHALLENGE]: ${quickWinAction}`,

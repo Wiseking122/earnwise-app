@@ -2,7 +2,7 @@ export type TaskType = 'ad' | 'app_download' | 'referral' | 'content_creation' |
 export type TaskStatus = 'active' | 'inactive';
 export type CompletionStatus = 'pending' | 'approved' | 'rejected';
 export type WithdrawalStatus = 'pending' | 'approved' | 'completed' | 'rejected';
-export type TransactionType = 'earning' | 'withdrawal' | 'referral' | 'staking' | 'bonus';
+export type TransactionType = 'earning' | 'withdrawal' | 'referral' | 'staking' | 'bonus' | 'affiliate_commission';
 export type UserRole = 'user' | 'admin' | 'advertiser';
 export type PlanType = 'free' | 'elite' | 'starter' | 'pro' | 'bronze' | 'diamond' | 'silver' | 'platinum' | 'golden';
 export type RankType = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
@@ -42,6 +42,9 @@ export interface UserProfile {
   totalEarnings?: number;
   taskBalance: number;
   referralBalance: number;
+  affiliateBalance?: number;
+  affiliateEarnings?: number;
+  totalAffiliateSales?: number;
   telegramId?: string | null;
   deviceFingerprint?: string | null;
   wiseCoins: number; // Task wallet
@@ -172,7 +175,7 @@ export interface WithdrawalRequest {
   userId: string;
   amount: number;
   status: WithdrawalStatus;
-  withdrawalType?: 'task' | 'referral';
+  withdrawalType?: 'task' | 'referral' | 'affiliate';
   bankDetails: BankDetails;
   requestedAt: any;
   processedAt?: any;
@@ -189,6 +192,14 @@ export interface Transaction {
   receiptDetails?: any;
 }
 
+export interface CourseSwipeCopy {
+  whatsapp: string;
+  twitter: string;
+  statusHook: string;
+  targetAudience: string;
+  objectionBuster: string;
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -199,13 +210,39 @@ export interface Course {
   incomePotential: string;
   image: string;
   imageUrl?: string;
+  affiliateCommissionRate: number; // 0.30 (30% to user promoter)
+  affiliateCommissionAmount: number; // 30% share (e.g. ₦2,100 for ₦7,000)
+  targetAudience?: string;
+  whatYouWillLearn?: string[];
+  swipeCopy?: CourseSwipeCopy;
 }
 
 export interface CoursePurchase {
   id: string;
   userId: string;
   courseId: string;
+  courseTitle?: string;
+  amount: number;
+  isFree?: boolean;
+  referrerId?: string | null;
+  affiliateCommission?: number;
+  platformShare?: number;
   purchasedAt: any;
+}
+
+export interface AffiliateSale {
+  id: string;
+  referrerId: string;
+  buyerId: string;
+  buyerName?: string;
+  courseId: string;
+  courseTitle: string;
+  coursePrice: number;
+  commissionRate: number; // 0.30 (30% to user)
+  commissionAmount: number; // 30%
+  platformShare: number; // 70% (Platform keeps 70%)
+  status: 'credited';
+  createdAt: any;
 }
 
 export interface OfferSubmission {

@@ -358,24 +358,68 @@ export const courses = [
   }
 ];
 
-const METADATA_MAPPING: Record<string, { category: string; price: number; steps: string[] }> = {
+const METADATA_MAPPING: Record<string, { 
+  category: string; 
+  price: number; 
+  steps: string[];
+  targetAudience?: string;
+  whatYouWillLearn?: string[];
+  swipeCopy?: {
+    headline: string;
+    whatsapp: string;
+    twitter: string;
+    statusHook: string;
+    targetAudience: string;
+    objectionBuster: string;
+  };
+}> = {
   "tiktok-shop": {
     category: "E-commerce",
     price: 7000,
+    targetAudience: "Content creators, e-commerce hustlers, and agency operators seeking high-margin social commerce sales.",
+    whatYouWillLearn: [
+      "Master TikTok Shop algorithm hooks & viral product discovery",
+      "End-to-end seller & affiliate partnership structures",
+      "Short-form product demonstration video scripts with 70%+ retention",
+      "Cross-border remote agency arbitrage for Nigerian operators"
+    ],
+    swipeCopy: {
+      headline: "How to Build a ₦500k/mo TikTok Shop Business (Without Holding Physical Inventory)",
+      whatsapp: "🔥 Have you seen how people are quietly printing money on TikTok Shop without dancing? This master course breaks down the exact product research formulas, supplier links, and viral video scripts. Check out the curriculum and enroll here: {{LINK}}",
+      twitter: "TikTok isn't just an entertainment app anymore—it's the highest converting e-commerce platform right now. Here's the complete playbook for selling trending products or partnering with brands: {{LINK}}",
+      statusHook: "Slide 1: If you spend 2+ hours a day scrolling TikTok, you're on the wrong side of the algorithm...\nSlide 2: People are making ₦250k - ₦1M/month selling trending items on TikTok Shop without holding inventory.\nSlide 3: Grab the complete TikTok Shop blueprint here before enrollment closes 👉 {{LINK}}",
+      targetAudience: "Smartphone users, creators, students looking for digital sales skills.",
+      objectionBuster: "Does this work in Nigeria? Yes! The curriculum includes remote agency models and cross-border partnership frameworks built specifically for international arbitrage."
+    },
     steps: [
-      "TikTok Shop Seller Setup: Build, register, and verify your professional merchant or creator storefront with complete tax clearances.",
-      "High-Margin Sourcing: Isolate trending micro-products with viral potential using fast shipping links and verified suppliers.",
-      "The Affiliate Outreach Script: Contact 50 micro-influencers daily with high-converting pitch scripts to secure free-sample promotion reviews.",
-      "Discount Strategy Blueprint: Craft custom flash offers and automated coupon structures inside the seller center to command action.",
-      "Viral Video Faceless Hooks: Film or stitch together 15-second visual templates focusing exclusively on psychological pain point triggers.",
-      "Live Integration Strategy: Run live broadcast streams or host virtual streaming loops with automated shop links to scale orders multi-fold.",
-      "Funnel Performance Metrics: Check the conversion tracking panel to locate product margin drop-offs and optimize image assets.",
-      "Autonomous Logistical Scaling: Set up automated inventory synchronization networks and outsourced customer support loops."
+      "Module 1: TikTok Shop Fundamentals — Ecosystem Architecture, Seller vs Affiliate Models & Market Eligibility",
+      "Module 2: High-Demand Product & Niche Research — Data Signals, Competitor Forensics & Net Margin Unit Economics",
+      "Module 3: Shop Readiness & High-Converting Listings — Store Setup, Mobile SEO Titles & Visual Asset Stack",
+      "Module 4: Viral Short-Form Video Creation — Psychological Hooks, Demonstration Scripts & Retention Architecture",
+      "Module 5: Affiliate Marketing & Creator Partnerships — Recruitment Systems, Commission Architecture & Cold Outreach",
+      "Module 6: Order Fulfillment, Customer Care & Logistics — Fulfillment SLAs, 3PL Warehousing & Account Health",
+      "Module 7: Analytics, Unit Economics & Conversion Optimization — Metrics Dashboards, Funnel Diagnosis & Systematic Scaling",
+      "Module 8: Practical Launch Capstone Project — End-to-End Store Execution, Launch Sprint & Remote Agency Simulation"
     ]
   },
   "pinterest-traffic": {
     category: "Marketing",
-    price: 7000,
+    price: 6000,
+    targetAudience: "Bloggers, affiliate marketers, and digital product owners needing consistent, free buyer traffic.",
+    whatYouWillLearn: [
+      "Pinterest visual SEO algorithms and keyword ranking structures",
+      "Batch-designing high-converting 2:3 vertical pins in minutes",
+      "Automated multi-board scheduling for 10,000+ monthly visits",
+      "Directing Pinterest visual searchers directly to high-ticket affiliate checkouts"
+    ],
+    swipeCopy: {
+      headline: "Drive 10,000+ Free Buyer Clicks Monthly from Pinterest (No Ad Spend)",
+      whatsapp: "Stop burning money on paid ads! Pinterest is a visual search engine full of people with their credit cards out. This master guide shows you how to harvest thousands of organic visitors every single week for free: {{LINK}}",
+      twitter: "Pinterest isn't just for wedding dresses and recipes—it's the highest purchasing-intent search engine on the web. Here is how to siphon free organic traffic to your affiliate links: {{LINK}}",
+      statusHook: "Slide 1: Most people don't know Pinterest is actually a search engine like Google.\nSlide 2: You can get 10,000+ free clicks every single month with simple Canva pins.\nSlide 3: See the step-by-step traffic harvesting framework here 👉 {{LINK}}",
+      targetAudience: "Affiliates, digital sellers, and webmasters seeking zero-cost traffic.",
+      objectionBuster: "Do I need design skills? No! We provide editable Canva templates sized to the exact 2:3 standard."
+    },
     steps: [
       "Pinterest SEO Configuration: Transition to a Pinterest Business setup and insert keywords in your domain, bio, and board headers.",
       "Visual Ratio Composition: Compose high-contrast pins matching the absolute 2:3 vertical standard ratio utilizing Canva templates.",
@@ -389,7 +433,22 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   },
   "discord-management": {
     category: "Freelancing",
-    price: 7000,
+    price: 6000,
+    targetAudience: "Freelancers, moderators, and community builders seeking $500 - $1,500/month remote retainers.",
+    whatYouWillLearn: [
+      "Professional Discord server hierarchy, channels, and security shields",
+      "Automated bot setups, spam guards, and verification flows",
+      "Gamified role leveling systems that skyrocket member retention",
+      "How to pitch high-ticket community management retainers to global Web3 & SaaS brands"
+    ],
+    swipeCopy: {
+      headline: "Land $500 - $1,500/Month Retainers as an Elite Discord Manager",
+      whatsapp: "Global companies and NFT/SaaS founders are desperately paying $500 - $1,500 monthly retainers for people to manage their Discord communities. This course gives you the exact setup templates, bot configurations, and client pitch scripts: {{LINK}}",
+      twitter: "Community management is one of the highest-paid remote skills right now. You can manage 2-3 servers from home on your laptop or phone. Here is how to land foreign retainers: {{LINK}}",
+      statusHook: "Slide 1: Want to earn in foreign currencies without complex coding or video editing?\nSlide 2: Discord community managers earn between $400 and $1,500 monthly per client.\nSlide 3: Get the exact community architecture & client pitch scripts here 👉 {{LINK}}",
+      targetAudience: "College students and young professionals seeking foreign-exchange earnings.",
+      objectionBuster: "Can I manage servers using a smartphone? Yes! Discord mobile lets you moderate and engage from anywhere."
+    },
     steps: [
       "Server Hierarchy Construction: Design visual structures sorting channels from announcements to premium alpha segments.",
       "Verification and Shield Deployment: Integrate custom bot systems to defend your community server from automated spam or raid loops.",
@@ -403,7 +462,22 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   },
   "instagram-growth": {
     category: "Marketing",
-    price: 7000,
+    price: 6500,
+    targetAudience: "Entrepreneurs, creators, and page flippers wanting 50k+ followers and profitable brand sponsorships.",
+    whatYouWillLearn: [
+      "High-retention Reels formatting and viral sound selection",
+      "DM automation funnels that convert profile visits to automated sales",
+      "Landing paid sponsorships and co-promotions with international brands",
+      "Valuing and safely flipping high-engagement theme pages for lump sums"
+    ],
+    swipeCopy: {
+      headline: "Grow 50k+ Instagram Followers & Flip Theme Pages for High Cash Exits",
+      whatsapp: "Stop posting randomly on Instagram hoping for views. There is an exact algorithmic blueprint for viral Reels, story sales funnels, and flipping pages for ₦200k - ₦500k. Learn how the top creators do it here: {{LINK}}",
+      twitter: "Theme pages on Instagram are digital real estate. Build them organically with viral short-form content, monetize with brand deals, then flip them for profit. Complete guide: {{LINK}}",
+      statusHook: "Slide 1: Did you know you don't even need to show your face to make money on Instagram?\nSlide 2: Faceless theme pages make ₦300k+ monthly from affiliate links and brand shoutouts.\nSlide 3: Learn the step-by-step growth and flipping system here 👉 {{LINK}}",
+      targetAudience: "Creators, affiliate promoters, and digital theme page builders.",
+      objectionBuster: "Do I need to show my face? Not at all! This course specifically focuses on faceless theme page strategies."
+    },
     steps: [
       "Aesthetic Profile Setup: Write a short bio detailing the visual theme and place a clean, professional profile asset.",
       "The Reels Engagement Formula: Repurpose, edit, and caption trending industry topics overlaid with algorithm hooks.",
@@ -418,6 +492,21 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   "whatsapp-lead-siphon": {
     category: "Marketing",
     price: 7000,
+    targetAudience: "Vendors, course creators, and affiliates wanting 500+ daily WhatsApp status views that buy.",
+    whatYouWillLearn: [
+      "Automated VCF lead siphon funnels that bypass manual number saving",
+      "Attention-Agitation-Proof-Offer copywriting for status slides",
+      "Organizing buyers with WhatsApp Business tags, catalogs, and quick replies",
+      "Hosting high-conversion 1-day WhatsApp masterclasses that generate bulk sales"
+    ],
+    swipeCopy: {
+      headline: "Transform Your WhatsApp Status into a ₦300k/Month Sales Machine",
+      whatsapp: "If you have more than 50 WhatsApp contacts, you are sitting on an untapped goldmine. This master blueprint shows you how to siphon hundreds of hot buyers daily and close sales effortlessly using your status slides. See how here: {{LINK}}",
+      twitter: "WhatsApp is the highest-converting sales channel in Nigeria right now. If your status views aren't bringing in direct bank alerts daily, you need this lead siphon framework: {{LINK}}",
+      statusHook: "Slide 1: Most people use WhatsApp status just to post memes and updates.\nSlide 2: Smart earners turn that exact same status into ₦200,000+ weekly using automated siphon links.\nSlide 3: Check out the exact system and swipe scripts here 👉 {{LINK}}",
+      targetAudience: "Local business owners, students, affiliate promoters, and service sellers.",
+      objectionBuster: "What if I have few contacts? Module 1 & 2 teach automated lead generation methods that bring in 50-100 new contacts daily!"
+    },
     steps: [
       "The Magnet Asset Blueprint: Build a high-value checklist, slide template, or mini video course in under 3 hours to capture intent.",
       "Contact List Automation Setup: Build web links that pre-populate save request sentences, making saver VCFs easily distributable.",
@@ -432,6 +521,21 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   "premium-ghostwriting": {
     category: "Writing",
     price: 7000,
+    targetAudience: "Writers, researchers, and aspiring freelancers wanting $500 - $3,000 international client contracts.",
+    whatYouWillLearn: [
+      "Deconstructing voice patterns of tech executives and LinkedIn influencers",
+      "Writing high-impact thought leadership posts, newsletters, and Twitter threads",
+      "The 'Free-Trial Pitch' framework that turns cold outreach into signed retainers",
+      "Receiving USD payments into Nigerian multi-currency accounts safely"
+    ],
+    swipeCopy: {
+      headline: "Write for US/European Founders and Earn $500 - $3,000/Month in Foreign Exchange",
+      whatsapp: "You don't need a literature degree to get paid in dollars. Foreign tech founders and CEOs are too busy to write their own LinkedIn and Twitter posts. This course trains you to ghostwrite for them and close $1,000+ retainers from Nigeria: {{LINK}}",
+      twitter: "High-ticket ghostwriting is the cleanest way to earn foreign currency without upfront investment. Write 1-2 hours a day for global executives: {{LINK}}",
+      statusHook: "Slide 1: Did you know international CEOs pay up to $2,000 a month just for someone to write 3 LinkedIn posts a week for them?\nSlide 2: It's called executive ghostwriting, and you can do it from anywhere in Nigeria.\nSlide 3: Check out the full foreign client outreach blueprint here 👉 {{LINK}}",
+      targetAudience: "Writers, students, communicators, and remote job seekers.",
+      objectionBuster: "Do I need previous writing experience? No. The vocal signature matrices and fill-in-the-blank templates make it easy to produce high-value content immediately."
+    },
     steps: [
       "High-Ticket Client Discovery: Source CEOs, VCs, and tech founders on LinkedIn who post infrequently but command heavy prestige.",
       "Vocal Blueprint Breakdown: Design linguistic matrices tracking their sentence pacing, favorite vocabulary, and focus topics.",
@@ -445,7 +549,22 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   },
   "smartphone-video": {
     category: "Freelancing",
-    price: 7000,
+    price: 5500,
+    targetAudience: "Aspiring video editors, content creators, and mobile creatives with only a smartphone.",
+    whatYouWillLearn: [
+      "Professional CapCut mobile workflows, 60fps export tuning, and bitrate control",
+      "Dynamic auto-captions, word-by-word highlights, and sound-effect timing",
+      "Fast hook sequencing: Zoom-cuts and split timeline transitions",
+      "Packaging monthly 15-video retainer packs for local businesses at ₦150k - ₦300k"
+    ],
+    swipeCopy: {
+      headline: "Master CapCut Video Editing & Charge ₦150k+ Monthly with Just Your Phone",
+      whatsapp: "You don't need an expensive laptop or camera to edit viral video ads. Local boutiques, gyms, and digital businesses are hungry for short-form video editors. Learn mobile CapCut editing and start closing clients: {{LINK}}",
+      twitter: "Video editing on your smartphone is one of the quickest skills to monetize today. CapCut has everything you need. Full step-by-step masterclass here: {{LINK}}",
+      statusHook: "Slide 1: Your smartphone camera and CapCut are all you need to start a ₦150k/month editing side hustle.\nSlide 2: Every local business needs TikTok and Reels ads right now.\nSlide 3: Master the mobile editing masterclass here 👉 {{LINK}}",
+      targetAudience: "Mobile users, creative students, and social media creators.",
+      objectionBuster: "Is a laptop required? 100% no! Every single module is recorded on mobile devices."
+    },
     steps: [
       "CapCut Mobile Workspace Tuning: Configure quality rendering setups (1080p, 60fps) and customize quick-accessible sound-FX folders.",
       "The Zoom-Cut Attraction Hook: Arrange timelines to split unneeded silences and layer zoom movements in the first 3 seconds.",
@@ -459,7 +578,22 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   },
   "ai-graphic-design": {
     category: "Design",
-    price: 7000,
+    price: 5000,
+    targetAudience: "Beginner designers, small business owners, and non-creatives wanting professional design assets.",
+    whatYouWillLearn: [
+      "Midjourney prompt engineering for photorealistic marketing and logo designs",
+      "Converting raster images to high-resolution vector print assets",
+      "Canva Pro layout grids, typographic harmony, and visual contrast rules",
+      "Selling ready-made digital graphic templates on social media for passive income"
+    ],
+    swipeCopy: {
+      headline: "Create Professional Marketing Graphics in Minutes Using AI & Canva",
+      whatsapp: "Stop paying graphic designers ₦15,000 for simple flyers! Learn how to use Midjourney and Canva to generate studio-grade marketing graphics, branding sets, and logos in minutes: {{LINK}}",
+      twitter: "AI graphic design is the biggest productivity cheat code of 2026. Design stunning flyers, pitch decks, and social posts without prior Photoshop experience: {{LINK}}",
+      statusHook: "Slide 1: You no longer need 3 years of Photoshop training to design like a pro.\nSlide 2: Generative AI tools and Canva let you create incredible brand flyers in 5 minutes.\nSlide 3: Learn the full prompt templates and design blueprints here 👉 {{LINK}}",
+      targetAudience: "Non-designers, business owners, and digital marketers.",
+      objectionBuster: "Do I need artistic drawing talent? Not at all! AI handles generation, and Canva provides the intuitive drag-and-drop alignment."
+    },
     steps: [
       "Midjourney Prompt Frameworks: Master styling variables, aspect ratios, and design weights to render clean background plates.",
       "Clean Scale Vector Conversion: Convert detailed raster files into infinite-scale vector formats for print materials.",
@@ -473,26 +607,63 @@ const METADATA_MAPPING: Record<string, { category: string; price: number; steps:
   }
 };
 
-export const COURSES: Course[] = courses.map(c => {
-  const meta = METADATA_MAPPING[c.id] || {
-    category: (c as any).category || "Marketing",
-    price: (c as any).price || 7000,
-    steps: (c as any).steps || [
-      `${c.title} Fundamentals: Establish baseline theoretical mastery of this high-income vertical.`,
-      `Core Strategy Implementation: Execute initial practical tests and validate structural setup.`,
-      `Optimized Channel Management: Deploy client reporting metrics to secure consistent delivery streams.`,
-      `The Escape Velocity Phase: Scale your operations through smart micro-resource delegation.`
-    ]
+export const COURSES: Course[] = courses.map((c, idx) => {
+  const meta = METADATA_MAPPING[c.id];
+  // Strictly enforce price bounds between ₦5,000 and ₦7,000
+  let calculatedPrice = 6000;
+  if (meta && meta.price) {
+    calculatedPrice = meta.price;
+  } else if ((c as any).price) {
+    calculatedPrice = (c as any).price;
+  } else {
+    // Generate an authentic price within 5,000 to 7,000
+    const priceVariants = [5000, 5500, 6000, 6500, 7000];
+    calculatedPrice = priceVariants[idx % priceVariants.length];
+  }
+  // Hard clamp: Must be >= 5000 and <= 7000
+  const finalPrice = Math.min(7000, Math.max(5000, calculatedPrice));
+  const commissionRate = 0.30; // 70/30 platform/user split: 30% to user promoter, 70% to platform
+  const commissionAmount = Math.round(finalPrice * commissionRate);
+
+  const steps = meta?.steps || (c as any).steps || [
+    `${c.title} Foundations: Theoretical mastery, market opportunities, and workspace setup.`,
+    `Core Execution Blueprint: Practical workflows, over-the-shoulder demonstration, and tool mastery.`,
+    `High-Ticket Monetization: Finding high-paying buyers, client outreach scripts, and pricing models.`,
+    `Automated Scaling & SOPs: Establishing delegation pipelines and recurring income retainers.`
+  ];
+
+  const targetAudience = meta?.targetAudience || "Students, freelancers, and aspiring digital earners looking to establish reliable monthly cashflow.";
+  const whatYouWillLearn = meta?.whatYouWillLearn || [
+    `Comprehensive end-to-end framework for ${c.title}`,
+    "Practical worksheets, templates, and downloadable checklists",
+    "Direct monetization and client acquisition strategies",
+    "Full access to the 24/7 AI Master Tutor for real-time guidance"
+  ];
+
+  const swipeCopy = meta?.swipeCopy || {
+    headline: `Master ${c.title} & Build a Lucrative Digital Income Stream`,
+    whatsapp: `Check out this complete, practical masterclass on ${c.title}. It includes step-by-step video frameworks, downloadable templates, and AI tutor support to help you start earning quickly. View curriculum here: {{LINK}}`,
+    twitter: `Want to master ${c.title} and turn it into real income? Here is the exact step-by-step masterclass with practical templates included: {{LINK}}`,
+    statusHook: `Slide 1: High-income digital skills are the fastest way to beat inflation.\nSlide 2: Learn ${c.title} with practical step-by-step blueprints.\nSlide 3: Check out the full curriculum & templates here 👉 {{LINK}}`,
+    targetAudience: "Digital earners and modern side-hustlers.",
+    objectionBuster: "Everything is broken down step-by-step so even complete beginners can implement immediately."
   };
+
   return {
     id: c.id,
     title: c.title,
     description: c.description,
-    price: meta.price,
-    category: meta.category,
-    steps: meta.steps,
+    price: finalPrice,
+    category: meta?.category || (c as any).category || "Marketing",
+    steps: steps,
     incomePotential: c.subtitle,
     image: c.image,
-    imageUrl: c.image
+    imageUrl: c.image,
+    affiliateCommissionRate: commissionRate,
+    affiliateCommissionAmount: commissionAmount,
+    targetAudience,
+    whatYouWillLearn,
+    swipeCopy
   };
 });
+

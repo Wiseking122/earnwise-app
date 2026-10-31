@@ -622,8 +622,18 @@ export const PayoutReceipt: React.FC<PayoutReceiptProps> = ({ isOpen, onClose, d
               </div>
               <div className="flex justify-between items-center gap-2">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Withdrawal Type</span>
-                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase ${data.withdrawalType === 'referral' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                  {data.withdrawalType === 'referral' ? 'Referral Payout' : 'Task Earnings'}
+                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase ${
+                  data.withdrawalType === 'affiliate' 
+                    ? 'text-cyan-600' 
+                    : data.withdrawalType === 'referral' 
+                    ? 'text-emerald-600' 
+                    : 'text-blue-600'
+                }`}>
+                  {data.withdrawalType === 'affiliate' 
+                    ? 'Academic Affiliate Payout' 
+                    : data.withdrawalType === 'referral' 
+                    ? 'Referral Payout' 
+                    : 'Task Earnings'}
                 </span>
               </div>
               <div className="flex justify-between items-center gap-2">

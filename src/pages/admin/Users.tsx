@@ -56,7 +56,7 @@ export default function AdminUsers() {
   // Poll default 150 most recent users
   useEffect(() => {
     setDbError(null);
-    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(150));
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(50));
     const unsub = onSnapshot(q, (snap) => {
       setDbUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any)));
       setLoading(false);

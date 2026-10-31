@@ -693,8 +693,18 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
               </div>
               <div className="flex justify-between items-center gap-4">
                 <span className="font-bold uppercase tracking-wide text-[9px] sm:text-[9.5px] whitespace-nowrap" style={{ color: '#64748b' }}>Payout Type</span>
-                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase whitespace-nowrap ${receipt.withdrawalType === 'referral' ? 'text-[#059669]' : 'text-[#2563eb]'}`}>
-                  {receipt.withdrawalType === 'referral' ? 'Referral Payout' : 'Video Task Payout'}
+                <span className={`font-extrabold text-[10.5px] sm:text-[11px] text-right uppercase whitespace-nowrap ${
+                  receipt.withdrawalType === 'affiliate'
+                    ? 'text-[#0891b2]'
+                    : receipt.withdrawalType === 'referral' 
+                    ? 'text-[#059669]' 
+                    : 'text-[#2563eb]'
+                }`}>
+                  {receipt.withdrawalType === 'affiliate' 
+                    ? 'Academic Affiliate Payout' 
+                    : receipt.withdrawalType === 'referral' 
+                    ? 'Referral Payout' 
+                    : 'Video Task Payout'}
                 </span>
               </div>
               <div className="flex justify-between items-center gap-4">
@@ -727,7 +737,7 @@ export default function TransactionReceipt({ receipt, onClose }: TransactionRece
               </div>
               <div className="flex justify-between items-center gap-4">
                 <span style={{ color: '#64748b' }} className="font-bold">
-                  {receipt.withdrawalType === 'referral' ? 'Processing Fee (Free)' : 'Processing Fee (10%)'}
+                  {(receipt.withdrawalType === 'referral' || receipt.withdrawalType === 'affiliate') ? 'Processing Fee (Free)' : 'Processing Fee (10%)'}
                 </span>
                 <span className="font-black" style={{ color: receipt.fee > 0 ? '#ef4444' : '#10b981' }}>
                   {receipt.fee > 0 ? `-₦${receipt.fee.toLocaleString()}` : 'Free'}

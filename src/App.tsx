@@ -32,6 +32,7 @@ import SubmitProof from './pages/SubmitProof';
 import PlatformSettings from './pages/admin/PlatformSettings';
 
 import CoursePlayer from './pages/CoursePlayer';
+import ProductLanding from './pages/ProductLanding';
 import VideoPlayer from './pages/VideoPlayer';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminTasks from './pages/admin/Tasks';
@@ -105,6 +106,9 @@ function AppRoutes() {
         <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
         <Route path="/submit-proof" element={<PrivateRoute><SubmitProof /></PrivateRoute>} />
 
+        <Route path="/product/:id" element={<ProductLanding />} />
+        <Route path="/p/:id" element={<ProductLanding />} />
+        <Route path="/academy/product/:id" element={<ProductLanding />} />
         <Route path="/academy/course/:id" element={<PrivateRoute><CoursePlayer /></PrivateRoute>} />
         <Route path="/player" element={<PrivateRoute><VideoPlayer /></PrivateRoute>} />
         <Route path="/outline" element={<EarningsOutline />} />

@@ -49,7 +49,7 @@ export default function AdminPayments() {
   const [payingUserId, setPayingUserId] = useState<string | null>(null);
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
-  const [withdrawalSubTab, setWithdrawalSubTab] = useState<'referrals' | 'tasks'>('referrals');
+  const [withdrawalSubTab, setWithdrawalSubTab] = useState<'referrals' | 'tasks' | 'affiliates'>('referrals');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [controls, setControls] = useState({
     payoutStartDate: '',
@@ -297,8 +297,10 @@ export default function AdminPayments() {
           if (!userSnap.exists()) throw new Error("User not found");
           
           const uData = userSnap.data();
+          const isAffiliate = request.withdrawalType === 'affiliate';
           const isReferral = request.withdrawalType === 'referral';
-          const walletField = isReferral ? 'referralBalance' : 'taskBalance';
+          const walletField = isAffiliate ? 'affiliateBalance' : (isReferral ? 'referralBalance' : 'taskBalance');
+          const isFeeFree = isAffiliate || isReferral;
           
           const uWalletBalance = uData[walletField] || 0;
           const currentWithdrawable = uData.withdrawableBalance || 0;
@@ -306,7 +308,8 @@ export default function AdminPayments() {
           if (!wasDeducted) {
             // Legacy requests require balance check and deduction on approval
             if (uWalletBalance < request.amount) {
-              throw new Error(`Insufficient user ${isReferral ? 'Referral' : 'Task'} balance for approval.`);
+              const label = isAffiliate ? 'Affiliate' : (isReferral ? 'Referral' : 'Task');
+              throw new Error(`Insufficient user ${label} balance for approval.`);
             }
             if (currentWithdrawable < request.amount) {
               throw new Error("Insufficient user overall withdrawable balance for approval.");
@@ -330,9 +333,9 @@ export default function AdminPayments() {
             description: `Withdrawal request #${request.id.slice(0,6)}`,
             createdAt: serverTimestamp(),
             receiptDetails: {
-              withdrawalType: request.withdrawalType || (isReferral ? 'referral' : 'task'),
-              fee: isReferral ? 0 : request.amount * 0.10,
-              netPayout: isReferral ? request.amount : request.amount * 0.90,
+              withdrawalType: request.withdrawalType || (isAffiliate ? 'affiliate' : isReferral ? 'referral' : 'task'),
+              fee: isFeeFree ? 0 : request.amount * 0.10,
+              netPayout: isFeeFree ? request.amount : request.amount * 0.90,
               bankName: request.bankDetails?.bankName || '',
               accountName: request.bankDetails?.accountName || '',
               accountNumber: request.bankDetails?.accountNumber || ''
@@ -400,9 +403,10 @@ export default function AdminPayments() {
           const uData = userSnap.data();
           
           if (wasDeducted) {
-            // Refund the pre-deducted balance
+            // Refund the pre-deducted balance to the respective wallet
+            const isAffiliate = request.withdrawalType === 'affiliate';
             const isReferral = request.withdrawalType === 'referral';
-            const walletField = isReferral ? 'referralBalance' : 'taskBalance';
+            const walletField = isAffiliate ? 'affiliateBalance' : (isReferral ? 'referralBalance' : 'taskBalance');
             
             transaction.update(userRef, {
               [walletField]: (uData[walletField] || 0) + request.amount,
@@ -630,8 +634,13 @@ export default function AdminPayments() {
           ) : activeTab === 'withdrawals' ? (
             (() => {
               const referralWithdrawalsList = withdrawals.filter(w => w.withdrawalType === 'referral');
+              const affiliateWithdrawalsList = withdrawals.filter(w => w.withdrawalType === 'affiliate');
               const taskWithdrawalsList = withdrawals.filter(w => !w.withdrawalType || w.withdrawalType === 'task');
-              const visibleWithdrawals = withdrawalSubTab === 'referrals' ? referralWithdrawalsList : taskWithdrawalsList;
+              const visibleWithdrawals = withdrawalSubTab === 'referrals' 
+                ? referralWithdrawalsList 
+                : withdrawalSubTab === 'affiliates'
+                ? affiliateWithdrawalsList
+                : taskWithdrawalsList;
 
               return (
                 <div className="space-y-4">
@@ -640,18 +649,26 @@ export default function AdminPayments() {
                     <button
                       onClick={() => setWithdrawalSubTab('referrals')}
                       className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                        withdrawalSubTab === 'referrals' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-933'
+                        withdrawalSubTab === 'referrals' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
-                      Pending Weekly Referrals ({referralWithdrawalsList.length})
+                      Referrals ({referralWithdrawalsList.length})
+                    </button>
+                    <button
+                      onClick={() => setWithdrawalSubTab('affiliates')}
+                      className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                        withdrawalSubTab === 'affiliates' ? 'bg-cyan-900 text-cyan-100 shadow-md' : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      🎓 Academic Affiliates ({affiliateWithdrawalsList.length})
                     </button>
                     <button
                       onClick={() => setWithdrawalSubTab('tasks')}
                       className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                        withdrawalSubTab === 'tasks' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-933'
+                        withdrawalSubTab === 'tasks' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
-                      Pending Monthly Tasks ({taskWithdrawalsList.length})
+                      Tasks ({taskWithdrawalsList.length})
                     </button>
                   </div>
 

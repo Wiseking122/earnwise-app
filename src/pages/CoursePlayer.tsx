@@ -22,7 +22,16 @@ import {
   CheckSquare,
   BookOpen,
   ArrowLeft,
-  Briefcase
+  Briefcase,
+  Eye,
+  ExternalLink,
+  HelpCircle,
+  Award,
+  AlertTriangle,
+  Check,
+  Copy,
+  Info,
+  X
 } from 'lucide-react';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -50,6 +59,9 @@ export default function CoursePlayer() {
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
   const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>({});
   const [showRestriction, setShowRestriction] = useState(false);
+  const [selectedResource, setSelectedResource] = useState<any | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const course = COURSES.find(c => c.id === id);
@@ -109,6 +121,9 @@ export default function CoursePlayer() {
     });
   };
 
+  const coursePrice = course?.price || 6000;
+  const affiliateCommission = Math.round(coursePrice * 0.30);
+
   const handlePurchase = async () => {
     if (!profile) return;
     if (profile.plan === 'free' && !isAdmin) {
@@ -117,8 +132,8 @@ export default function CoursePlayer() {
     }
     if (!user || !course) return;
 
-    if (!hasFreeCredit && (profile?.depositBalance || 0) < 7000) {
-      const errStr = `Insufficient deposited balance. Your deposited balance from your personal bank is ₦${(profile?.depositBalance || 0).toLocaleString()}, but ₦7,000 is required to unlock this course. Only bank deposits are accepted for Academy courses, not task earnings.`;
+    if (!hasFreeCredit && (profile?.depositBalance || 0) < coursePrice) {
+      const errStr = `Insufficient deposited balance. Your deposited balance from your personal bank is ₦${(profile?.depositBalance || 0).toLocaleString()}, but ₦${coursePrice.toLocaleString()} is required to unlock this course. Only bank deposits are accepted for Academy courses, not task earnings.`;
       setPurchaseError(errStr);
       alert(errStr);
       return;
@@ -127,11 +142,17 @@ export default function CoursePlayer() {
     setPurchaseError(null);
     setPurchaseLoading(true);
     try {
+      const activeReferrer = localStorage.getItem('earnwise_course_referrer') || profile?.referredBy || null;
+      const targetRefId = (activeReferrer && activeReferrer !== user.uid) ? activeReferrer : null;
+
       const res = await axios.post(getApiUrl('/api/v1/academy/purchase'), {
         userId: user.uid,
         courseId: course.id,
-        courseTitle: course.title
+        courseTitle: course.title,
+        coursePrice: coursePrice,
+        referrerId: targetRefId
       });
+
       if (res.data) {
         if (res.data.useClientFallback) {
           console.warn("[ACADEMY] Server bypass enabled. Executing client-side transaction...");
@@ -142,8 +163,12 @@ export default function CoursePlayer() {
             purchaseId,
             userId: user.uid,
             courseId: course.id,
-            amount: hasFreeCredit ? 0 : 7000,
+            courseTitle: course.title,
+            amount: hasFreeCredit ? 0 : coursePrice,
             isFree: hasFreeCredit,
+            referrerId: targetRefId,
+            affiliateCommission: hasFreeCredit ? 0 : (targetRefId ? affiliateCommission : 0),
+            platformShare: hasFreeCredit ? 0 : (targetRefId ? coursePrice - affiliateCommission : coursePrice),
             purchasedAt: new Date()
           });
 
@@ -156,12 +181,67 @@ export default function CoursePlayer() {
             }
           } else {
             await updateDoc(userRef, {
-              balance: increment(-7000),
-              withdrawableBalance: increment(-7000),
-              depositBalance: increment(-7000)
+              balance: increment(-coursePrice),
+              withdrawableBalance: increment(-coursePrice),
+              depositBalance: increment(-coursePrice)
             });
+
+            // Write buyer transaction
+            const transRef = doc(collection(db, 'transactions'));
+            await setDoc(transRef, {
+              id: transRef.id,
+              userId: user.uid,
+              amount: -coursePrice,
+              type: 'withdrawal',
+              description: `Unlocked Course: ${course.title}`,
+              createdAt: new Date()
+            });
+
+            // Credit 30% affiliate commission to promoter's separate affiliate wallet
+            if (targetRefId && affiliateCommission > 0) {
+              try {
+                const referrerUserRef = doc(db, 'users', targetRefId);
+                await updateDoc(referrerUserRef, {
+                  affiliateBalance: increment(affiliateCommission),
+                  affiliateEarnings: increment(affiliateCommission),
+                  totalAffiliateSales: increment(1),
+                  totalEarnings: increment(affiliateCommission)
+                });
+
+                const refTransRef = doc(collection(db, 'transactions'));
+                await setDoc(refTransRef, {
+                  id: refTransRef.id,
+                  userId: targetRefId,
+                  amount: affiliateCommission,
+                  type: 'affiliate_commission',
+                  description: `30% Course Affiliate Commission: ${course.title} (Sale to ${profile?.displayName || 'Student'})`,
+                  createdAt: new Date()
+                });
+
+                const affSaleRef = doc(collection(db, 'affiliateSales'));
+                await setDoc(affSaleRef, {
+                  id: affSaleRef.id,
+                  referrerId: targetRefId,
+                  buyerId: user.uid,
+                  buyerName: profile?.displayName || profile?.username || 'Student',
+                  courseId: course.id,
+                  courseTitle: course.title,
+                  coursePrice: coursePrice,
+                  commissionRate: 0.30,
+                  commissionAmount: affiliateCommission,
+                  platformShare: coursePrice - affiliateCommission,
+                  status: 'credited',
+                  createdAt: new Date()
+                });
+              } catch (affErr) {
+                console.warn("[ACADEMY] Client fallback affiliate commission credit warning:", affErr);
+              }
+            }
           }
         }
+        try {
+          localStorage.removeItem('earnwise_course_referrer');
+        } catch (_) {}
         setIsOwned(true);
       }
     } catch (err: any) {
@@ -172,6 +252,10 @@ export default function CoursePlayer() {
   };
 
   const handleDownload = () => {
+    if (!isOwned) {
+      alert("Access Denied: Confirmed course enrollment is required before accessing or downloading course materials.");
+      return;
+    }
     if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
@@ -203,14 +287,42 @@ Generated via Earnwise Academy
     URL.revokeObjectURL(url);
   };
 
-  const triggerResourceDownload = (name: string, type: string, description: string) => {
+  const triggerResourceDownload = (resOrName: any, type?: string, description?: string) => {
+    if (!isOwned) {
+      alert("Access Denied: Confirmed enrollment is required before accessing or downloading worksheets, guides, and templates.");
+      return;
+    }
+    let downloadUrl: string | undefined;
+    let filename = '';
+
+    if (typeof resOrName === 'object' && resOrName !== null) {
+      downloadUrl = resOrName.downloadUrl;
+      filename = resOrName.filename || resOrName.name;
+    } else {
+      filename = resOrName;
+    }
+
+    if (downloadUrl) {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    const resName = typeof resOrName === 'string' ? resOrName : (resOrName?.name || 'Resource');
+    const resType = type || resOrName?.type || 'DOCUMENT';
+    const resDesc = description || resOrName?.description || 'EarnWise Academic Resource';
+
     const fileContent = `
 =========================================
 EARNWISE PREMIUM ACADEMY STRATEGY ASSET
 =========================================
-Asset Name : ${name}
-Format Type: ${type.toUpperCase()}
-Description: ${description}
+Asset Name : ${resName}
+Format Type: ${String(resType).toUpperCase()}
+Description: ${resDesc}
 
 Tactical Directive:
 Deploy this asset in active setups. Maintain optimization parameters for high yield.
@@ -223,7 +335,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${name.replace(/\s+/g, '_')}_Protocol_Asset.txt`;
+    link.download = `${resName.replace(/\s+/g, '_')}_Protocol_Asset.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -233,7 +345,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
   const fetchWithRetry = async (url: string, options: any, retries = 3, delay = 1000): Promise<Response> => {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeout);
       
@@ -252,6 +364,10 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
   };
 
   const askTutor = async () => {
+    if (!isOwned) {
+      setMessages(prev => [...prev, { role: 'ai', content: "🔒 Access Denied: Confirmed course enrollment is required before accessing 24/7 AI Master Tutor assistance." }]);
+      return;
+    }
     if (profile?.plan === 'free' && !isAdmin) {
       setShowRestriction(true);
       return;
@@ -326,7 +442,6 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
         });
       }
     } catch (err: any) {
-      // Provide a helpful fallback response instead of showing technical errors
       setMessages(prev => {
          const newMessages = [...prev];
          newMessages[newMessages.length - 1].content = "I'm here to guide you through this course. I'm experiencing a temporary connectivity issue, but please feel free to ask your question again, or I can help you with general course insights.";
@@ -338,6 +453,10 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
   };
 
   const expandProtocol = async () => {
+    if (!isOwned) {
+      alert("Access Denied: Confirmed course enrollment is required before accessing detailed execution blueprints.");
+      return;
+    }
     if (aiLoading || !user || !course) return;
     
     setAiLoading(true);
@@ -360,7 +479,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
           userId: user.uid,
           courseId: course.id,
           courseTitle: course.title,
-          question: `Provide a full, 1000-word detailed execution blueprint for Step ${activeStep + 1}: ${course.steps[activeStep]}. Include specific Nigerian tools, legal requirements, mathematical profit projections, and advanced execution hacks.`,
+          question: `Provide a full, 1000-word detailed execution blueprint for Step ${activeStep + 1}: ${course.steps[activeStep]}. Include specific operational tools, legal requirements, mathematical profit projections, and advanced execution hacks.`,
           context: lessonContext
         })
       });
@@ -426,6 +545,8 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
     );
   }
 
+  const enrichedStep = getEnrichedStep(course.title, course.steps[activeStep], activeStep);
+
   return (
     <Layout>
       <div className="flex-1 flex flex-col bg-slate-950">
@@ -446,86 +567,143 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-[#818090] font-mono leading-none">
-             NODE RESOLVER <span className="text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-sm">v1.2.8</span>
+             NODE RESOLVER <span className="text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-sm">v2.4.0</span>
           </div>
         </header>
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-slate-950 text-slate-100 relative">
           {!isOwned ? (
-            <div className="min-h-full flex flex-col items-center justify-center p-8 text-center space-y-8 max-w-xl mx-auto">
-               <div className="w-24 h-24 bg-[#0b081e] rounded-[2rem] shadow-2xl flex items-center justify-center text-amber-400 ring-2 ring-amber-500/20 shadow-amber-500/5 relative">
-                  <Lock size={36} />
-                  <div className="absolute -inset-0.5 rounded-[2rem] bg-linear-to-r from-amber-500 to-violet-600 opacity-20 blur-xs pointer-events-none" />
+            <div className="min-h-full flex flex-col items-center justify-center p-6 sm:p-8 text-center space-y-6 max-w-xl mx-auto">
+               <div className="w-20 h-20 bg-[#0b081e] rounded-3xl shadow-2xl flex items-center justify-center text-amber-400 ring-2 ring-amber-500/20 shadow-amber-500/5 relative">
+                  <Lock size={32} />
+                  <div className="absolute -inset-0.5 rounded-3xl bg-linear-to-r from-amber-500 to-violet-600 opacity-20 blur-xs pointer-events-none" />
                </div>
                
-               <div className="space-y-3">
-                 <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-violet-400 bg-violet-500/10 px-3 py-1 rounded-full">Secure Transmission Encrypted</span>
-                 <h3 className="text-3xl font-display font-black text-white italic uppercase tracking-tight">Strategy Locked</h3>
-                 <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-sm mx-auto">
-                   {hasFreeCredit 
-                     ? (isAdmin ? "Admin protocol active. Full strategy credentials decrypted." : `Credential allocation active. You have ${freeCreditsLeft} free strategy unlocks remaining in your tier.`)
-                     : "This high-yield elite strategy requires a standard digital allocation to decrypt and download."}
+               <div className="space-y-2">
+                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-mono uppercase tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                   <Sparkles size={11} />
+                   <span>Accredited Academic Curriculum</span>
+                 </div>
+                 <h3 className="text-2xl sm:text-3xl font-display font-black text-white italic uppercase tracking-tight">{course.title}</h3>
+                 <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-md mx-auto">
+                   {course.description}
                  </p>
                </div>
+
+               {/* Course Value & Curriculum Stack */}
+               <div className="w-full bg-[#0e0a26] border border-white/10 rounded-2xl p-4 text-left space-y-3">
+                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                   <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Estimated Earning Potential</span>
+                   <span className="text-xs font-bold text-emerald-400">{course.incomePotential}</span>
+                 </div>
+                 {course.targetAudience && (
+                   <p className="text-[11px] text-slate-300">
+                     <strong className="text-amber-400 font-bold">Target Audience:</strong> {course.targetAudience}
+                   </p>
+                 )}
+                 <div className="space-y-1.5 pt-1">
+                   <p className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Included in this enrollment:</p>
+                   <ul className="text-[11px] text-slate-300 space-y-1">
+                     <li className="flex items-center gap-2">
+                       <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                       <span>{course.steps.length} In-Depth Practical Strategy Modules & Exercises</span>
+                     </li>
+                     <li className="flex items-center gap-2">
+                       <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                       <span>Downloadable Excel Worksheets, PDF Guides & Swipe Templates</span>
+                     </li>
+                     <li className="flex items-center gap-2">
+                       <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                       <span>24/7 AI Master Tutor for lesson explanations & assignments</span>
+                     </li>
+                     <li className="flex items-center gap-2">
+                       <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                       <span>30% Affiliate Marketing Reseller Rights (Earn ₦{affiliateCommission.toLocaleString()} per referral)</span>
+                     </li>
+                   </ul>
+                 </div>
+               </div>
                
-               <div className="bg-[#0b081e] p-5 rounded-2xl border border-amber-500/20 flex items-center gap-4 w-full max-w-xs relative overflow-hidden">
-                  <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-amber-500/5 rounded-full pointer-events-none" />
-                  {hasFreeCredit ? (
-                    <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center text-violet-400">
-                      <Zap className="fill-violet-400 animate-pulse" size={20} />
+               {/* Valuation and Affiliate Split Callout */}
+               <div className="w-full max-w-sm space-y-3">
+                 <div className="bg-[#0b081e] p-4 rounded-2xl border border-amber-500/20 flex items-center justify-between relative overflow-hidden">
+                    <div className="text-left">
+                       <p className="text-[8px] font-mono tracking-widest text-[#818090] uppercase">ENROLLMENT PRICE</p>
+                       <p className="text-2xl font-display font-black text-white leading-tight">
+                          {hasFreeCredit ? 'FREE (PLAN TIER)' : `₦${coursePrice.toLocaleString()}`}
+                       </p>
                     </div>
-                  ) : (
-                    <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 font-display font-black text-lg">
-                      ₦
-                    </div>
-                  )}
-                  <div className="text-left">
-                     <p className="text-[8px] font-mono tracking-widest text-[#818090] uppercase">REQUISITION VALUATION</p>
-                     <p className="text-xl font-display font-black text-white leading-tight">
-                        {hasFreeCredit ? 'FREE (PLAN TIER)' : '₦7,000 COP'}
-                     </p>
-                  </div>
+                    {!hasFreeCredit && (
+                      <div className="text-right">
+                        <span className="text-[8px] font-mono uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-sm">70/30 Share (30% You)</span>
+                        <p className="text-[10px] text-slate-400 mt-1">Affiliate Earns: <span className="text-emerald-400 font-bold">₦{affiliateCommission.toLocaleString()}</span></p>
+                      </div>
+                    )}
+                 </div>
+
+                 <button 
+                  onClick={handlePurchase}
+                  disabled={purchaseLoading}
+                  className="w-full bg-linear-to-r from-amber-500 to-yellow-600 text-slate-950 h-14 rounded-2xl font-display font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                 >
+                   {purchaseLoading ? <Loader2 className="animate-spin text-slate-950" /> : <>{hasFreeCredit ? 'Decrypt Strategy Access' : 'Make Payment / Enroll Now'} <ArrowRight size={16} /></>}
+                 </button>
                </div>
 
-               <button 
-                onClick={handlePurchase}
-                disabled={purchaseLoading}
-                className="w-full max-w-xs bg-linear-to-r from-amber-500 to-yellow-600 text-slate-950 h-14 rounded-2xl font-display font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-               >
-                 {purchaseLoading ? <Loader2 className="animate-spin text-slate-950" /> : <>{hasFreeCredit ? 'Decrypt Strategy Access' : 'Purchase Decryption'} <ArrowRight size={16} /></>}
-               </button>
-
-               {!hasFreeCredit && (profile?.depositBalance || 0) < 7000 && (
-                 <div className="w-full max-w-xs bg-red-950/40 p-4 rounded-xl border border-red-500/20 text-center space-y-2 mt-4">
-                   <p className="text-xs text-red-500 font-bold">
-                     ⚠️ Deposited balance is too low (₦{(profile?.depositBalance || 0).toLocaleString()})
-                   </p>
-                   <p className="text-[10px] text-slate-400">
-                     You need at least ₦7,000 in bank-deposited funds to purchase this course. (Note: Task earnings cannot be used).
-                   </p>
-                   <Link 
-                     to="/deposit" 
-                     className="inline-block text-[10px] uppercase tracking-wider font-extrabold text-amber-500 hover:underline hover:text-amber-400"
-                   >
-                     Deposit Funds & Unlock Course →
-                   </Link>
+               {!hasFreeCredit && (profile?.depositBalance || 0) < coursePrice && (
+                 <div className="w-full max-w-sm bg-red-950/40 p-4 rounded-xl border border-red-500/20 text-center space-y-2">
+                    <p className="text-xs text-red-500 font-bold">
+                      ⚠️ Deposited balance is too low (₦{(profile?.depositBalance || 0).toLocaleString()})
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      You need at least ₦{coursePrice.toLocaleString()} in bank-deposited funds to purchase this course. (Note: Task earnings cannot be used).
+                    </p>
+                    <Link 
+                      to="/deposit" 
+                      className="inline-block text-[11px] uppercase tracking-wider font-extrabold text-amber-500 hover:underline hover:text-amber-400"
+                    >
+                      Make Payment / Deposit Funds →
+                    </Link>
                  </div>
                )}
 
                {purchaseError && (
-                 <p className="text-xs text-red-500 font-bold mt-3 text-center max-w-xs">{purchaseError}</p>
+                 <p className="text-xs text-red-500 font-bold mt-2 text-center max-w-sm">{purchaseError}</p>
                )}
             </div>
           ) : (
-            <div className="p-4 sm:p-8 space-y-8 pb-32 max-w-5xl mx-auto w-full">
+            <div className="p-4 sm:p-8 space-y-6 pb-32 max-w-5xl mx-auto w-full">
+              {/* Affiliate Partner Quick Share Banner */}
+              <div className="bg-linear-to-r from-blue-950/70 to-indigo-950/70 border border-blue-500/25 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[8.5px] font-mono uppercase tracking-widest text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded font-black">70% Affiliate Reseller</span>
+                    <span className="text-xs font-bold text-white">Earn ₦{affiliateCommission.toLocaleString()} per sale</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-snug">Promote this accredited course to others. Every student who enrolls through your link credits 70% direct cash to your Referral Balance!</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/academy?ref=${user?.uid}&course=${course.id}`;
+                    navigator.clipboard.writeText(link);
+                    setCopiedSnippet(true);
+                    setTimeout(() => setCopiedSnippet(false), 2500);
+                  }}
+                  className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md cursor-pointer active:scale-95"
+                >
+                  {copiedSnippet ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
+                  <span>{copiedSnippet ? 'Link Copied!' : 'Copy Affiliate Link'}</span>
+                </button>
+              </div>
+
               {/* Progress Tracker */}
               <div className="bg-slate-900/40 p-6 rounded-3xl border border-white/5 space-y-4">
                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-md">CURRICULUM NODE DIRECTIVE</span>
                       <h4 className="text-sm font-display font-black uppercase text-slate-300 mt-2 tracking-wide font-sans">
-                        Step {activeStep + 1} of {course.steps.length}: {getEnrichedStep(course.title, course.steps[activeStep], activeStep).moduleTitle}
+                        Step {activeStep + 1} of {course.steps.length}: {enrichedStep.moduleTitle}
                       </h4>
                     </div>
                     <span className="text-xs font-mono text-violet-400 font-bold bg-violet-500/10 px-3 py-1 rounded-full self-start sm:self-center">
@@ -571,7 +749,7 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
                        <div>
                           <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-violet-400 font-bold">Action Protocol Directive</p>
                           <h3 className="text-xl sm:text-2xl font-display font-black text-white uppercase mt-0.5 tracking-tightest">
-                             {getEnrichedStep(course.title, course.steps[activeStep], activeStep).moduleTitle}
+                             {enrichedStep.moduleTitle}
                           </h3>
                        </div>
                     </div>
@@ -580,46 +758,95 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
                     </div>
                  </div>
 
-                 {/* 1. Synopsis Summary */}
+                 {/* 1. Learning Objectives (if present) */}
+                 {enrichedStep.learningObjectives && enrichedStep.learningObjectives.length > 0 && (
+                   <div className="bg-linear-to-r from-amber-500/10 via-violet-500/10 to-transparent p-5 rounded-2xl border border-amber-500/20 space-y-3">
+                     <div className="flex items-center gap-2">
+                       <Award size={15} className="text-amber-400" />
+                       <h4 className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold">
+                         CORE LEARNING OBJECTIVES
+                       </h4>
+                     </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                       {enrichedStep.learningObjectives.map((obj, oIdx) => (
+                         <div key={oIdx} className="flex items-start gap-2.5 text-xs text-slate-300">
+                           <span className="text-amber-400 font-bold mt-0.5">✓</span>
+                           <span>{obj}</span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* 2. Synopsis Summary */}
                  <div className="space-y-3">
                     <h4 className="text-[11px] font-mono uppercase tracking-widest text-[#a19fc0] flex items-center gap-2">
                        <BookOpen size={14} className="text-amber-400" />
-                       OVERVIEW ABSTRACT
+                       OVERVIEW ABSTRACT & CORE THESIS
                     </h4>
-                    <p className="text-slate-200 text-base leading-relaxed pl-1 font-medium select-text font-sans">
+                    <p className="text-slate-200 text-sm sm:text-base leading-relaxed pl-1 font-medium select-text font-sans">
                        {course.steps[activeStep]}
                     </p>
                  </div>
 
-                 {/* 2. Detailed Core Framework Breakdown */}
+                 {/* 3. Detailed Core Framework Breakdown */}
                  <div className="space-y-6 pt-2 border-t border-white/5">
-                    <div className="flex items-center gap-2">
-                       <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping" />
-                       <h4 className="text-[11px] font-mono uppercase tracking-widest text-amber-400">
-                          DETAILED CORE FRAMEWORK BREAKDOWN & OPERATIONS
-                       </h4>
+                    <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping" />
+                          <h4 className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold">
+                             IN-DEPTH LESSON MODULES & FIELD BLUEPRINTS
+                          </h4>
+                       </div>
+                       <span className="text-[10px] font-mono text-slate-400">
+                         {enrichedStep.subsections.length} Core Lessons
+                       </span>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                       {getEnrichedStep(course.title, course.steps[activeStep], activeStep).subsections.map((sub, sIdx) => (
-                         <div key={sIdx} className="bg-slate-900/60 p-5 rounded-2xl border border-white/5 space-y-3 flex flex-col justify-between hover:border-violet-500/10 transition-colors">
-                            <div className="space-y-2">
-                               <h5 className="text-[10px] font-mono tracking-wider text-violet-300 font-black uppercase">
-                                  {sub.subtitle}
-                               </h5>
-                               <p className="text-xs text-slate-300 leading-relaxed select-text font-sans">
-                                  {sub.content}
-                               </p>
+                    <div className="space-y-6">
+                       {enrichedStep.subsections.map((sub, sIdx) => (
+                         <div key={sIdx} className="bg-slate-900/70 p-6 rounded-2xl border border-white/5 space-y-4 hover:border-amber-500/20 transition-all">
+                            <h5 className="text-sm font-display font-bold text-white tracking-wide border-b border-white/5 pb-2.5 flex items-center justify-between">
+                               <span className="text-violet-300">{sub.subtitle}</span>
+                               <span className="text-[9px] font-mono font-normal text-slate-500">LESSON 0{sIdx + 1}</span>
+                            </h5>
+                            
+                            <div className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-line space-y-3 select-text">
+                               {sub.content}
                             </div>
-                            <div className="pt-2 text-[9px] font-mono text-[#515060] border-t border-white/5">
-                               NODE REFERENCE KEY #{sIdx + 128}
-                            </div>
+
+                            {sub.workedScenario && (
+                              <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/25 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 text-emerald-400 font-mono font-bold text-[10px] uppercase tracking-wider">
+                                  <span>💡</span> WORKED SCENARIO & NUMBERS
+                                </div>
+                                <p className="text-emerald-200/90 leading-relaxed font-sans select-text">{sub.workedScenario}</p>
+                               </div>
+                            )}
+
+                            {sub.proTip && (
+                              <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/25 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 text-amber-400 font-mono font-bold text-[10px] uppercase tracking-wider">
+                                  <Zap size={12} className="fill-amber-400" /> PRO EXECUTION TIP
+                                </div>
+                                <p className="text-amber-200/90 leading-relaxed font-sans select-text">{sub.proTip}</p>
+                               </div>
+                            )}
+
+                            {sub.commonPitfall && (
+                              <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/25 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 text-rose-400 font-mono font-bold text-[10px] uppercase tracking-wider">
+                                  <AlertTriangle size={12} /> COMMON PITFALL TO AVOID
+                                </div>
+                                <p className="text-rose-200/90 leading-relaxed font-sans select-text">{sub.commonPitfall}</p>
+                               </div>
+                            )}
                          </div>
                        ))}
                     </div>
                  </div>
 
-                 {/* 3. AI Enhanced Intelligence Lab */}
+                 {/* 4. AI Enhanced Intelligence Lab */}
                  <AnimatePresence>
                    {expandedStep ? (
                      <motion.div 
@@ -654,94 +881,264 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
                    )}
                  </AnimatePresence>
 
-                 {/* 4. Actionable Step-by-Step Assignment/Exercise */}
-                 <div className="bg-slate-900/50 p-6 sm:p-8 rounded-3xl border border-white/5 space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                       <div className="flex items-center gap-2.5 text-amber-400">
-                          <CheckSquare size={16} className="text-amber-400" />
-                          <h4 className="text-[11px] font-mono uppercase tracking-widest font-black font-sans">
-                             YOUR ACTION TASKS & MILESTONE CHECKS
-                          </h4>
+                 {/* 5. Interactive Knowledge Check Quiz (if present) */}
+                 {enrichedStep.knowledgeCheck && enrichedStep.knowledgeCheck.length > 0 && (
+                   <div className="bg-linear-to-b from-indigo-950/40 to-slate-900/60 p-6 sm:p-8 rounded-3xl border border-indigo-500/30 space-y-6">
+                     <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                       <div className="flex items-center gap-2.5 text-indigo-400">
+                         <HelpCircle size={18} />
+                         <div>
+                           <h4 className="text-xs font-mono uppercase tracking-widest font-black text-white">
+                             KNOWLEDGE CHECK & MASTERY AUDIT
+                           </h4>
+                           <p className="text-[10px] text-slate-400">Test your comprehension before proceeding to the practical assignment.</p>
+                         </div>
                        </div>
-                       <span className="text-[9px] font-mono text-slate-400 bg-white/5 px-2.5 py-1 rounded-md">
-                          {getEnrichedStep(course.title, course.steps[activeStep], activeStep).assignment.tasks.filter((_, idx) => checkedTasks[`${activeStep}_${idx}`]).length} / {getEnrichedStep(course.title, course.steps[activeStep], activeStep).assignment.tasks.length} Completed
+                       <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md">
+                         {enrichedStep.knowledgeCheck.length} Questions
                        </span>
-                    </div>
+                     </div>
 
-                    <p className="text-xs text-slate-400 pl-1 font-sans">
-                       Before registering completion for Step {activeStep + 1}, satisfy the following operational tasks. Select each once resolved:
-                    </p>
+                     <div className="space-y-6">
+                       {enrichedStep.knowledgeCheck.map((q, qIdx) => {
+                         const qKey = `${activeStep}_q_${qIdx}`;
+                         const selectedOpt = quizAnswers[qKey];
+                         const isAnswered = selectedOpt !== undefined;
+                         const isCorrect = isAnswered && selectedOpt === q.correctIndex;
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                       {getEnrichedStep(course.title, course.steps[activeStep], activeStep).assignment.tasks.map((task, idx) => {
-                         const tKey = `${activeStep}_${idx}`;
-                         const isChecked = !!checkedTasks[tKey];
                          return (
-                           <div 
-                             key={idx} 
-                             onClick={() => handleToggleTask(tKey)}
-                             className={`flex items-start gap-4 p-4 rounded-2xl border transition-all cursor-pointer select-none ${
-                               isChecked 
-                                 ? 'bg-violet-950/20 border-violet-500/40 text-slate-100 shadow-md shadow-violet-950/30' 
-                                 : 'bg-slate-950/40 border-white/5 text-slate-300 hover:border-white/10 hover:bg-slate-900/40'
-                             }`}
-                           >
-                              <div className={`mt-0.5 w-4 h-4 rounded-md border flex items-center justify-center transition-all flex-shrink-0 ${
-                                isChecked 
-                                  ? 'bg-amber-500 border-amber-500 text-slate-950' 
-                                  : 'border-slate-600 hover:border-slate-400'
-                              }`}>
-                                 {isChecked && <span className="text-[10px] font-black">✓</span>}
-                              </div>
-                              <span className="text-xs font-semibold leading-relaxed font-sans">
-                                 {task}
-                              </span>
+                           <div key={qIdx} className="bg-slate-950/60 p-5 rounded-2xl border border-white/5 space-y-3.5">
+                             <p className="text-xs font-bold text-slate-200 font-sans">
+                               <span className="text-indigo-400 font-mono mr-2">Q{qIdx + 1}.</span>
+                               {q.question}
+                             </p>
+
+                             <div className="grid grid-cols-1 gap-2 pt-1">
+                               {q.options.map((opt, oIdx) => {
+                                 const isThisSelected = selectedOpt === oIdx;
+                                 let optStyle = "bg-slate-900/50 border-white/5 text-slate-300 hover:border-indigo-500/30 hover:bg-slate-900";
+                                 
+                                 if (isAnswered) {
+                                   if (oIdx === q.correctIndex) {
+                                     optStyle = "bg-emerald-950/40 border-emerald-500/60 text-emerald-200 font-bold";
+                                   } else if (isThisSelected) {
+                                     optStyle = "bg-rose-950/40 border-rose-500/60 text-rose-300";
+                                   } else {
+                                     optStyle = "bg-slate-950/30 border-white/5 text-slate-500 opacity-60";
+                                   }
+                                 }
+
+                                 return (
+                                   <button
+                                     key={oIdx}
+                                     onClick={() => {
+                                       if (!isAnswered) {
+                                         setQuizAnswers(prev => ({ ...prev, [qKey]: oIdx }));
+                                       }
+                                     }}
+                                     disabled={isAnswered}
+                                     className={`w-full text-left p-3.5 rounded-xl border text-xs transition-all flex items-center justify-between cursor-pointer ${optStyle}`}
+                                   >
+                                     <span className="flex-1 pr-3">{opt}</span>
+                                     {isAnswered && oIdx === q.correctIndex && (
+                                       <span className="text-emerald-400 font-bold text-xs flex items-center gap-1">✓ Correct</span>
+                                     )}
+                                     {isAnswered && isThisSelected && oIdx !== q.correctIndex && (
+                                       <span className="text-rose-400 font-bold text-xs">✗ Incorrect</span>
+                                     )}
+                                   </button>
+                                 );
+                               })}
+                             </div>
+
+                             {isAnswered && (
+                               <div className={`p-3.5 rounded-xl border text-xs space-y-1 ${isCorrect ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200' : 'bg-amber-950/20 border-amber-500/30 text-amber-200'}`}>
+                                 <div className="font-mono text-[10px] uppercase font-bold tracking-wider">
+                                   {isCorrect ? '✓ Explanation & Verification:' : '⚠️ Solution Explanation:'}
+                                 </div>
+                                 <p className="text-[11px] font-sans leading-relaxed text-slate-300">{q.explanation}</p>
+                               </div>
+                             )}
                            </div>
                          );
                        })}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* 6. Actionable Step-by-Step Assignment & Deliverables */}
+                 <div className="bg-slate-900/60 p-6 sm:p-8 rounded-3xl border border-white/5 space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
+                       <div className="flex items-center gap-2.5 text-amber-400">
+                          <CheckSquare size={18} />
+                          <div>
+                            <h4 className="text-xs font-mono uppercase tracking-widest font-black text-white font-sans">
+                               {enrichedStep.assignment.title || 'PRACTICAL ACTION ASSIGNMENT & DELIVERABLES'}
+                            </h4>
+                            <span className="text-[10px] font-mono text-slate-400">Milestone Verification & Field Tasks</span>
+                          </div>
+                       </div>
+                       <span className="text-[10px] font-mono font-bold text-violet-400 bg-violet-500/10 px-3 py-1 rounded-md">
+                          {enrichedStep.assignment.tasks.filter((_, idx) => checkedTasks[`${activeStep}_${idx}`]).length} / {enrichedStep.assignment.tasks.length} Completed
+                       </span>
+                    </div>
+
+                    {enrichedStep.assignment.purpose && (
+                      <div className="bg-slate-950/60 p-4 rounded-xl border border-white/5 space-y-1">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-amber-400 font-bold">ASSIGNMENT OBJECTIVE</span>
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans">{enrichedStep.assignment.purpose}</p>
+                      </div>
+                    )}
+
+                    {enrichedStep.assignment.instructions && (
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                          <Info size={12} className="text-amber-400" /> STEP-BY-STEP INSTRUCTIONS
+                        </span>
+                        <div className="space-y-2">
+                          {enrichedStep.assignment.instructions.map((inst, iIdx) => (
+                            <div key={iIdx} className="flex items-start gap-2.5 text-xs text-slate-300">
+                              <span className="w-5 h-5 rounded-full bg-violet-950 border border-violet-500/30 flex items-center justify-center text-[10px] font-mono font-bold text-violet-300 flex-shrink-0 mt-0.5">{iIdx + 1}</span>
+                              <span className="leading-relaxed font-sans">{inst}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {enrichedStep.assignment.expectedOutput && (
+                      <div className="p-4 rounded-xl bg-violet-950/20 border border-violet-500/30 space-y-1">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-violet-300 font-bold">EXPECTED LEARNER DELIVERABLE</span>
+                        <p className="text-xs text-slate-200 leading-relaxed font-sans">{enrichedStep.assignment.expectedOutput}</p>
+                      </div>
+                    )}
+
+                    {enrichedStep.assignment.rubric && (
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                          <Award size={12} className="text-amber-400" /> EVALUATION RUBRIC & SCORING STANDARD
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {enrichedStep.assignment.rubric.map((rub, rIdx) => (
+                            <div key={rIdx} className="bg-slate-950/50 p-3 rounded-xl border border-white/5 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-amber-300 font-sans">{rub.criteria}</span>
+                                <span className="text-[10px] font-mono font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded">{rub.points}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 leading-normal font-sans">{rub.standard}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {enrichedStep.assignment.alternativeSimulation && (
+                      <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-1.5">
+                        <div className="flex items-center gap-2 text-amber-400 font-mono font-bold text-[10px] uppercase tracking-wider">
+                          <AlertTriangle size={13} /> GLOBAL ALTERNATIVE / NIGERIA SIMULATION TRACK
+                        </div>
+                        <p className="text-xs text-amber-200/90 leading-relaxed font-sans select-text">
+                          {enrichedStep.assignment.alternativeSimulation}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-3 pt-2">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                        ACTION TASKS & MILESTONE VERIFICATION CHECKLIST
+                      </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                         {enrichedStep.assignment.tasks.map((task, idx) => {
+                           const tKey = `${activeStep}_${idx}`;
+                           const isChecked = !!checkedTasks[tKey];
+                           return (
+                             <div 
+                               key={idx} 
+                               onClick={() => handleToggleTask(tKey)}
+                               className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all cursor-pointer select-none ${
+                                 isChecked 
+                                   ? 'bg-violet-950/30 border-violet-500/50 text-slate-100 shadow-md shadow-violet-950/30' 
+                                   : 'bg-slate-950/40 border-white/5 text-slate-300 hover:border-white/10 hover:bg-slate-900/50'
+                               }`}
+                             >
+                                <div className={`mt-0.5 w-4 h-4 rounded-md border flex items-center justify-center transition-all flex-shrink-0 ${
+                                  isChecked 
+                                    ? 'bg-amber-500 border-amber-500 text-slate-950' 
+                                    : 'border-slate-600 hover:border-slate-400'
+                                }`}>
+                                   {isChecked && <Check size={12} className="stroke-[3]" />}
+                                </div>
+                                <span className="text-xs font-semibold leading-relaxed font-sans">
+                                   {task}
+                                </span>
+                             </div>
+                           );
+                         })}
+                      </div>
                     </div>
                  </div>
 
-                 {/* 5. Resource Download Section */}
+                 {/* 7. Genuine Resources, Spreadsheets & PDF Field Guides */}
                  <div className="space-y-4 pt-2 border-t border-white/5">
-                    <h4 className="text-[11px] font-mono uppercase tracking-widest text-[#a19fc0] flex items-center gap-2">
-                       <Wrench size={14} className="text-amber-400" />
-                       PREMIUM TOOLS & ASSET REGISTRY
-                    </h4>
+                    <div className="flex items-center justify-between">
+                       <h4 className="text-[11px] font-mono uppercase tracking-widest text-[#a19fc0] flex items-center gap-2">
+                          <Wrench size={14} className="text-amber-400" />
+                          GENUINE RESOURCES, SPREADSHEETS & PDF FIELD GUIDES
+                       </h4>
+                       <span className="text-[9px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded">
+                         OFFICIAL BINARY ASSETS
+                       </span>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                       {getEnrichedStep(course.title, course.steps[activeStep], activeStep).resources.map((res, rIdx) => (
+                       {enrichedStep.resources.map((res: any, rIdx: number) => (
                          <div 
                            key={rIdx} 
-                           onClick={() => triggerResourceDownload(res.name, res.type, res.description)}
-                           className="bg-slate-900/40 hover:bg-slate-900/80 p-5 rounded-2xl border border-white/5 hover:border-amber-500/25 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+                           className="bg-slate-900/50 hover:bg-slate-900/90 p-5 rounded-2xl border border-white/5 hover:border-amber-500/30 transition-all group flex flex-col justify-between space-y-4"
                          >
-                            <div className="space-y-1.5">
-                               <div className="flex items-center gap-2">
-                                  {res.type === 'spreadsheet' ? (
-                                    <Table size={16} className="text-emerald-400" />
-                                  ) : (
-                                    <FileText size={16} className="text-amber-400" />
-                                  )}
-                                  <span className="text-[9px] font-mono font-bold uppercase text-slate-400 px-1.5 py-0.5 bg-white/5 rounded-md">
-                                     {res.type}
-                                  </span>
+                            <div className="space-y-2">
+                               <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                     {res.type === 'spreadsheet' ? (
+                                       <Table size={18} className="text-emerald-400" />
+                                     ) : (
+                                       <FileText size={18} className="text-amber-400" />
+                                     )}
+                                     <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md ${
+                                       res.type === 'spreadsheet' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'
+                                     }`}>
+                                        {res.type === 'spreadsheet' ? 'EXCEL .XLSX' : 'PDF DOCUMENT'}
+                                     </span>
+                                  </div>
+                                  <span className="text-[9px] font-mono text-slate-500">READY</span>
                                </div>
-                               <h5 className="text-[11px] font-mono text-slate-200 truncate font-bold group-hover:text-amber-400 transition-colors bg-transparent border-none p-0 outline-hidden">
+                               <h5 className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1">
                                   {res.name}
-                               </h5>
-                               <p className="text-[10px] text-slate-400 leading-normal line-clamp-2">
+                                </h5>
+                               <p className="text-[11px] text-slate-400 leading-normal line-clamp-2">
                                   {res.description}
                                </p>
                             </div>
-                            <div className="pt-2 text-[9px] font-mono font-bold text-amber-500 uppercase flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                               <Download size={10} /> REQUISITION SECURE
+                            <div className="pt-2 border-t border-white/5 flex items-center gap-2">
+                               <button
+                                 onClick={() => triggerResourceDownload(res)}
+                                 className="flex-1 py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-xl text-[10px] font-mono font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                               >
+                                 <Download size={12} /> Download
+                               </button>
+                               <button
+                                 onClick={() => setSelectedResource(res)}
+                                 className="py-2 px-3 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 rounded-xl text-[10px] font-mono font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                 title="Preview & Google Drive"
+                               >
+                                 <Eye size={12} /> Preview
+                               </button>
                             </div>
                          </div>
                        ))}
                     </div>
                  </div>
 
-                 {/* 6. Prominent Navigation Action Bar */}
+                 {/* 8. Prominent Navigation Action Bar */}
                  <div className="flex flex-col sm:flex-row gap-4 border-t border-white/5 pt-8 mt-4">
                     <button 
                       disabled={activeStep === 0}
@@ -872,6 +1269,103 @@ Deploy this asset in active setups. Maintain optimization parameters for high yi
                  </button>
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Resource Preview & Google Drive Modal */}
+        <AnimatePresence>
+          {selectedResource && (
+            <div className="fixed inset-0 z-[1300] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-[#0b081e] border border-amber-500/30 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-start justify-between border-b border-white/5 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                      selectedResource.type === 'spreadsheet' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {selectedResource.type === 'spreadsheet' ? <Table size={24} /> : <FileText size={24} />}
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold">
+                        {selectedResource.type === 'spreadsheet' ? 'EXCEL SPREADSHEET RESOURCE' : 'PDF FIELD GUIDE'}
+                      </span>
+                      <h3 className="text-base sm:text-lg font-display font-black text-white">{selectedResource.name}</h3>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedResource(null)} className="p-2 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-xs text-slate-300">
+                  <p className="leading-relaxed">{selectedResource.description}</p>
+                  
+                  {selectedResource.previewContent && (
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-3">
+                      <span className="text-[10px] font-mono uppercase text-amber-400 font-bold">DOCUMENT EXECUTIVE ABSTRACT</span>
+                      <p className="text-slate-300 font-sans leading-relaxed">{selectedResource.previewContent.summary}</p>
+                      
+                      {selectedResource.previewContent.keyPoints && (
+                        <div className="space-y-1.5 pt-2 border-t border-white/5">
+                          <span className="text-[9px] font-mono uppercase text-slate-400 font-bold">CORE SECTIONS & WORKSHEETS:</span>
+                          {selectedResource.previewContent.keyPoints.map((pt: string, pIdx: number) => (
+                            <div key={pIdx} className="flex items-start gap-2 text-[11px] text-slate-400">
+                              <span className="text-amber-400">•</span>
+                              <span>{pt}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {selectedResource.previewContent.sampleSnippet && (
+                        <div className="p-3 bg-black/60 rounded-xl border border-white/5 font-mono text-[11px] text-amber-300 whitespace-pre-wrap select-all">
+                          {selectedResource.previewContent.sampleSnippet}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-white/5">
+                  <button
+                    onClick={() => {
+                      triggerResourceDownload(selectedResource);
+                      setSelectedResource(null);
+                    }}
+                    className="flex-1 py-3.5 bg-linear-to-r from-amber-500 to-yellow-600 text-slate-950 rounded-xl font-display font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer"
+                  >
+                    <Download size={16} /> Download File
+                  </button>
+                  
+                  <a
+                    href={selectedResource.type === 'spreadsheet' ? 'https://docs.google.com/spreadsheets/u/0/create' : 'https://drive.google.com/drive/my-drive'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 text-white rounded-xl font-display font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+                  >
+                    <ExternalLink size={16} /> Open in Google Drive / {selectedResource.type === 'spreadsheet' ? 'Sheets' : 'Drive'}
+                  </a>
+
+                  {selectedResource.previewContent?.sampleSnippet && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedResource.previewContent.sampleSnippet);
+                        setCopiedSnippet(true);
+                        setTimeout(() => setCopiedSnippet(false), 2000);
+                      }}
+                      className="py-3.5 px-4 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 rounded-xl font-mono font-bold text-xs flex items-center justify-center gap-1.5 border border-violet-500/20 cursor-pointer"
+                    >
+                      {copiedSnippet ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      {copiedSnippet ? 'Copied!' : 'Copy Snippet'}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </div>

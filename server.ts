@@ -5782,13 +5782,17 @@ GENERAL RULES:
 
   // Secure Purchase Engine
   app.post("/api/v1/academy/purchase", async (req, res) => {
-    const { userId, courseId, courseTitle } = req.body;
+    const { userId, courseId, courseTitle, coursePrice: rawPrice, referrerId } = req.body;
     if (!userId || !courseId) return res.status(400).json({ error: "Identity mismatch" });
+
+    // Validate price within 5,000 to 7,000
+    const parsedPrice = Number(rawPrice) || 6000;
+    const coursePrice = Math.min(7000, Math.max(5000, parsedPrice));
 
     // Instantly bypass and engage client fallback if Admin SDK lacks database access capabilities
     if (!isDbAdminCapable) {
       console.info("[ACADEMY] Server Admin SDK is running in restricted mode. Automatically engaging Client SDK fallback execution...");
-      return res.json({ success: true, useClientFallback: true });
+      return res.json({ success: true, useClientFallback: true, coursePrice });
     }
 
     try {
@@ -5803,8 +5807,8 @@ GENERAL RULES:
         const isAdmin = userData?.role === 'admin';
         const plan = userData?.plan || 'free';
         const freeCoursesUsed = userData?.freeCoursesUsed || 0;
-        const currentBalance = userData?.balance || 0;
         const depositBalance = userData?.depositBalance || 0;
+        const buyerName = userData?.displayName || userData?.username || 'Student Earner';
 
         // Determine free credits based on plan
         let maxFreeCredits = 0;
@@ -5812,10 +5816,10 @@ GENERAL RULES:
         else if (plan === 'platinum') maxFreeCredits = 2;
 
         const hasFreeCredits = (freeCoursesUsed < maxFreeCredits) || isAdmin;
-        const cost = hasFreeCredits ? 0 : 7000;
+        const cost = hasFreeCredits ? 0 : coursePrice;
 
-        if (!hasFreeCredits && depositBalance < 7000) {
-          throw new Error("Insufficient deposited balance. ₦7,000 required from direct bank deposits to purchase this course.");
+        if (!hasFreeCredits && depositBalance < coursePrice) {
+          throw new Error(`Insufficient deposited balance. ₦${coursePrice.toLocaleString()} required from direct bank deposits to purchase this course.`);
         }
 
         // Check for existing purchase using predictable ID
@@ -5823,36 +5827,106 @@ GENERAL RULES:
         const purchaseDoc = await transaction.get(purchaseRef);
         
         if (purchaseDoc.exists) {
-          throw new Error("Course already decentralized to your identity.");
+          throw new Error("Course already unlocked on your account.");
         }
+
+        // Determine affiliate referrer
+        let targetReferrerId = (referrerId && referrerId !== userId) ? referrerId : (userData?.referredBy && userData.referredBy !== userId ? userData.referredBy : null);
+        let referrerDoc = null;
+        let referrerRef = null;
+
+        if (targetReferrerId) {
+          referrerRef = dbAdmin.doc(`users/${targetReferrerId}`);
+          referrerDoc = await transaction.get(referrerRef);
+          if (!referrerDoc.exists) {
+            // Check if referred by referralCode instead of uid
+            const codeQuery = await dbAdmin.collection('users').where('referralCode', '==', targetReferrerId).limit(1).get();
+            if (!codeQuery.empty) {
+              referrerRef = codeQuery.docs[0].ref;
+              referrerDoc = codeQuery.docs[0];
+              targetReferrerId = referrerDoc.id;
+            } else {
+              targetReferrerId = null;
+            }
+          }
+        }
+
+        // Calculate 70/30 commission split (Platform keeps 70%, User promoter receives 30%)
+        const commissionRate = 0.30;
+        const affiliateCommission = (!hasFreeCredits && targetReferrerId) ? Math.round(cost * commissionRate) : 0;
+        const platformShare = cost - affiliateCommission; // 70% retained by platform
 
         const purchaseData: any = {
           purchaseId,
           userId,
           courseId,
+          courseTitle: courseTitle || 'Academy Course',
           amount: cost,
           isFree: hasFreeCredits,
+          referrerId: targetReferrerId,
+          affiliateCommission,
+          platformShare,
           purchasedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
         transaction.set(purchaseRef, purchaseData);
 
         if (!hasFreeCredits) {
+          // Debit buyer deposit & withdrawable balance atomically
           transaction.update(userRef, {
-            balance: admin.firestore.FieldValue.increment(-7000),
-            withdrawableBalance: admin.firestore.FieldValue.increment(-7000),
-            depositBalance: admin.firestore.FieldValue.increment(-7000)
+            balance: admin.firestore.FieldValue.increment(-cost),
+            withdrawableBalance: admin.firestore.FieldValue.increment(-cost),
+            depositBalance: admin.firestore.FieldValue.increment(-cost)
           });
 
+          // Buyer transaction record
           const transRef = dbAdmin.collection('transactions').doc();
           transaction.set(transRef, {
             id: transRef.id,
             userId,
-            amount: -7000,
+            amount: -cost,
             type: 'withdrawal',
-            description: `Unlocked Course: ${courseTitle || 'Executive Strategy'}`,
+            description: `Unlocked Course: ${courseTitle || 'Academy Strategy'}`,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           });
+
+          // 30% Affiliate Commission credit to promoter's separate affiliate balance
+          if (targetReferrerId && affiliateCommission > 0 && referrerRef) {
+            transaction.update(referrerRef, {
+              affiliateBalance: admin.firestore.FieldValue.increment(affiliateCommission),
+              affiliateEarnings: admin.firestore.FieldValue.increment(affiliateCommission),
+              totalAffiliateSales: admin.firestore.FieldValue.increment(1),
+              totalEarnings: admin.firestore.FieldValue.increment(affiliateCommission)
+            });
+
+            // Promoter affiliate transaction receipt
+            const refTrans = dbAdmin.collection('transactions').doc();
+            transaction.set(refTrans, {
+              id: refTrans.id,
+              userId: targetReferrerId,
+              amount: affiliateCommission,
+              type: 'affiliate_commission',
+              description: `30% Course Affiliate Commission: ${courseTitle || 'Course'} (Buyer: ${buyerName})`,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Permanent Affiliate Sale Record (30% user / 70% platform)
+            const affSaleRef = dbAdmin.collection('affiliateSales').doc();
+            transaction.set(affSaleRef, {
+              id: affSaleRef.id,
+              referrerId: targetReferrerId,
+              buyerId: userId,
+              buyerName,
+              courseId,
+              courseTitle: courseTitle || 'Academy Course',
+              coursePrice: cost,
+              commissionRate: 0.30,
+              commissionAmount: affiliateCommission,
+              platformShare,
+              status: 'credited',
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
         } else if (!isAdmin) {
           // Consume a free credit if not admin
           transaction.update(userRef, {
@@ -5866,7 +5940,7 @@ GENERAL RULES:
       console.error("[ACADEMY] Purchase failed:", err.message);
       if (err.message?.includes('permission') || err.message?.includes('PERMISSION_DENIED') || err.code === 7) {
         console.warn("[ACADEMY] Server database write denied. Engaging Client SDK fallback execution...");
-        return res.json({ success: true, useClientFallback: true });
+        return res.json({ success: true, useClientFallback: true, coursePrice });
       }
       res.status(400).json({ error: err.message });
     }
@@ -5991,12 +6065,161 @@ CRITICAL PROTOCOLS:
     }
   });
 
-  // --- Static Uploads Folder ---
+  // --- Static Uploads & Downloads Folders ---
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
   app.use("/uploads", express.static(uploadsDir));
+
+  const downloadsDir = path.join(process.cwd(), "public/downloads");
+  if (!fs.existsSync(downloadsDir)) {
+    fs.mkdirSync(downloadsDir, { recursive: true });
+  }
+  // --- Social Media Preview Interceptor (WhatsApp, Facebook, Twitter, Telegram) for Affiliate Product Links ---
+  const SOCIAL_PREVIEW_COURSES: Record<string, { title: string; price: number; description: string; image: string }> = {
+    "tiktok-shop": {
+      title: "TikTok Shop Growth Strategy",
+      price: 6000,
+      description: "Leverage the viral ecosystem of TikTok Shop to dominate social e-commerce with practical blueprints and templates.",
+      image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=1200&auto=format&fit=crop&q=80"
+    },
+    "pinterest-traffic": {
+      title: "Pinterest Traffic Harvesting",
+      price: 5500,
+      description: "Drive mass organic traffic to blogs, shops, or affiliate links using the visual search power of Pinterest.",
+      image: "https://images.unsplash.com/photo-1611162616493-2a0754546c1f?w=1200&auto=format&fit=crop&q=80"
+    },
+    "discord-management": {
+      title: "Elite Discord Community Management",
+      price: 6000,
+      description: "Master the architectural and psychological frameworks for managing high-engagement communities.",
+      image: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=1200&auto=format&fit=crop&q=80"
+    },
+    "instagram-growth": {
+      title: "Instagram Page Flipping & Growth",
+      price: 6500,
+      description: "Build, optimize, and monetize high-retention theme pages on Instagram from scratch.",
+      image: "https://images.unsplash.com/photo-1611224885990-ab7363d1f2a9?w=1200&auto=format&fit=crop&q=80"
+    },
+    "whatsapp-lead-siphon": {
+      title: "WhatsApp Organic Lead Siphon",
+      price: 6000,
+      description: "Transform your WhatsApp status into a lucrative digital sales funnel and siphon thousands of buyers on autopilot.",
+      image: "https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=1200&auto=format&fit=crop&q=80"
+    },
+    "premium-ghostwriting": {
+      title: "Premium Ghostwriting & Foreign Arbitrage",
+      price: 7000,
+      description: "Write high-converting content for international executives and businesses to secure stable dollar payouts from Nigeria.",
+      image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&auto=format&fit=crop&q=80"
+    },
+    "smartphone-video": {
+      title: "Smartphone Video Editing & Content Creation",
+      price: 5500,
+      description: "Master cinematic mobile editing workflows on CapCut to create high-retaining short-form video ads for local brands.",
+      image: "https://images.unsplash.com/photo-1512499617640-c74ae3a79d37?w=1200&auto=format&fit=crop&q=80"
+    },
+    "ai-graphic-design": {
+      title: "AI-Powered Graphic Design Mastery",
+      price: 5000,
+      description: "Leverage tools like Midjourney and Canva to design professional marketing flyers, logos, and digital branding sets.",
+      image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c1": {
+      title: "High-Ticket Digital Arbitrage",
+      price: 6000,
+      description: "Master dollar arbitrage by flipping digital resources, services, and high-value domains dynamically.",
+      image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c2": {
+      title: "Social Media Ghostwriting",
+      price: 5500,
+      description: "Master the secrets of written persuasion and structure viral posts for international micro-influencer channels.",
+      image: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c3": {
+      title: "AI-Powered Content Empire",
+      price: 6500,
+      description: "Deploy generative AI workflow machines to produce high-retention content bundles at lightning-fast scales or speeds.",
+      image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c4": {
+      title: "Micro-SaaS for Campus Problems",
+      price: 5000,
+      description: "Engineer lightweight web and text utilities that resolve high-friction college student or local community pain points.",
+      image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c5": {
+      title: "The Faceless YouTube Blueprint",
+      price: 6000,
+      description: "Establish complete automated video networks on YouTube without revealing personal presence, harvesting high ad yields.",
+      image: "https://images.unsplash.com/photo-1579869847514-7c1a19d2d2ad?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c6": {
+      title: "Local Arbitrage & Lead Generation",
+      price: 5500,
+      description: "Connect service-based local artisans with high-paying client hubs in major commercial centers.",
+      image: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c7": {
+      title: "Digital Product Funnels",
+      price: 6500,
+      description: "Architect frictionless sales mechanisms and convert cold web prospects into repeat loyal patrons.",
+      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=80"
+    },
+    "c8": {
+      title: "Freelance Client Acquisition Mastery",
+      price: 7000,
+      description: "Master outreach scripts, portfolio framing, and negotiation protocols for international freelancing.",
+      image: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&auto=format&fit=crop&q=80"
+    }
+  };
+
+  app.get(["/product/:id", "/p/:id", "/academy/product/:id"], (req, res, next) => {
+    const userAgent = (req.headers['user-agent'] || '').toLowerCase();
+    const isCrawler = /facebookexternalhit|whatsapp|twitterbot|telegrambot|discordbot|slackbot|linkedinbot|pinterest|googlebot|bingbot|applebot/.test(userAgent);
+    
+    const courseId = req.params.id;
+    const course = SOCIAL_PREVIEW_COURSES[courseId];
+    
+    if (isCrawler && course) {
+      const host = req.get('host') || 'earnwise.ng';
+      const protocol = req.protocol || 'https';
+      const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+      
+      const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${course.title} — ₦${course.price.toLocaleString()} | EarnWise Academic</title>
+  <meta name="description" content="${course.description}">
+  <meta property="og:type" content="product">
+  <meta property="og:site_name" content="EarnWise Academic Marketplace">
+  <meta property="og:title" content="${course.title} — ₦${course.price.toLocaleString()}">
+  <meta property="og:description" content="${course.description} • Confirmed access includes practical worksheets, guides & 24/7 AI tutor.">
+  <meta property="og:image" content="${course.image}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="${fullUrl}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${course.title} — ₦${course.price.toLocaleString()}">
+  <meta name="twitter:description" content="${course.description}">
+  <meta name="twitter:image" content="${course.image}">
+</head>
+<body style="font-family: sans-serif; background: #020617; color: white; padding: 20px; text-align: center;">
+  <h2>${course.title}</h2>
+  <p style="color: #10b981; font-weight: bold; font-size: 20px;">₦${course.price.toLocaleString()}</p>
+  <p>${course.description}</p>
+  <img src="${course.image}" style="max-width: 100%; border-radius: 12px; margin: 20px 0;" alt="${course.title}" />
+</body>
+</html>`;
+      return res.status(200).send(html);
+    }
+    
+    // Normal browser visits pass through to Vite / SPA
+    next();
+  });
 
   // --- Vite / Static Files ---
   if (!isProd) {
