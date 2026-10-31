@@ -97,41 +97,5 @@ export const PLANS: PlanDetails[] = [
     description: 'Earn up to ₦2,500 daily with a maximum total lifetime earnings cap of ₦55,000! Our elite institutional package. Receive a massive 5.0x payout multiplier on all approved tasks, with UNLIMITED Wise AI and instant withdrawal priority.',
     dailyLimit: '₦2,500 / Day',
     maxEarnings: '₦55,000'
-  },
-  {
-    id: 'platinum',
-    name: 'Platinum',
-    cost: 15000,
-    multiplier: 7.5,
-    minWithdrawal: 1,
-    perks: [
-      'Earn up to ₦3,000 Daily',
-      'Unlimited Lifetime Earnings',
-      'Unlimited Task Withdrawal',
-      '7.5x Earnings Multiplier',
-      '2 Free Premium Courses'
-    ],
-    color: 'bg-indigo-600',
-    description: 'Earn up to ₦3,000 daily with completely unlimited total lifetime earnings! Prestige institutional tier. Benefit from a massive 7.5x earning multiplier, 2 free premium courses, an individual WhatsApp account manager, and UNLIMITED daily Wise AI requests.',
-    dailyLimit: '₦3,000 / Day',
-    maxEarnings: 'Unlimited'
-  },
-  {
-    id: 'golden',
-    name: 'Golden',
-    cost: 25000,
-    multiplier: 10.0,
-    minWithdrawal: 1,
-    perks: [
-      'Earn up to ₦4,000 Daily',
-      'Unlimited Lifetime Earnings',
-      'Unlimited Task Withdrawal',
-      '10.0x Earnings Multiplier',
-      '4 Free Premium Courses'
-    ],
-    color: 'bg-amber-500',
-    description: 'Earn up to ₦4,000 daily with completely unlimited total lifetime earnings! The absolute apex of the Earnwise network. Experience a massive 1,000% boost (10x earnings) on every action, 4 free premium courses, zero-wait withdrawals, and UNLIMITED daily Wise AI queries.',
-    dailyLimit: '₦4,000 / Day',
-    maxEarnings: 'Unlimited'
   }
 ];

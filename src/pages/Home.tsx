@@ -209,12 +209,8 @@ export default function Home() {
   }, [profile?.planEndDate, profile?.plan, isAdmin]);
 
   useEffect(() => {
-    if (isPlanExpired && isRenewalRequired) {
-      setShowRenewModal(true);
-    } else {
-      setShowRenewModal(false);
-    }
-  }, [isPlanExpired, isRenewalRequired]);
+    setShowRenewModal(false);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -414,13 +410,15 @@ export default function Home() {
                     </h2>
                     <p className="text-blue-400/80 text-[7.5px] sm:text-[9px] font-bold uppercase tracking-widest truncate">Available Naira Funds Secure</p>
                   </div>
-                  <div className="flex gap-1.5 sm:gap-2 shrink-0">
-                    <Link to="/deposit" className="w-8 h-8 sm:w-10 sm:h-10 bg-white/5 backdrop-blur-md hover:bg-white/10 border border-white/10 rounded-lg flex items-center justify-center transition-all active:scale-95 group/icon relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/20 to-transparent opacity-0 group-hover/icon:opacity-100 transition-opacity" />
-                      <Zap size={14} className="text-blue-400 group-hover/icon:scale-110 transition-transform drop-shadow" />
+                  <div className="flex gap-2 shrink-0">
+                    <Link to="/deposit" className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-xl flex items-center gap-1.5 transition-all active:scale-95 group/icon relative overflow-hidden text-emerald-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider shadow-sm">
+                      <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover/icon:opacity-100 transition-opacity" />
+                      <span className="text-sm">＋</span>
+                      <span>Deposit</span>
                     </Link>
-                    <Link to="/withdrawal" className="w-8 h-8 sm:w-10 sm:h-10 bg-linear-to-tr from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 rounded-lg flex items-center justify-center transition-all active:scale-95 shadow-[0_0_12px_rgba(37,99,235,0.3)]">
-                      <Wallet size={14} className="text-white drop-shadow" />
+                    <Link to="/withdrawal" className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center gap-1.5 transition-all active:scale-95 shadow-md text-white font-bold text-[10px] sm:text-xs uppercase tracking-wider">
+                      <span className="text-sm">↗</span>
+                      <span>Withdraw</span>
                     </Link>
                   </div>
                 </div>

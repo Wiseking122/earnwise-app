@@ -238,7 +238,7 @@ export default function Academy() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-300 text-[10px] font-mono uppercase tracking-widest font-black">
                 <Sparkles size={12} className="text-blue-400" />
-                <span>EarnWise Academic Affiliate Marketplace</span>
+                <span>EarnWise Affiliate Marketing Marketplace</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-black uppercase tracking-wider">
                 <Percent size={12} />

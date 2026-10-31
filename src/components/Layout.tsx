@@ -225,7 +225,7 @@ export default function Layout({ children, title, showBack }: LayoutProps) {
   const navItems = [
     { path: '/', label: 'Home', icon: Home, locked: isFree },
     { path: '/tasks', label: 'Tasks', icon: List, locked: isFree },
-    { path: '/academy', label: 'Academy', icon: BookOpen, locked: isFree },
+    { path: '/academy', label: 'Affiliate', icon: BookOpen, locked: isFree },
     { path: '/advertiser', label: 'Ads', icon: Megaphone, locked: false },
     { path: '/earnings', label: 'Wallet', icon: Wallet, locked: isFree },
   ];
