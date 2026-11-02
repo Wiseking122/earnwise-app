@@ -206,9 +206,10 @@ export default function FloatingAIAssistant() {
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 left-6 bg-blue-600 text-white p-4 rounded-full shadow-2xl z-[2000] hover:scale-110 transition-transform"
+        className="fixed bottom-20 sm:bottom-24 right-4 sm:right-6 bg-blue-600 text-white p-3 sm:p-3.5 rounded-full shadow-2xl z-[2000] hover:scale-110 active:scale-95 transition-transform"
+        aria-label="Open AI Assistant"
       >
-        <Bot size={24} />
+        <Bot size={20} />
       </button>
 
       <AnimatePresence>
@@ -217,9 +218,9 @@ export default function FloatingAIAssistant() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed bottom-40 left-6 w-80 h-[450px] bg-slate-900 border border-blue-500/30 rounded-3xl shadow-2xl z-[2001] flex flex-col overflow-hidden"
+            className="fixed bottom-24 sm:bottom-28 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-80 max-w-sm h-[430px] bg-slate-900 border border-blue-500/30 rounded-3xl shadow-2xl z-[2001] flex flex-col overflow-hidden"
           >
-            <div className="p-4 bg-slate-950 flex items-center justify-between border-b border-blue-500/20">
+            <div className="p-3.5 bg-slate-950 flex items-center justify-between border-b border-blue-500/20">
               <h3 className="text-white font-bold flex items-center gap-2"><Sparkles size={16} className="text-blue-400"/> EarnWise AI</h3>
               <button onClick={() => setIsOpen(false)}><X size={18} className="text-slate-400"/></button>
             </div>
